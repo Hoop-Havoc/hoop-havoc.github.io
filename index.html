@@ -242,7 +242,7 @@ kbd.b{box-shadow:inset 0 calc(var(--k)*-3.5) 0 var(--blue),0 calc(var(--k)*2) 0 
           <button type="button" data-d="legend" aria-pressed="false">Legend</button>
         </div>
       </div>
-      <div class="lvl" id="lvlStrip"><b id="lvlN">Level 1</b><span class="xpbar"><i id="lvlBar"></i></span><small id="lvlTxt">0 / 100 XP</small><button type="button" id="bVer" class="verbtn">v67 Updates</button></div>
+      <div class="lvl" id="lvlStrip"><b id="lvlN">Level 1</b><span class="xpbar"><i id="lvlBar"></i></span><small id="lvlTxt">0 / 100 XP</small><button type="button" id="bVer" class="verbtn">v68 Updates</button></div>
     </div>
     <aside class="howto" aria-label="How to play">
       <h2>How to play</h2>
@@ -527,6 +527,7 @@ let slowT = 0, hitstop = 0, flashA = 0;
 const cam = { x: W / 2, y: H / 2, z: 1, focus: null, t: 0 };
 const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function camFocus(p, t, z) { if (RM || attract) return; cam.focus = p; cam.t = t; cam.fz = z || 1.32; }
+let streetCv = null;
 let round = 0, time = 0, banner = null, shake = 0, crowdJump = 0, particles = [];
 let crowd = [], stars = [], skyline = [];
 const keys = {}; let touchL = false, touchR = false;
@@ -1732,7 +1733,8 @@ const CELEBS = ['HOLD IT', 'GOGGLES', 'SHIMMY', 'SKY POINT', 'FLEX', 'ICE COLD',
 // every court has its own green celebration
 const MAP_CELEB = { arena: 'MIC DROP', ice: 'AXEL', moon: 'FLAG PLANT', beach: 'SURF', roof: 'CAPE', bounce: 'FLIPS', snow: 'SNOWBALL', heavy: 'GROUND POUND', street: 'BOOMBOX', rain: 'UMBRELLA', ranch: 'LASSO', water: 'SWIM', lava: 'HUMAN TORCH', jungle: 'SNAKES', haunted: 'GHOST RIDE', egypt: 'THRONE', candy: 'LOLLIPOP', pirate: 'SPYGLASS', neon: 'RAGE QUIT', rome: 'LAUREL', sky: 'WINGS', castle: 'SWORD', disco: 'DISCO', cave: 'DIAMOND' };
 const CELEB_CALL = { 'MIC DROP': 'MIC DROP!', AXEL: 'TRIPLE AXEL!', 'FLAG PLANT': 'PLANTED IT!', SURF: "SURF'S UP!", CAPE: 'HERO MODE!', FLIPS: 'BACKFLIPS!', SNOWBALL: 'SNOWBALL!', 'GROUND POUND': 'GROUND POUND!', BOOMBOX: 'DROP THE BEAT!', UMBRELLA: 'RAIN OR SHINE!', LASSO: 'YEEHAW!', SWIM: 'MAKING WAVES!', 'HOT FEET': 'TOO HOT!', 'CHEST POUND': 'KING OF THE JUNGLE!', ZOMBIE: 'BRAINS!', PHARAOH: 'PHARAOH MODE!', THRONE: 'BOW DOWN!', 'GHOST RIDE': 'GHOST RIDE!', LOLLIPOP: 'SWEET!', SPYGLASS: 'LAND HO!', ROBOT: 'BEEP BOOP!', 'RAGE QUIT': 'RAGE QUIT!', LAUREL: 'VICTORY!', WINGS: 'TAKE FLIGHT!', SWORD: 'FOR THE KINGDOM!', DISCO: 'GROOVY!', PICKAXE: 'JACKPOT!', 'HUMAN TORCH': 'FLAME ON!', SNAKES: 'SNAKES! RUN!', DIAMOND: 'SHINE BRIGHT!' };
-function celebPose(p) {
+function celebPose(p) { const o = celebPoseMore(p); return o || celebPose0(p); }
+function celebPose0(p) {
   // phi/reach = shooting arm, phiB = other arm, lean = body
   const f = p.facing, k = p.celeb.kind, c = p.celeb, u = c.t;
   switch (k) {
@@ -1780,6 +1782,82 @@ function celebPose(p) {
     default:            return { phi: 3.0, reach: 1, phiB: 3.0, lean: 0 };   // JUMP SPIN
   }
 }
+function celebPoseMore(p) {
+  const c = p.celeb, u = c.t, f = p.facing;
+  switch (c.kind) {
+    case 'MIC DROP':   return u > 1.0 ? { phi: 2.95 + Math.sin(u * 7) * 0.08, reach: 1, phiB: 0.35, lean: -0.14 * f + Math.sin(u * 14) * 0.03 } : null;   // the strut, hand in the air
+    case 'AXEL':       return c.slide ? { phi: 1.6, reach: 1, phiB: 1.6, lean: -0.3 * f } : null;                                                        // arms wide, knee slide
+    case 'FLAG PLANT': return u > 1.1 ? { phi: 2.9 + Math.sin(u * 5) * 0.25, reach: 1, phiB: 2.4 - Math.sin(u * 5) * 0.25, lean: 0 } : null;             // moon hops, waving
+    case 'SNOWBALL':   return c.sm ? { phi: 1.25, reach: 1, phiB: 0.4, lean: -0.08 * f } : null;                                                         // ta-da: a snowman
+    case 'UMBRELLA':   return u > 0.8 && u < 3.4 ? { phi: 2.95, reach: 0.85, phiB: 0.4, lean: Math.sin(u * 2.5) * 0.12 } : null;                         // holding on as it floats
+    default: return null;
+  }
+}
+function celebMore(p, c, dt) {
+  const u = c.t, f = p.facing;
+  switch (c.kind) {
+    case 'MIC DROP':
+      if (u > 1.0) {   // the crowd erupts while they strut off
+        crowdJump = Math.max(crowdJump, 1);
+        if (!c.cannon) { c.cannon = true; for (const side of [0, W]) for (let i = 0; i < 40; i++) particles.push({ x: side, y: GROUND - 120, vx: (side ? -1 : 1) * rand(200, 520), vy: rand(-520, -220), c: pick(['#ffd34d', '#ff4f6d', '#ffffff', teams[p.team].color]), life: rand(1.6, 2.6), max: 2.6, g: 380, s: rand(3, 5.5) }); boom(0.15); }
+        if (p.grounded && u < 3.4) { p.vx = f * 85; if (Math.floor(u * 2.3) !== c.step) { c.step = Math.floor(u * 2.3); p.squash = Math.max(p.squash, 0.12); } }
+        if (Math.random() < dt * 14) spark(rand(30, W - 30), rand(260, 420), '#ffffff', 0, 0, true);   // camera flashes in the stands
+      }
+      break;
+    case 'AXEL':
+      if (c.landed && u > 1.25 && !c.slide) { c.slide = u; hiss(0.6, 0.06); }
+      if (c.slide && u - c.slide < 1.6) { p.vx = f * 260 * (1 - (u - c.slide) / 1.6); if (Math.random() < dt * 40) spark(p.F.x - f * 6, GROUND - 2, pick(['#ffffff', '#d6f0ff']), -f * rand(60, 200), -rand(40, 140), true); }
+      break;
+    case 'FLAG PLANT':
+      if (u > 1.1 && u < 3.4 && p.grounded && (c.mh || 0) < 3) { c.mh = (c.mh || 0) + 1; p.vy = -380; p.vx = f * 40; p.grounded = false; courtPuff(p.x, GROUND, 0.6, 5); tone(330 + c.mh * 80, 0.25, 'sine', 0.04, 1.4); }
+      break;
+    case 'SURF':
+      if (u < 3.3) { p.vx = f * 150 * Math.sin(Math.min(1, u / 3.3) * Math.PI); if (p.x > W - 60 || p.x < 60) p.facing = -f; }   // ride the wave across the court
+      break;
+    case 'SNOWBALL':
+      if (u > 1.25 && !c.sm) { c.sm = { x: clamp(p.x + f * 58, 40, W - 40), t0: u }; tone(523, 0.15, 'triangle', 0.04); }
+      if (c.sm && Math.random() < dt * 10) spark(c.sm.x + rand(-20, 20), GROUND - rand(10, 90), '#ffffff', 0, rand(-30, -5), true);
+      break;
+    case 'GROUND POUND':
+      if (c.st === 3 && !c.after && u - (c.ct || u) > 0.5) c.after = 1;
+      if (c.after && c.after < 3 && u - c.ct > 0.55 * c.after + 0.4) {   // aftershocks bounce everybody else
+        c.after++; shake = Math.max(shake, 10); tone(55, 0.4, 'sine', 0.12, 0.5); rings.push({ x: c.cx, y: GROUND, t: 0, c: '#ffc83d', big: 0.5 });
+        for (const q of players) if (q !== p && q.grounded) { q.vy = -300; q.grounded = false; }
+        courtPuff(c.cx, GROUND, 1.2, 8);
+      }
+      break;
+    case 'BOOMBOX':
+      if (p.grounded && Math.floor(u * 4) !== c.tr) { c.tr = Math.floor(u * 4); p.vx = (c.tr % 4 < 2 ? 1 : -1) * 70; }   // toprock side steps on the beat
+      break;
+    case 'UMBRELLA':
+      if (u > 0.8 && u < 3.4) { if (p.y > GROUND - 150) p.vy = Math.min(p.vy, -80); else p.vy = Math.sin(u * 3) * 25; p.vx = f * 45; p.grounded = false; }   // floats away like Mary Poppins
+      else if (u >= 3.4) p.vy = Math.min(p.vy, 110);
+      break;
+    case 'LASSO':
+      if (c.tg >= 0 && u > 2.3 && u < 3.3) { const q = players[c.tg]; if (q) { if (q.grounded && Math.floor(u * 3) !== c.yank) { c.yank = Math.floor(u * 3); q.vy = -220; q.grounded = false; tone(520, 0.12, 'triangle', 0.04); } q.vx += Math.sign(p.x - q.x) * 260 * dt; } }   // reel them in, hop by hop
+      if (p.grounded && u > 1.4 && u < 3.3 && Math.floor(u * 2) !== c.yh) { c.yh = Math.floor(u * 2); p.vy = -200; p.grounded = false; }
+      break;
+  }
+}
+function celebFxMore(p, layer, sc) {
+  const c = p.celeb; if (!c) return; const u = c.t;
+  if (c.kind === 'SNOWBALL' && c.sm && layer === 'under') {   // a snowman builds itself, ball by ball
+    const k = u - c.sm.t0, x = c.sm.x;
+    const ball = (i, r, y) => { const e = ease(clamp((k - i * 0.25) / 0.3, 0, 1)); if (e <= 0) return false; ctx.fillStyle = INKD; ctx.beginPath(); ctx.arc(x, y, r * e + 2.5, 0, 7); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, r * e, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(150,190,230,.35)'; ctx.beginPath(); ctx.arc(x + r * 0.3 * e, y + r * 0.2 * e, r * 0.75 * e, 0, 7); ctx.fill(); return e >= 1; };
+    ball(0, 22, GROUND - 22); ball(1, 16, GROUND - 56);
+    if (ball(2, 12, GROUND - 82)) {
+      ctx.fillStyle = INKD; ctx.beginPath(); ctx.arc(x - 4, GROUND - 85, 1.8, 0, 7); ctx.arc(x + 4, GROUND - 85, 1.8, 0, 7); ctx.fill();
+      ctx.fillStyle = '#ff8a3d'; ctx.beginPath(); ctx.moveTo(x, GROUND - 81); ctx.lineTo(x + p.facing * 12, GROUND - 79); ctx.lineTo(x, GROUND - 77); ctx.fill();
+      ctx.fillStyle = '#21162f'; ctx.fillRect(x - 11, GROUND - 96, 22, 4); ctx.fillRect(x - 7, GROUND - 110, 14, 15);   // top hat
+      ctx.fillStyle = '#e8483b'; ctx.fillRect(x - 7, GROUND - 99, 14, 3);
+      ctx.fillStyle = INKD; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(x, GROUND - 62 + i * 7, 1.8, 0, 7); ctx.fill(); }
+    }
+  }
+  if (c.kind === 'BOOMBOX' && layer === 'under') {   // bass rings off the speaker on every beat
+    const ph = (u * 4) % 1, a = 1 - ph; ctx.strokeStyle = `rgba(255,79,163,${0.5 * a})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(p.x, GROUND + 2, 20 + ph * 90, 5 + ph * 16, 0, 0, 7); ctx.stroke();
+    ctx.strokeStyle = `rgba(79,227,255,${0.35 * a})`; ctx.beginPath(); ctx.ellipse(p.x, GROUND + 2, 10 + ph * 60, 3 + ph * 10, 0, 0, 7); ctx.stroke();
+  }
+}
 function celebFly(p, c, u, t0, t1, amp, hgt) {
   // fly a figure-eight across the court between t0 and t1, then drift back down
   if (u < t0) return false;
@@ -1792,6 +1870,7 @@ function celebFly(p, c, u, t0, t1, amp, hgt) {
   p.vy = Math.min(p.vy, 150); return false;
 }
 function celebTick(p, c, dt) {
+  celebMore(p, c, dt);
   if (!c.conf && !attract) {   // every green celebration kicks off with a burst in the team's colors
     c.conf = true; const tcol = teams[p.team].color;
     for (let i = 0; i < 34; i++) particles.push({ x: p.Hd.x + rand(-10, 10), y: p.Hd.y, vx: rand(-220, 220), vy: rand(-420, -160), c: pick([tcol, '#ffffff', '#5dff7a', MUSTARD]), life: rand(1, 1.8), max: 1.8, g: 520, s: rand(2.5, 4.5) });
@@ -1817,7 +1896,7 @@ function celebTick(p, c, dt) {
       if (Math.random() < dt * 34) spark(p.F.x - f * 32 * p.scale, Math.min(GROUND, p.F.y) - 3, pick(['#ffffff', '#cfefff', '#7fd4ff']), -f * rand(40, 150), -rand(60, 190), true);
       break;
     case 'FLIPS':
-      if (p.grounded && (c.n || 0) < 2 && !(c.fl > 0)) {
+      if (p.grounded && (c.n || 0) < 3 && !(c.fl > 0)) {
         c.n = (c.n || 0) + 1; c.fl = 1; c.t0 = u; const vy0 = 640 * Math.sqrt(g / 1400); c.T = Math.min(0.8, 0.85 * 2 * vy0 / g);
         p.vy = -vy0; p.vx = 0; p.grounded = false; p.y = GROUND - 1; tone(330 + c.n * 110, 0.14, 'triangle', 0.05, 1.6);
       }
@@ -2003,6 +2082,7 @@ function celebTick(p, c, dt) {
 function star(x, y, r) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const r2 = i % 2 ? r * 0.45 : r, a = i * Math.PI / 5 - Math.PI / 2; ctx.lineTo(x + Math.cos(a) * r2, y + Math.sin(a) * r2); } ctx.closePath(); ctx.fill(); }
 function noteGlyph(x, y, s) { ctx.beginPath(); ctx.ellipse(x, y, 3.4 * s, 2.5 * s, -0.4, 0, 7); ctx.fill(); ctx.fillRect(x + 2.4 * s, y - 11 * s, 1.4 * s, 11 * s); ctx.beginPath(); ctx.moveTo(x + 3.8 * s, y - 11 * s); ctx.quadraticCurveTo(x + 8 * s, y - 8 * s, x + 6.5 * s, y - 4.5 * s); ctx.lineTo(x + 3.8 * s, y - 7.5 * s); ctx.fill(); }
 function celebFx(p, layer, sc, neck, ux, uy, fwx, fwy) {
+  celebFxMore(p, layer, sc);
   if (layer === 'under' && p.celeb && !attract) {   // a spotlight follows the shooter
     const k = clamp(p.celeb.t / 0.3, 0, 1) * clamp((4 - p.celeb.t) / 0.5, 0, 1);
     if (k > 0) { const pg = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,240,200,${0.16 * k})`; ctx.beginPath(); ctx.ellipse(p.x, GROUND + 2, 46, 9, 0, 0, 7); ctx.fill();
@@ -3456,22 +3536,25 @@ function drawBackground() {
     for (let k = 0; k < 7; k++) { ctx.beginPath(); ctx.ellipse(0, 0, 14, 9, k * 0.45, 0, 7); ctx.stroke(); }
     ctx.restore();
   } else if (d === 'street') {
+    if (!streetCv) { streetCv = document.createElement('canvas'); streetCv.width = W * 1.5; streetCv.height = H * 1.5; const sg = streetCv.getContext('2d'); sg.setTransform(1.5, 0, 0, 1.5, 0, 0);
     // brick wall with spray paint, chain-link fence, street lamps
-    ctx.fillStyle = '#4a2a26'; ctx.fillRect(0, GROUND - 210, W, 210);
-    ctx.fillStyle = 'rgba(0,0,0,.25)';
-    ctx.beginPath(); for (let y = GROUND - 210; y < GROUND; y += 14) for (let x = ((y / 14) % 2) * 22; x < W; x += 44) { ctx.rect(x, y, 42, 1.5); ctx.rect(x, y, 1.5, 14); } ctx.fill();   // mortar lines in one go
-    ctx.save(); ctx.translate(300, GROUND - 130); ctx.rotate(-0.08); ctx.font = `58px ${HYPE}`; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
-    ctx.lineWidth = 9; ctx.strokeStyle = '#16171f'; ctx.strokeText('Hoop', 0, 0); ctx.fillStyle = '#ff4fa3'; ctx.fillText('Hoop', 0, 0);
-    ctx.translate(230, 30); ctx.rotate(0.12); ctx.strokeText('Havoc', 0, 0); ctx.fillStyle = '#4fe3ff'; ctx.fillText('Havoc', 0, 0); ctx.restore(); ctx.lineJoin = 'miter';
-    ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(760, GROUND - 120, 26, 0, 7); ctx.fill(); ctx.fillStyle = '#16171f'; ctx.beginPath(); ctx.arc(752, GROUND - 126, 4, 0, 7); ctx.arc(768, GROUND - 126, 4, 0, 7); ctx.fill();
-    ctx.strokeStyle = 'rgba(200,210,220,.22)'; ctx.lineWidth = 1;
-    ctx.beginPath(); for (let x = -300; x < W; x += 16) { ctx.moveTo(x, GROUND - 280); ctx.lineTo(x + 280, GROUND); ctx.moveTo(x + 280, GROUND - 280); ctx.lineTo(x, GROUND); } ctx.stroke();   // the whole fence in one stroke
+    sg.fillStyle = '#4a2a26'; sg.fillRect(0, GROUND - 210, W, 210);
+    sg.fillStyle = 'rgba(0,0,0,.25)';
+    sg.beginPath(); for (let y = GROUND - 210; y < GROUND; y += 14) for (let x = ((y / 14) % 2) * 22; x < W; x += 44) { sg.rect(x, y, 42, 1.5); sg.rect(x, y, 1.5, 14); } sg.fill();   // mortar lines in one go
+    sg.save(); sg.translate(300, GROUND - 130); sg.rotate(-0.08); sg.font = `58px ${HYPE}`; sg.textAlign = 'center'; sg.lineJoin = 'round';
+    sg.lineWidth = 9; sg.strokeStyle = '#16171f'; sg.strokeText('Hoop', 0, 0); sg.fillStyle = '#ff4fa3'; sg.fillText('Hoop', 0, 0);
+    sg.translate(230, 30); sg.rotate(0.12); sg.strokeText('Havoc', 0, 0); sg.fillStyle = '#4fe3ff'; sg.fillText('Havoc', 0, 0); sg.restore(); sg.lineJoin = 'miter';
+    sg.fillStyle = '#ffd34d'; sg.beginPath(); sg.arc(760, GROUND - 120, 26, 0, 7); sg.fill(); sg.fillStyle = '#16171f'; sg.beginPath(); sg.arc(752, GROUND - 126, 4, 0, 7); sg.arc(768, GROUND - 126, 4, 0, 7); sg.fill();
+    sg.strokeStyle = 'rgba(200,210,220,.22)'; sg.lineWidth = 1;
+    sg.beginPath(); for (let x = -300; x < W; x += 16) { sg.moveTo(x, GROUND - 280); sg.lineTo(x + 280, GROUND); sg.moveTo(x + 280, GROUND - 280); sg.lineTo(x, GROUND); } sg.stroke();   // the whole fence in one stroke
     for (const lx of [160, 800]) {
-      ctx.strokeStyle = '#2a2d36'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(lx, GROUND); ctx.lineTo(lx, 70); ctx.lineTo(lx + 40, 70); ctx.stroke();
-      const g = ctx.createLinearGradient(0, 74, 0, GROUND); g.addColorStop(0, 'rgba(255,220,140,.32)'); g.addColorStop(1, 'rgba(255,220,140,0)');
-      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(lx + 30, 74); ctx.lineTo(lx + 50, 74); ctx.lineTo(lx + 140, GROUND); ctx.lineTo(lx - 60, GROUND); ctx.fill();
-      ctx.fillStyle = '#ffe9a8'; ctx.fillRect(lx + 30, 70, 20, 5);
+      sg.strokeStyle = '#2a2d36'; sg.lineWidth = 6; sg.beginPath(); sg.moveTo(lx, GROUND); sg.lineTo(lx, 70); sg.lineTo(lx + 40, 70); sg.stroke();
+      const g = sg.createLinearGradient(0, 74, 0, GROUND); g.addColorStop(0, 'rgba(255,220,140,.32)'); g.addColorStop(1, 'rgba(255,220,140,0)');
+      sg.fillStyle = g; sg.beginPath(); sg.moveTo(lx + 30, 74); sg.lineTo(lx + 50, 74); sg.lineTo(lx + 140, GROUND); sg.lineTo(lx - 60, GROUND); sg.fill();
+      sg.fillStyle = '#ffe9a8'; sg.fillRect(lx + 30, 70, 20, 5);
     }
+    }
+    ctx.drawImage(streetCv, 0, 0, W, H);
   } else if (d === 'rain') {
     ctx.fillStyle = '#2f3c35';
     for (let x = -30; x < W; x += 95) { const h = 120 + (x * 13 % 70); ctx.fillRect(x + 40, GROUND - h * 0.45, 9, h * 0.45); ctx.beginPath(); ctx.arc(x + 44, GROUND - h * 0.5, 42 + (x % 3) * 6, 0, 7); ctx.fill(); }
@@ -6566,8 +6649,9 @@ function newCup() {
   tourney = { round: 0, me };
 }
 // ---- update log ----
-const GAME_VERSION = 67;
+const GAME_VERSION = 68;
 const UPDATES = [
+  [68, 'Celebrations Second Act', ['Arena: confetti cannons and the crowd erupts while you strut off.', 'Ice: a knee slide across the rink. Moon: floaty moon hops.', 'Beach: surf across the court. Bounce House: three flips.', 'Snow: a snowman builds itself. Heavy: aftershocks bounce everyone.', 'Street: toprock steps and bass rings. Rain: float away on your umbrella. Ranch: reel your lasso catch in.', 'Street Court draws faster.']],
   [67, 'Refine Pass', ['Street Court and the arena crowds run faster.', 'Announcer subtitles move up top on touch screens so they never cover the buttons.', 'Trophy pop-ups no longer cover the game-over screen.', 'The menu says Random Teams when random matchups are on.', 'A Morning Fall Corp credit in Settings.']],
   [66, 'Smooth Motion', ['Slow motion and dunks no longer stutter: the game moves every frame, even on slower computers.', 'Replays are smoother too.']],
   [65, 'New Logo', ['An HH logo, blue over red, for the website tab and home screen.']],
