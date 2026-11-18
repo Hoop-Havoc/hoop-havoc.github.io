@@ -1925,12 +1925,22 @@ function statLine(m) { return [plural(m.pts, 'Pt'), plural(m.dunks, 'Dunk'), plu
 const EMOTE = { highfive: ['!', '#ffd34d'], chestbump: ['!!', '#ffd34d'], point: ['Yes!', '#5dff7a'], flex: ['★', '#ffd34d'], facepalm: ['...', '#cdbbdb'], kneel: ['...', '#cdbbdb'],
   shrug: ['?', '#bfe6ff'], headshake: ['No', '#ff7a7a'], turnaway: ['><', '#ff7a7a'], argue: ['#!', '#ff4f6d'], kick: ['#', '#ff4f6d'], headgrab: ['!?', '#ff9d3d'], wag: ['Nope', '#ff4f6d'], dance: ['♪', '#ff6fd8'] };
 const LINES = {
-  highfive: ['Up top!', 'Yeah!', "Let's go!", 'Too easy!'], chestbump: ["Let's gooo!", 'Boom!', 'Yeah!!'], point: ["That's my guy!", 'Yes sir!', 'Called it!', "He's cooking!"],
-  flex: ['Mine now!', 'Too quick!', 'Thank you!', 'Yoink!'], facepalm: ['Ugh...', 'Seriously?', 'Not again...', 'Oof.'], kneel: ['Ugh...', "I'm tired...", 'Oof.', '*huff*'],
-  shrug: ['Lucky shot.', 'Whatever.', 'Fluke!', 'Eh.'], headshake: ['Nope.', 'No way!', 'Come on!', 'Really?'], turnaway: ["Can't watch!", 'Nooo!', 'Too much!'],
-  argue: ['That was a foul!', 'Ref!!', 'He traveled!', 'No way!'], kick: ['Argh!', 'Grr!', 'Come ON!'], headgrab: ['My bad!', 'Oops!', 'What was that?!', 'Yikes!'],
-  wag: ['Not today!', 'Nope!', 'Get that outta here!', 'Denied!'], dance: ['Winners!', 'Too easy!', "Let's go!", 'GG!'],
-  clap: Object.assign(["Let's go!", 'Lock in!', 'D up!', 'Ball!'], { chance: 0.45 }), bounce: Object.assign(['Ready!', "I'm warm!"], { chance: 0.35 }),
+  highfive: ['Up top!', 'Yeah!', "Let's go!", 'Too easy!', 'Gimme five!', 'Money!', 'What a shot!', "That's how we do it!"],
+  chestbump: ["Let's gooo!", 'Boom!', 'Yeah!!', 'BANG!', 'Big time!', "Can't stop us!"],
+  point: ["That's my guy!", 'Yes sir!', 'Called it!', "He's cooking!", 'Told you!', 'Splash!', 'MVP!', 'Bucket!'],
+  flex: ['Mine now!', 'Too quick!', 'Thank you!', 'Yoink!', 'Pickpocket!', 'Too slow!', 'My ball!', 'Gotcha!'],
+  facepalm: ['Ugh...', 'Seriously?', 'Not again...', 'Oof.', 'Why me...', 'Come on, man.', 'That hurt.', 'Wow...'],
+  kneel: ['Ugh...', "I'm tired...", 'Oof.', '*huff*', 'Need water...', 'Long game...', 'Timeout?', '*pant pant*'],
+  shrug: ['Lucky shot.', 'Whatever.', 'Fluke!', 'Eh.', 'He got lucky.', 'Do it again.', 'Bank was open?', "Won't happen again."],
+  headshake: ['Nope.', 'No way!', 'Come on!', 'Really?', 'Not happening.', 'Unreal.', 'Shake it off.', 'Next play.'],
+  turnaway: ["Can't watch!", 'Nooo!', 'Too much!', 'Make it stop!', "I didn't see that!", 'Oh no...'],
+  argue: ['That was a foul!', 'Ref!!', 'He traveled!', 'No way!', 'Goaltend!', 'He pushed me!', 'Are you blind?!', 'Call it both ways!'],
+  kick: ['Argh!', 'Grr!', 'Come ON!', 'Ugh!!', 'So close!', 'Rrrgh!'],
+  headgrab: ['My bad!', 'Oops!', 'What was that?!', 'Yikes!', 'Brick!', 'Hand slipped!', 'Not my best...', "Don't replay that!"],
+  wag: ['Not today!', 'Nope!', 'Get that outta here!', 'Denied!', 'Not in my house!', 'Try again!', 'Rejected!', 'Wrong rim!'],
+  dance: ['Winners!', 'Too easy!', "Let's go!", 'GG!', 'Champions!', 'Run it back?', 'Undefeated!', 'Easy work!'],
+  clap: Object.assign(["Let's go!", 'Lock in!', 'D up!', 'Ball!', 'Focus up!', 'This is ours!', 'Defense!', 'Get stops!'], { chance: 0.55 }),
+  bounce: Object.assign(['Ready!', "I'm warm!", 'Bring it!', "Let's dance!"], { chance: 0.45 }),
 };
 const GOOD = new Set(['highfive', 'chestbump', 'point', 'flex', 'wag', 'dance', 'clap', 'bounce']);
 function drawEmotes() {
@@ -6816,8 +6826,9 @@ function newCup() {
   tourney = { round: 0, me };
 }
 // ---- update log ----
-const GAME_VERSION = 72;
+const GAME_VERSION = 73;
 const UPDATES = [
+  [73, 'Twice The Trash Talk', ['Every reaction has twice as many lines, from "Gimme five!" and "Pickpocket!" to "Are you blind?!" and "Don\u2019t replay that!".', 'More warm-up chatter before each point.']],
   [72, 'Better Speech Bubbles', ['Players say real lines: "Up top!", "That was a foul!", "Lucky shot.", "Not today!", "My bad!" and lots more.', 'Comic-style bubbles in each team\u2019s color with a tail pointing at the speaker.', 'Bubbles stack instead of overlapping, and warm-up chatter like "Lock in!" during the intro.']],
   [71, 'Style And Auto CPU', ['A new Style tab in the Locker: ball trails (Sparkle, Fire, Rainbow, Stardust, Bubbles, Lightning, Love, Gold Rush) and headbands, unlocked as you level up.', 'Auto CPU difficulty: it eases off when it\u2019s ahead and gets sharper when it\u2019s behind, so games stay close.']],
   [70, 'Polish', ['Speech bubbles over reacting players, like Yes!, No, Nope and question marks, so you can read every moment.', 'Announcer subtitles sit below the players on computers.', 'Trophy pop-ups always appear in the top-right corner.', 'Stat lines say 1 Pt instead of 1 Pts.']],
