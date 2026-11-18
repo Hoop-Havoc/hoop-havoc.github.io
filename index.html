@@ -278,6 +278,7 @@ kbd.b{box-shadow:inset 0 calc(var(--k)*-3.5) 0 var(--blue),0 calc(var(--k)*2) 0 
       <p id="pauseHint">Press <kbd>P</kbd> or <kbd>Esc</kbd> to keep playing.</p>
       <div class="row">
         <button class="btn red" id="bResume" type="button"><b>Resume</b></button>
+        <button class="btn alt" id="bRestart" type="button"><b>Restart</b></button>
         <button class="btn alt" id="bQuit" type="button"><b>Quit to menu</b></button>
       </div>
       <div class="toggles">
@@ -339,7 +340,9 @@ const ACH = [
   ['sig', 'Local Legend', "Land a court's signature dunk"], ['dunks15', 'Dunk Encyclopedia', 'Land 15 different dunks'], ['comeback', 'Never Say Die', 'Come back from 6 down'],
   ['airball', 'Brick City', 'Shoot an airball'], ['win', 'First W', 'Beat the CPU'], ['pro', 'Pro Status', 'Beat the Pro CPU'],
   ['legend', 'Legendary', 'Beat the Legend CPU'], ['blowout', 'Blowout', 'Win by 10 or more'], ['champ', 'Champion', 'Win the tournament'],
-  ['maps', 'World Tour', 'Play on 12 different courts'], ['games10', 'Gym Rat', 'Play 10 games'], ['lvl5', 'Rising Star', 'Reach level 5'],
+  ['maps', 'World Tour', 'Play on 12 different courts'], ['cup100', 'Marathon', 'Win a First To 100 game against the CPU'], ['dunk100', 'Dunk Contest Star', 'Score 100 or more in the Dunk Contest'],
+  ['three20', 'Sniper', 'Score 20 or more in the 3-Point Shootout'], ['daily3', 'Daily Grinder', 'Finish the Daily Challenge 3 days in a row'], ['hype', 'Hype Machine', 'Set off Hype Time'],
+  ['chaos', 'Chaos Survivor', 'Score during a chaos round'], ['greens10', 'Green Machine', 'Hit 10 greens in your career'], ['lvl10', 'All-Star', 'Reach level 10'], ['games10', 'Gym Rat', 'Play 10 games'], ['lvl5', 'Rising Star', 'Reach level 5'],
 ];
 const SAY = { 'ON FIRE!': "He's on fire!", 'AIRBALL!': 'Airball!', 'STEAL!': 'Stolen!', 'GET THAT OUTTA HERE!': 'Get that outta here!', 'REJECTED!': 'Rejected!',
   'NOT IN MY HOUSE!': 'Not in my house!', 'SWATTED!': 'Swatted!', 'COMEBACK!': 'What a comeback!', 'LEAD CHANGE!': 'Lead change!', 'ALL TIED UP!': 'All tied up!',
@@ -1607,6 +1610,7 @@ function tipIn(p, hp, reach) {
 }
 function catchBallCore(p) {
   ball.airChk = false; ball.shotIdx = -1;
+  if (state === 'play' && ball.thrower && ball.thrower !== p && ball.thrower.team === p.team && !ball.shot && Math.random() < 0.22) quip(p, ['Got it!', 'Mine!', 'Thanks!', 'Good look!'], true, 1);
   if (Math.hypot(ball.vx - p.vx, ball.vy - p.vy) > 320) { p.catchT = 0.18; rings.push({ x: ball.x, y: ball.y, t: 0, c: '#ffffff', big: 0.1 }); }
   ball.protectUntil = time + (time - (ball.stolenAt || -9) < 1.5 ? 1.1 : 0.45);   // fresh possession, especially off a steal, gets a moment to breathe
   tutEv('catch');
@@ -1943,6 +1947,7 @@ const LINES = {
   bounce: Object.assign(['Ready!', "I'm warm!", 'Bring it!', "Let's dance!"], { chance: 0.45 }),
 };
 const GOOD = new Set(['highfive', 'chestbump', 'point', 'flex', 'wag', 'dance', 'clap', 'bounce']);
+function quip(p, lines, good, dur = 1.3) { if (!p || attract || p.celeb || (p.react && p.react.say && p.react.t < 0.8)) return; react(p, 'quip', dur, { say: pick(lines), good }); }
 function drawEmotes() {
   // comic speech bubbles: white with a team-coloured outline, a tail pointing at the speaker, and they never stack on top of each other
   if (attract || state === 'replay') return;
@@ -1950,12 +1955,12 @@ function drawEmotes() {
   ctx.font = `700 13px ${TEXT}`;
   const placed = [];
   for (const p of list) {
-    const r = p.react, a = clamp(Math.min(r.t / 0.1, (r.dur - r.t) / 0.25, 1), 0, 1); if (a <= 0) continue;
+    const r = p.react, a = clamp(Math.min(r.t / 0.1, (r.dur - r.t) / 0.25, 1), 0, 1); if (a <= 0) continue; const good = GOOD.has(r.kind) || r.good;
     const txt = r.say, w = ctx.measureText(txt).width + 18, h = 24, hx = p.Hd.x, hy = p.Hd.y - 30 * p.scale;
     let x = clamp(hx, w / 2 + 6, W - w / 2 - 6), y = hy - 26;
     for (const q of placed) if (Math.abs(q.x - x) < (q.w + w) / 2 + 4 && Math.abs(q.y - y) < h + 4) y = q.y - h - 6;   // stack instead of overlapping
     placed.push({ x, y, w });
-    const pop = r.t < 0.22 ? 1 + Math.sin(r.t / 0.22 * Math.PI) * 0.28 : 1, tilt = (GOOD.has(r.kind) ? -1 : 1) * 0.04 + Math.sin(r.t * 4 + p.wob) * 0.02;
+    const pop = r.t < 0.22 ? 1 + Math.sin(r.t / 0.22 * Math.PI) * 0.28 : 1, tilt = (good ? -1 : 1) * 0.04 + Math.sin(r.t * 4 + p.wob) * 0.02;
     const edge = teams[p.team].color;
     ctx.save(); ctx.globalAlpha = a; ctx.translate(x, y); ctx.rotate(tilt); ctx.scale(pop, pop);
     // tail toward the speaker's head
@@ -1965,7 +1970,7 @@ function drawEmotes() {
     ctx.beginPath(); ctx.moveTo(tx - 7, h / 2); ctx.lineTo(tx + (hx - x) * 0.15, h / 2 + 12); ctx.lineTo(tx + 6, h / 2); ctx.fill();
     ctx.fillStyle = '#ffffff'; rr(-w / 2, -h / 2, w, h, 9); ctx.fill();
     ctx.beginPath(); ctx.moveTo(tx - 4.5, h / 2 - 1); ctx.lineTo(tx + (hx - x) * 0.15, h / 2 + 7.5); ctx.lineTo(tx + 3.5, h / 2 - 1); ctx.fill();
-    ctx.fillStyle = GOOD.has(r.kind) ? INK : '#5a2140'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 0, 1);
+    ctx.fillStyle = good ? INK : '#5a2140'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 0, 1);
     ctx.restore();
   }
   ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
@@ -2135,7 +2140,7 @@ function celebTick(p, c, dt) {
         if (q && q !== p) {   // bonk: down they go, seeing stars
           const dir = Math.sign(q.x - p.x) || 1;
           q.down = 1.8; q.downCD = 2.4; q.dizzy = Math.max(q.dizzy || 0, 2.2); q.w += dir * 5; q.vx += dir * 120; q.mood = 'sad'; q.moodT = 2;
-          pop('STUNNED!', q.Hd.x, q.Hd.y - 60, '#00f0ff');
+          pop('STUNNED!', q.Hd.x, q.Hd.y - 60, '#00f0ff'); quip(q, ['@_@', 'Lag!', 'Not fair!', 'Ow, my head!'], false, 1.8);
         }
         tone(180, 0.18, 'square', 0.07, 0.5); tone(90, 0.3, 'sine', 0.1, 0.6); shake = Math.max(shake, 8);
       }
@@ -2577,6 +2582,7 @@ function leanTarget(p) {
 function flatMax(p) { return Math.min(1.56, Math.acos(clamp(p.headR * 0.8 / p.L, 0, 0.99))); }   // lying flat, head resting on the floor
 function standMax(p) { return Math.min(1.45, Math.acos(clamp((p.headR + 3) / p.L, 0, 0.99)) - 0.04); }
 function posterVictim(v, dunker) {
+  setTimeout(() => quip(v, ['Ow!', 'Not on me!', 'Poster boy...', 'I felt that.', 'Why me?!'], false, 1.8), 200);
   v.dizzy = 2.6; { const hp = hoops[dunker.team], s = Math.sign(hp.boardX - W / 2); for (let i = 0; i < 7; i++) fxBulbs.push({ x: hp.boardX - s * rand(-30, 170), y: hp.rimY + rand(-60, 90), t: -rand(0, 0.5) }); }
   // dunked on: you hit the floor, see stars, and get back up a few seconds later. Frozen? you shatter.
   const dir = Math.sign(v.x - dunker.x) || 1;
@@ -3303,7 +3309,7 @@ function scored(ti, hp) {
   let pts = 1, txt = pick(['BUCKET!', 'COUNT IT!', 'CASH!', 'MONEY!']), sub = '', deep = false;
   const tags = [], sh = ball.shotTeam, add = x => { sub = sub ? `${sub} · ${x}` : x; tags.push(x); };
   if (hp.swish > 0.3 && !ball.dunk && !ball.oop) txt = 'NOTHING BUT NET!';
-  if (sh !== -1 && sh !== ti) { txt = 'OWN GOAL'; sub = 'Wrong hoop!'; }
+  if (sh !== -1 && sh !== ti) { txt = 'OWN GOAL'; sub = 'Wrong hoop!'; if (ball.thrower) setTimeout(() => quip(ball.thrower, ['Wrong hoop!!', 'Oops...', 'That counts?!', 'Not again...'], false, 1.6), 50); }
   else if (ball.oop) { oopStats.scores++; pts = 1; txt = ball.oopSelf ? 'SELF-OOP!' : 'ALLEY-OOP!'; if (ball.dunkName) add(ball.dunkName); }
   else if (ball.dunk) { pts = 2; txt = (ball.dunkName || 'SLAM DUNK') + '!'; }
   else if (Math.abs(ball.shotX - hp.boardX) > DEEP) { pts = 2; txt = 'FROM DOWNTOWN!'; deep = true; }
@@ -3358,7 +3364,7 @@ function scored(ti, hp) {
   O.onFire = false; O.streak = 0; T.streak++; T.stats.best = Math.max(T.stats.best, T.streak);
   if (real) { if (ball.green) T.stats.greens++; T.stats.baskets++; if (ball.oop) T.stats.oops++; else if (ball.dunk) T.stats.dunks++; else if (deep) T.stats.deep++; }
   if (T.onFire && sh === ti && ball.fire && --T.fireLeft <= 0) { T.onFire = false; T.streak = 0; pop('COOLED OFF', W / 2, 160, '#7fd4ff'); }
-  if (T.streak >= 3 && !T.onFire) { T.onFire = true; T.fireLeft = 3; pop('ON FIRE!', hp.cx, hp.rimY - 70, '#ff4f6d'); roar(1.4, 0.12); }
+  if (T.streak >= 3 && !T.onFire) { T.onFire = true; T.fireLeft = 3; if (scorer && scorer.team === ti) setTimeout(() => quip(scorer, ["I'm on fire!", "Can't miss!", 'Too hot!', 'Feeling it!'], true, 1.6), 400); pop('ON FIRE!', hp.cx, hp.rimY - 70, '#ff4f6d'); roar(1.4, 0.12); }
   for (const p of players) p.mood = p.team === ti ? 'happy' : 'sad';
   teams.forEach((tm, i) => { const c = clutch(i); if (c && !tm.clutchOn && !attract) pop(`${tm.name.toUpperCase()}: CLUTCH MODE · BIGGER GREENS`, W / 2, 185, '#5dff7a'); tm.clutchOn = c; });
   const scorer = ball.oop || ball.dunk ? players.find(p => p.team === ti && (p.hang > 0 || p === ball.thrower)) : ball.thrower;
@@ -3389,6 +3395,7 @@ function scored(ti, hp) {
     }
   }
   if (sh === ti && ball.green && hasWon(ti) && greenBurst && !attract) { winnerGreen(hp); if (banner) { banner.txt = 'GAME WINNER!'; banner.big = true; banner.tags = ['GREEN RELEASE', ...banner.tags.filter(x => x !== 'GAME WINNER' && x !== 'GREEN RELEASE')].slice(0, 3); } }
+  if (sh === ti && humanTeam(ti) && chaos) unlock('chaos');
   if (sh === ti && humanTeam(ti)) {
     if (ball.shatter) unlock('shatter'); if (ball.poster) unlock('poster'); if (goldenRound) unlock('golden');
     if (ball.dunk && ball.dunkName) { if (Object.values(MAP_DUNK).some(d => d.name === ball.dunkName)) unlock('sig'); if (!SV.dunks.includes(ball.dunkName)) { SV.dunks.push(ball.dunkName); persist(); if (SV.dunks.length >= 15) unlock('dunks15'); } }
@@ -3418,7 +3425,7 @@ function updatePowers(dt) {
   for (const p of players) {
     if (Math.hypot(p.hand.x - orb.x, p.hand.y - oy) < 26 || Math.hypot(p.Hd.x - orb.x, p.Hd.y - oy) < 18 + p.headR) {
       const t = teams[p.team];
-      if (orb.id === 'FREEZE') { teams[1 - p.team].frozen = 2.6; if (ball.holder && ball.holder.team === 1 - p.team) knockLoose(null); }
+      if (orb.id === 'FREEZE') { teams[1 - p.team].frozen = 2.6; for (const q of players) if (q.team !== p.team && Math.random() < 0.5) quip(q, ['Brrr!', 'So cold!', "Can't move!", 'Frozen!'], false, 1.4); if (ball.holder && ball.holder.team === 1 - p.team) knockLoose(null); }
       else t.power = { id: orb.id, t: 9, c: orb.c };
       for (let i = 0; i < 24; i++) spark(orb.x, oy, orb.c, rand(-220, 220), rand(-220, 220), true);
       tone(880, 0.18, 'triangle', 0.06, 1.5);
@@ -6353,6 +6360,11 @@ $('bPause').addEventListener('click', togglePause);
 $('bMute').addEventListener('click', toggleMute);
 $('bResume').addEventListener('click', togglePause);
 $('bQuit').addEventListener('click', toMenu);
+$('bRestart').addEventListener('click', () => {
+  if (contest) startContest(contest.kind); else if (daily) startGame(1, 11, 'daily');
+  else if (tourney) { const o = TOURNEY[Math.min(3, tourney.round)]; startGame(1, o.to, true); if (tourney.me) Object.assign(teams[0], tourney.me); }
+  else if (tutorial()) startGame(4); else startGame(mode, WIN);
+});
 $('bAgain').addEventListener('click', () => again());   // a rematch keeps the same target (21 or 100)
 $('bMenu').addEventListener('click', toMenu);
 document.querySelectorAll('.seg button[data-d]').forEach(b => b.addEventListener('click', () => {
@@ -6559,6 +6571,7 @@ function unlock(id) {
 function lvlInfo(xp = SV.xp) { let L = 1, need = 100; while (xp >= need) { xp -= need; L++; need = 100 + 60 * (L - 1); } return { L, cur: xp, need }; }
 function gainXP(n) {
   const b = lvlInfo().L; SV.xp += n; persist(); const a = lvlInfo().L;
+  if (a >= 10) unlock('lvl10');
   if (a > b) { const col = TEAM_COLORS.find(c => c[2] === a); toast(`Level ${a}!`, col ? `${col[3]} jerseys unlocked in the Locker.` : 'Keep hooping.'); if (a >= 5) unlock('lvl5'); }
   syncLevel();
 }
@@ -6688,6 +6701,8 @@ function afterGame(w) {
     if (mode === 1) { carAdd('cpuGames'); if (w === 0) { carAdd('wins'); SV.car.ws = car('ws') + 1; SV.car.bestWs = Math.max(car('bestWs'), SV.car.ws); } else SV.car.ws = 0; }
     xp = 40 + (w === 0 || mode === 2 ? 50 : 0) + S.baskets * 4 + (S.dunks + S.oops) * 4 + S.greens * 6 + S.blocks * 5 + S.steals * 4 + (WIN >= 100 ? 120 : 0) + (tourney && tourney.round >= 4 && w === 0 ? 250 : 0);
     if (car('games') >= 10) unlock('games10');
+    if (car('greens') >= 10) unlock('greens10');
+    if (mode === 1 && w === 0 && WIN >= 100) unlock('cup100');
     const d = tourney ? TOURNEY[Math.max(0, tourney.round - (w === 0 ? 1 : 0))].diff : diff;
     if (mode === 1 && w === 0) { unlock('win'); if (d !== 'rookie') unlock('pro'); if (d === 'legend') unlock('legend'); }
     if (humanTeam(w) && margin >= 10) unlock('blowout');
@@ -6697,7 +6712,7 @@ function afterGame(w) {
     const ok = w === 0 && daily.goal[2](teams[0].stats, margin, teams[1]); lbl.textContent = 'Try Again';
     if (ok) {
       SV.daily.done = SV.daily.done || {};
-      if (!SV.daily.done[daily.key]) { SV.daily.done[daily.key] = 1; const y = dayKey(new Date(Date.now() - 864e5)); SV.daily.streak = SV.daily.last === y ? (SV.daily.streak || 0) + 1 : 1; SV.daily.last = daily.key; xp += 150; toast('Daily Challenge Complete!', `${SV.daily.streak} day streak. +150 XP`); persist(); }
+      if (!SV.daily.done[daily.key]) { SV.daily.done[daily.key] = 1; const y = dayKey(new Date(Date.now() - 864e5)); SV.daily.streak = SV.daily.last === y ? (SV.daily.streak || 0) + 1 : 1; SV.daily.last = daily.key; xp += 150; if (SV.daily.streak >= 3) unlock('daily3'); toast('Daily Challenge Complete!', `${SV.daily.streak} day streak. +150 XP`); persist(); }
       $('overSub').textContent = 'Daily Challenge Complete! Come Back Tomorrow.';
     } else $('overSub').textContent = `Daily Goal Missed: ${daily.goal[1]}.`;
   }
@@ -6826,8 +6841,9 @@ function newCup() {
   tourney = { round: 0, me };
 }
 // ---- update log ----
-const GAME_VERSION = 73;
+const GAME_VERSION = 74;
 const UPDATES = [
+  [74, 'More Moments', ['Players talk at more moments: calling for the ball when open, catching passes, catching fire, own goals, getting posterized, frozen or stunned.', 'A Restart button on the pause screen.', '8 new trophies: Marathon, Dunk Contest Star, Sniper, Daily Grinder, Hype Machine, Chaos Survivor, Green Machine and All-Star.']],
   [73, 'Twice The Trash Talk', ['Every reaction has twice as many lines, from "Gimme five!" and "Pickpocket!" to "Are you blind?!" and "Don\u2019t replay that!".', 'More warm-up chatter before each point.']],
   [72, 'Better Speech Bubbles', ['Players say real lines: "Up top!", "That was a foul!", "Lucky shot.", "Not today!", "My bad!" and lots more.', 'Comic-style bubbles in each team\u2019s color with a tail pointing at the speaker.', 'Bubbles stack instead of overlapping, and warm-up chatter like "Lock in!" during the intro.']],
   [71, 'Style And Auto CPU', ['A new Style tab in the Locker: ball trails (Sparkle, Fire, Rainbow, Stardust, Bubbles, Lightning, Love, Gold Rush) and headbands, unlocked as you level up.', 'Auto CPU difficulty: it eases off when it\u2019s ahead and gets sharper when it\u2019s behind, so games stay close.']],
@@ -6883,11 +6899,15 @@ function hypeAdd(i, v) {
   if (attract || practice() || i < 0) return;
   const t = teams[i]; if (time < (t.hypeUntil || 0)) return;
   t.hype = Math.min(1, (t.hype || 0) + v);
-  if (t.hype >= 1) { t.hype = 0; t.hypeUntil = time + 12; setTimeout(() => { pop('HYPE TIME! BIGGER GREENS', W / 2, 130, t.color); say(`${tc(t.name)}. Hype time!`, true); roar(1.6, 0.12); }, 900); }
+  if (t.hype >= 1) { t.hype = 0; t.hypeUntil = time + 12; if (humanTeam(i)) unlock('hype'); setTimeout(() => { pop('HYPE TIME! BIGGER GREENS', W / 2, 130, t.color); say(`${tc(t.name)}. Hype time!`, true); roar(1.6, 0.12); }, 900); }
 }
 // ---- per frame: contest clocks, earthquakes, magnets ----
 function frameExtras(el) {
   if (paused || attract) return;
+  if (state === 'play' && ball.holder && Math.random() < el * 0.5) {
+    const h = ball.holder, mate = players.find(q => q.team === h.team && q !== h && !q.react && q.grounded);
+    if (mate && Math.abs(mate.x - hoops[mate.team].cx) < 170 && Math.abs(h.x - hoops[h.team].cx) > 220) quip(mate, ['Ball!', "I'm open!", 'Lob it!', 'Here!', 'Up top!'], true, 1.1);
+  }
   ballTrail(el);
   if (tut && tutorial() && state === 'play') tutAdapt();
   if (contest && !contestOpen && state === 'play') {
@@ -6957,6 +6977,7 @@ function finishContest() {
   contestOpen = true; paused = true;
   const c = contest, k = c.kind, score = c.total, prev = (SV.best && SV.best[k]) || 0, isRec = score > prev;
   if (isRec) { SV.best[k] = score; persist(); }
+  if (k === 'dunk' && score >= 100) unlock('dunk100'); if (k === 'three' && score >= 20) unlock('three20');
   const xp = Math.round(k === 'dunk' ? score * 1.5 : score * 3); if (xp) gainXP(xp);
   const rows = c.log.map(([n, v], i) => `<div><em>Dunk ${i + 1}</em>${n}<span>${v} Points</span></div>`).join('');
   openPanel(k === 'dunk' ? 'Dunk Contest' : '3-Point Shootout', `<div class="ht"><div class="sc">${score} Points</div><p>${isRec ? 'New personal best!' : `Personal best: ${prev}.`}${xp ? ` +${xp} XP.` : ''}</p>${k === 'dunk' ? `<div class="brk">${rows}</div>` : `<p>${c.makes} deep makes from ${c.shots} shots.</p>`}</div>`,
