@@ -240,7 +240,7 @@ kbd.b{box-shadow:inset 0 calc(var(--k)*-3.5) 0 var(--blue),0 calc(var(--k)*2) 0 
           <button type="button" data-d="legend" aria-pressed="false">Legend</button>
         </div>
       </div>
-      <div class="lvl" id="lvlStrip"><b id="lvlN">Level 1</b><span class="xpbar"><i id="lvlBar"></i></span><small id="lvlTxt">0 / 100 XP</small></div>
+      <div class="lvl" id="lvlStrip"><b id="lvlN">Level 1</b><span class="xpbar"><i id="lvlBar"></i></span><small id="lvlTxt">0 / 100 XP</small><button type="button" id="bVer" class="verbtn">v63 Updates</button></div>
     </div>
     <aside class="howto" aria-label="How to play">
       <h2>How to play</h2>
@@ -6555,6 +6555,46 @@ function newCup() {
   TOURNEY.forEach((o, i) => { const t = pool[i % pool.length]; o.name = t[0]; o.color = t[1]; o.dark = t[2]; });
   tourney = { round: 0, me };
 }
+// ---- update log ----
+const GAME_VERSION = 63;
+const UPDATES = [
+  [63, 'Update Log', ['A What’s New popup after each update, plus this list of every update.', 'The version number is shown on the menu.']],
+  [62, 'First To 100 For 2 Players', ['A new head-to-head marathon mode in Modes.']],
+  [61, '3D Diamonds And Better Celebrations', ['Crystal Cave diamonds are real spinning 3D gems.', 'Every green celebration gets a confetti burst and a spotlight.', 'Rooftop and Cloud Kingdom celebrations fly across the sky.', 'Lightning on the castle sword, roses in the Colosseum, candy rain, a disco floor and a pirate treasure chest.']],
+  [60, 'Ghost Ride', ['On Haunted Graveyard greens, a ghost picks you up and flies you around.']],
+  [59, 'New Green Celebrations', ['Volcano: Human Torch. Jungle: Snakes chase you. Crystal Cave: catch a falling diamond. Pyramids: a throne drops from the sky.', 'Longer swimming laps Under The Sea.', 'Far fewer pop-ups: the announcer calls them instead.']],
+  [58, 'Random Tournaments', ['Every new tournament rolls random teams.']],
+  [57, 'Rage Quit', ['Neon Arcade greens: mash a controller, then throw it and stun an opponent.']],
+  [56, 'Blackout Tweak', ['Blackout rounds are dim with no spotlights.']],
+  [55, 'Lessons, Subtitles And Matchups', ['Pick any tutorial lesson, practice it on repeat, and a smaller lesson card.', 'The announcer is now on-screen subtitles.', 'Normal games roll random team matchups.']],
+  [54, 'Adaptive Tutorial', ['Each lesson sets itself up, like a missed shot for the putback lesson.']],
+  [53, 'Gameplay Fixes', ['Frozen players can’t move and drop the ball.', 'Only the defender you dunk on gets posterized, and they get back up.', 'Smoother dunks with hang time.', 'Game-winning greens get a huge finale.', 'Box score behind a button.']],
+  [52, 'NBA-Style Announcer', ['Play-by-play calls with player names.']],
+  [51, 'Big Update, Part 2', ['Dunk Contest, 3-Point Shootout and Daily Challenge.', 'Magnet, Shrink, Double and Sniper power-ups.', 'Chaos rounds, hype meter, highlight reel, settings and 2-player rivalry.']],
+  [50, 'Big Update, Part 1', ['Court picker, House Rules and Tournament.', 'Trophies, XP and levels, your own team, career stats.', 'MVP card and halftime show.']],
+  [49, '20 Dunks And 20 Tweaks', ['20 new dunks, no behind-the-backboard layups.', 'Airball calls, lead changes, runs, game winners, controller support and more.']],
+  [48, '12 New Courts', ['Volcano, Jungle, Haunted, Pyramids, Candy, Pirate, Neon, Colosseum, Clouds, Castle, Disco and Crystal Cave, each with music, a signature dunk and a green show.']],
+  [47, 'Polish Drop', ['Custom title cards for every court, better blocks, behind-the-back passes, real power-up icons and ice blocks.']],
+  [46, 'New Look', ['A full UI revamp, court celebrations, and baskets that always count.']],
+];
+function updRows(list) { return list.map(([v, t, items]) => `<div class="upd"><div class="updh"><b>${t}</b><span>v${v}</span></div><ul>${items.map(x => `<li>${x}</li>`).join('')}</ul></div>`).join(''); }
+function openUpdates() {
+  openPanel('All Updates', `<div class="updl">${updRows(UPDATES)}</div>`, [['Done', closePanel, 'red']]);
+}
+function whatsNew() {
+  const latest = UPDATES[0];
+  openPanel(`What’s New In v${GAME_VERSION}`, `<div class="updl">${updRows([latest])}</div>`, [['Let’s Play', closePanel, 'red'], ['See All Updates', openUpdates]]);
+}
+document.head.insertAdjacentHTML('beforeend', `<style>
+.verbtn{margin-left:calc(var(--k)*6);font:600 calc(var(--k)*12)/1 var(--text);color:var(--cream);background:var(--ink2);border:calc(var(--k)*1.5) solid rgba(255,240,207,.3);border-radius:99px;padding:calc(var(--k)*5) calc(var(--k)*10);cursor:pointer;white-space:nowrap}
+.updl{display:grid;gap:calc(var(--k)*10);text-align:left}
+.upd{background:var(--deep);border-radius:calc(var(--k)*10);padding:calc(var(--k)*10) calc(var(--k)*14)}
+.updh{display:flex;justify-content:space-between;align-items:baseline;gap:calc(var(--k)*10)}
+.updh b{font:400 calc(var(--k)*18)/1.1 var(--display);color:var(--mustard)} .updh span{font:600 calc(var(--k)*12)/1 var(--text);color:var(--muted)}
+.upd ul{margin:calc(var(--k)*6) 0 0;padding-left:calc(var(--k)*18);color:var(--cream);font:500 calc(var(--k)*14)/1.4 var(--text)}
+</style>`);
+$('bVer').addEventListener('click', openUpdates);
+setTimeout(() => { if ((SV.seenVer || 0) < GAME_VERSION && !$('menu').hidden && $('panel').hidden) { SV.seenVer = GAME_VERSION; persist(); whatsNew(); } }, 900);
 function sfxDest() { if (!sfxBus) { sfxBus = ac.createGain(); sfxBus.gain.value = vol('sfx'); sfxBus.connect(ac.destination); } return sfxBus; }
 function applyVol() { if (sfxBus) sfxBus.gain.value = vol('sfx'); if (music.vol) music.vol.gain.value = vol('music'); }
 // ---- hype meter ----
