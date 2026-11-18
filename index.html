@@ -1863,7 +1863,7 @@ function celebFxMore(p, layer, sc) {
   }
 }
 // ---- reactions: short body-language moments layered on top of normal play ----
-function react(p, kind, dur, extra) { if (!p || p.celeb || attract && kind !== 'dance') return; p.react = { kind, t: 0, dur, ...(extra || {}) }; }
+function react(p, kind, dur, extra) { if (!p || p.celeb || attract && kind !== 'dance') return; const L = LINES[kind]; p.react = { kind, t: 0, dur, say: L && Math.random() < (L.chance || 1) ? pick(L) : null, ...(extra || {}) }; }
 function teamReact(ti, scorer, big) {
   if (practice()) return;
   const shooter = scorer && scorer.team === ti ? scorer : null;
@@ -1924,7 +1924,43 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 function statLine(m) { return [plural(m.pts, 'Pt'), plural(m.dunks, 'Dunk'), plural(m.greens, 'Green')].join(', '); }
 const EMOTE = { highfive: ['!', '#ffd34d'], chestbump: ['!!', '#ffd34d'], point: ['Yes!', '#5dff7a'], flex: ['★', '#ffd34d'], facepalm: ['...', '#cdbbdb'], kneel: ['...', '#cdbbdb'],
   shrug: ['?', '#bfe6ff'], headshake: ['No', '#ff7a7a'], turnaway: ['><', '#ff7a7a'], argue: ['#!', '#ff4f6d'], kick: ['#', '#ff4f6d'], headgrab: ['!?', '#ff9d3d'], wag: ['Nope', '#ff4f6d'], dance: ['♪', '#ff6fd8'] };
+const LINES = {
+  highfive: ['Up top!', 'Yeah!', "Let's go!", 'Too easy!'], chestbump: ["Let's gooo!", 'Boom!', 'Yeah!!'], point: ["That's my guy!", 'Yes sir!', 'Called it!', "He's cooking!"],
+  flex: ['Mine now!', 'Too quick!', 'Thank you!', 'Yoink!'], facepalm: ['Ugh...', 'Seriously?', 'Not again...', 'Oof.'], kneel: ['Ugh...', "I'm tired...", 'Oof.', '*huff*'],
+  shrug: ['Lucky shot.', 'Whatever.', 'Fluke!', 'Eh.'], headshake: ['Nope.', 'No way!', 'Come on!', 'Really?'], turnaway: ["Can't watch!", 'Nooo!', 'Too much!'],
+  argue: ['That was a foul!', 'Ref!!', 'He traveled!', 'No way!'], kick: ['Argh!', 'Grr!', 'Come ON!'], headgrab: ['My bad!', 'Oops!', 'What was that?!', 'Yikes!'],
+  wag: ['Not today!', 'Nope!', 'Get that outta here!', 'Denied!'], dance: ['Winners!', 'Too easy!', "Let's go!", 'GG!'],
+  clap: Object.assign(["Let's go!", 'Lock in!', 'D up!', 'Ball!'], { chance: 0.45 }), bounce: Object.assign(['Ready!', "I'm warm!"], { chance: 0.35 }),
+};
+const GOOD = new Set(['highfive', 'chestbump', 'point', 'flex', 'wag', 'dance', 'clap', 'bounce']);
 function drawEmotes() {
+  // comic speech bubbles: white with a team-coloured outline, a tail pointing at the speaker, and they never stack on top of each other
+  if (attract || state === 'replay') return;
+  const list = players.filter(p => p.react && p.react.say && !p.celeb && !p.iceShatter).sort((a, b) => a.Hd.x - b.Hd.x);
+  ctx.font = `700 13px ${TEXT}`;
+  const placed = [];
+  for (const p of list) {
+    const r = p.react, a = clamp(Math.min(r.t / 0.1, (r.dur - r.t) / 0.25, 1), 0, 1); if (a <= 0) continue;
+    const txt = r.say, w = ctx.measureText(txt).width + 18, h = 24, hx = p.Hd.x, hy = p.Hd.y - 30 * p.scale;
+    let x = clamp(hx, w / 2 + 6, W - w / 2 - 6), y = hy - 26;
+    for (const q of placed) if (Math.abs(q.x - x) < (q.w + w) / 2 + 4 && Math.abs(q.y - y) < h + 4) y = q.y - h - 6;   // stack instead of overlapping
+    placed.push({ x, y, w });
+    const pop = r.t < 0.22 ? 1 + Math.sin(r.t / 0.22 * Math.PI) * 0.28 : 1, tilt = (GOOD.has(r.kind) ? -1 : 1) * 0.04 + Math.sin(r.t * 4 + p.wob) * 0.02;
+    const edge = teams[p.team].color;
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(x, y); ctx.rotate(tilt); ctx.scale(pop, pop);
+    // tail toward the speaker's head
+    const tx = clamp((hx - x) * 0.6, -w / 2 + 10, w / 2 - 10);
+    ctx.fillStyle = INKD; rr(-w / 2 - 2.5, -h / 2 - 2.5 + 3, w + 5, h + 5, 11); ctx.fill();           // drop shadow
+    ctx.fillStyle = edge; rr(-w / 2 - 2.5, -h / 2 - 2.5, w + 5, h + 5, 11); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(tx - 7, h / 2); ctx.lineTo(tx + (hx - x) * 0.15, h / 2 + 12); ctx.lineTo(tx + 6, h / 2); ctx.fill();
+    ctx.fillStyle = '#ffffff'; rr(-w / 2, -h / 2, w, h, 9); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(tx - 4.5, h / 2 - 1); ctx.lineTo(tx + (hx - x) * 0.15, h / 2 + 7.5); ctx.lineTo(tx + 3.5, h / 2 - 1); ctx.fill();
+    ctx.fillStyle = GOOD.has(r.kind) ? INK : '#5a2140'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 0, 1);
+    ctx.restore();
+  }
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
+}
+function drawEmotesOld() {
   // a little speech bubble over each player who's reacting, so you can read the moment at a glance
   if (attract || state === 'replay') return;
   for (const p of players) {
@@ -6780,8 +6816,9 @@ function newCup() {
   tourney = { round: 0, me };
 }
 // ---- update log ----
-const GAME_VERSION = 71;
+const GAME_VERSION = 72;
 const UPDATES = [
+  [72, 'Better Speech Bubbles', ['Players say real lines: "Up top!", "That was a foul!", "Lucky shot.", "Not today!", "My bad!" and lots more.', 'Comic-style bubbles in each team\u2019s color with a tail pointing at the speaker.', 'Bubbles stack instead of overlapping, and warm-up chatter like "Lock in!" during the intro.']],
   [71, 'Style And Auto CPU', ['A new Style tab in the Locker: ball trails (Sparkle, Fire, Rainbow, Stardust, Bubbles, Lightning, Love, Gold Rush) and headbands, unlocked as you level up.', 'Auto CPU difficulty: it eases off when it\u2019s ahead and gets sharper when it\u2019s behind, so games stay close.']],
   [70, 'Polish', ['Speech bubbles over reacting players, like Yes!, No, Nope and question marks, so you can read every moment.', 'Announcer subtitles sit below the players on computers.', 'Trophy pop-ups always appear in the top-right corner.', 'Stat lines say 1 Pt instead of 1 Pts.']],
   [69, 'Player Reactions', ['Teammates run over for high fives and chest bumps, or point at the scorer.', 'The team that got scored on facepalms, shrugs, argues, kicks the floor, puts hands on knees or can\u2019t watch.', 'Blockers wag a finger, stealers flex, airballs get a head grab.', 'Warm-ups during the intro: claps, stretches and bounces.', 'Winners dance and losers slump after the final buzzer.', 'Landing dust after big drops.']],
