@@ -240,6 +240,7 @@ kbd.b{box-shadow:inset 0 calc(var(--k)*-3.5) 0 var(--blue),0 calc(var(--k)*2) 0 
           <button type="button" data-d="rookie" aria-pressed="false">Rookie</button>
           <button type="button" data-d="pro" aria-pressed="true">Pro</button>
           <button type="button" data-d="legend" aria-pressed="false">Legend</button>
+          <button type="button" data-d="auto" aria-pressed="false">Auto</button>
         </div>
       </div>
       <div class="lvl" id="lvlStrip"><b id="lvlN">Level 1</b><span class="xpbar"><i id="lvlBar"></i></span><small id="lvlTxt">0 / 100 XP</small><button type="button" id="bVer" class="verbtn">v69 Updates</button></div>
@@ -436,6 +437,7 @@ const DIFF = {
   pro:    { react:0.19, tol:0.045, range:560 },
   legend: { react:0.1,  tol:0.022, range:680 },
 };
+DIFF.auto = DIFF.pro;   // replaced each tick by a blend that follows the score
 const SKINS = ['#f2c9a1','#e0b08a','#d9a066','#b97e52','#a86b45','#8a5636','#6e4429','#4f3020'];
 const HAIRS = ['afro','puff','buns','bantu','braids','locs','twists','ponytail','fade','hightop','bald'];
 const HAIR_C = ['#16100c','#1f1712','#2c1f16','#3b2a1d','#5a3a22','#8a5a2b','#b8862c','#6b2418'];
@@ -1665,7 +1667,7 @@ function knockLoose(byHand) {
 
 /* ---------- AI ---------- */
 function cpuThink(ti, dt) {
-  const t = teams[ti], a = t.ai, D = DIFF[attract ? 'pro' : tourney ? TOURNEY[Math.min(3, tourney.round)].diff : daily ? 'pro' : diff];
+  const t = teams[ti], a = t.ai, D = (attract || tourney || daily || diff !== 'auto') ? DIFF[attract ? 'pro' : tourney ? TOURNEY[Math.min(3, tourney.round)].diff : daily ? 'pro' : diff] : autoDiff(ti);
   const h = ball.holder, mine = players.filter(p => p.team === ti);
   a.timer -= dt;
   if (a.press) {
@@ -1939,6 +1941,39 @@ function drawEmotes() {
     ctx.restore();
   }
   ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
+}
+// ---- cosmetics ----
+const TRAILS = [['none', 'None', 1], ['sparkle', 'Sparkle', 1], ['fire', 'Fire', 2], ['rainbow', 'Rainbow', 3], ['stars', 'Stardust', 4], ['bubbles', 'Bubbles', 5], ['lightning', 'Lightning', 6], ['love', 'Love', 7], ['gold', 'Gold Rush', 9]];
+const BANDS = [[null, 'None', 1], ['#ffffff', 'White', 1], ['#ffd34d', 'Gold', 2], ['#5dff7a', 'Lime', 3], ['#00f0ff', 'Cyan', 4], ['#ff4fd8', 'Pink', 5], ['#21162f', 'Black', 6], ['#ff4f6d', 'Red', 7]];
+function myTeam(i) { return mode === 2 ? i === 0 : i === 0; }
+function ballTrail(el) {
+  const k = (SV.style || {}).trail; if (!k || k === 'none' || ball.holder || state === 'replay') return;
+  const from = ball.shot ? ball.shotTeam : ball.thrower ? ball.thrower.team : -1; if (from < 0 || !myTeam(from)) return;
+  if (Math.hypot(ball.vx, ball.vy) < 120) return;
+  const x = ball.x, y = ball.y, n = Math.random() < el * 50 ? 1 : 0; if (!n) return;
+  const hue = (time * 1100) % 360;
+  switch (k) {
+    case 'sparkle': spark(x + rand(-5, 5), y + rand(-5, 5), pick(['#ffffff', '#fff1a8']), rand(-30, 30), rand(-30, 30), false); break;
+    case 'fire': spark(x + rand(-6, 6), y + rand(-6, 6), pick(['#ffd34d', '#ff8a3d', '#ff3d1f']), rand(-30, 30), rand(-120, -40), false); break;
+    case 'rainbow': particles.push({ x, y, vx: 0, vy: 0, c: `hsl(${hue},95%,62%)`, life: 0.5, max: 0.5, g: 0, s: 5 }); break;
+    case 'stars': spark(x, y, pick(['#ffd34d', '#ffffff', '#c79bff']), rand(-60, 60), rand(-60, 60), false); break;
+    case 'bubbles': particles.push({ x: x + rand(-8, 8), y: y + rand(-8, 8), vx: rand(-15, 15), vy: rand(-50, -20), c: pick(['#cfefff', '#a8e4ff', '#ffffff']), life: 0.9, max: 0.9, g: -20, s: rand(2.5, 4.5) }); break;
+    case 'lightning': spark(x + rand(-10, 10), y + rand(-10, 10), pick(['#ffffff', '#bfe6ff', '#00f0ff']), rand(-140, 140), rand(-140, 140), false); break;
+    case 'love': particles.push({ x: x + rand(-6, 6), y: y + rand(-6, 6), vx: rand(-20, 20), vy: rand(-60, -20), c: pick(['#ff4f8b', '#ff8ac0', '#ffffff']), life: 0.8, max: 0.8, g: -30, s: rand(3, 5) }); break;
+    case 'gold': particles.push({ x: x + rand(-5, 5), y, vx: rand(-20, 20), vy: rand(0, 40), c: pick(['#ffd34d', '#e8b82a', '#fff1a8']), life: 0.9, max: 0.9, g: 500, s: rand(2.5, 4) }); break;
+  }
+}
+function drawHeadband(p, R) {
+  const b = BANDS[(SV.style || {}).band || 0]; if (!b || !b[0] || attract || !myTeam(p.team)) return;
+  ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.clip();
+  ctx.fillStyle = b[0]; ctx.fillRect(-R * 1.1, -R * 0.62, R * 2.2, R * 0.3);
+  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(-R * 1.1, -R * 0.36, R * 2.2, R * 0.05);
+  ctx.restore();
+}
+function autoDiff(ti) {
+  // Auto: the CPU eases off when it's ahead and sharpens up when it's behind, so games stay close
+  const m = teams[ti].score - teams[1 - ti].score, k = clamp(0.5 - m * 0.07, 0, 1), A = DIFF.rookie, B = DIFF.legend;
+  return { react: lerp(A.react, B.react, k), tol: lerp(A.tol, B.tol, k), range: lerp(A.range, B.range, k) };
 }
 function celebFly(p, c, u, t0, t1, amp, hgt) {
   // fly a figure-eight across the court between t0 and t1, then drift back down
@@ -4628,6 +4663,7 @@ function drawPlayerBody(p) {
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1.5, R * 0.1);
     for (const k of [-1, 1]) { ctx.beginPath(); ctx.arc(f * R * 0.15 + k * R * 0.32, -R * 0.02, R * 0.26, 0, 7); ctx.stroke(); }
   }
+  drawHeadband(p, R);
   if (O.hat || O.face) { ctx.save(); ctx.scale(f, 1); hatFront(p, R, O, t); ctx.restore(); }
   ctx.restore();
 
@@ -6534,7 +6570,7 @@ function openRules() {
 let lockerTab = 'team';
 function openLocker(tab) {
   lockerTab = tab || lockerTab; const I = lvlInfo();
-  const tabs = `<div class="tabs"><div class="seg" role="group" aria-label="Locker">${[['team', 'Your Team'], ['career', 'Career'], ['trophies', 'Trophies'], ['settings', 'Settings']].map(([k, l]) => `<button type="button" data-t="${k}" aria-pressed="${String(k === lockerTab)}">${l}</button>`).join('')}</div></div>`;
+  const tabs = `<div class="tabs"><div class="seg" role="group" aria-label="Locker">${[['team', 'Your Team'], ['style', 'Style'], ['career', 'Career'], ['trophies', 'Trophies'], ['settings', 'Settings']].map(([k, l]) => `<button type="button" data-t="${k}" aria-pressed="${String(k === lockerTab)}">${l}</button>`).join('')}</div></div>`;
   const lvl = `<div class="lvl" style="margin-bottom:12px"><b>Level ${I.L}</b><span class="xpbar"><i style="width:${I.cur / I.need * 100}%"></i></span><small>${I.cur} / ${I.need} XP</small></div>`;
   let body = '';
   if (lockerTab === 'team') {
@@ -6549,6 +6585,10 @@ function openLocker(tab) {
     const st = [['Games', g], ['Wins Vs CPU', w], ['Win Rate', cg ? Math.round(w / cg * 100) + '%' : '-'], ['Best Win Streak', car('bestWs')], ['Points', car('points')], ['Dunks', car('dunks')], ['Greens', car('greens')], ['Blocks', car('blocks')],
       ['Steals', car('steals')], ['Cups Won', car('cups')], ['Courts Played', `${SV.maps.length}/${COURTS.length}`], ['Dunks Landed', `${SV.dunks.length}/${DUNKS.length + Object.keys(MAP_DUNK).length}`]];
     body = `<div class="cgrid">${st.map(([l, v]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('')}</div>`;
+  } else if (lockerTab === 'style') {
+    const st = SV.style || {}, lock = L => I.L < L;
+    body = `<p style="margin:0 0 8px">Your team's look. Unlock more as you level up.</p><div class="h3">Ball Trail</div><div class="pgrid">${TRAILS.map(([k, n, L]) => `<button class="pick" type="button" data-tr="${k}" aria-pressed="${String((st.trail || 'none') === k)}" ${lock(L) ? 'disabled' : ''}>${n}${lock(L) ? `<small>Level ${L}</small>` : ''}</button>`).join('')}</div>
+      <div class="h3" style="margin-top:14px">Headband</div><div class="swrow">${BANDS.map(([c, n, L], i) => `<button class="sw" type="button" data-hb="${i}" style="background:${c || 'repeating-linear-gradient(45deg,#33244a 0 6px,#21162f 6px 12px)'}" aria-label="${n}${lock(L) ? ', unlocks at level ' + L : ''}" aria-pressed="${String((st.band || 0) === i)}" ${lock(L) ? 'disabled' : ''}>${lock(L) ? `<small>Lv ${L}</small>` : ''}</button>`).join('')}</div>`;
   } else if (lockerTab === 'settings') {
     body = '<div class="credit"><b>Hoop Havoc</b><span>A Morning Fall Corp Game</span><small>v' + GAME_VERSION + '</small></div>' + [['music', 'Music'], ['sfx', 'Sound Effects'], ['shake', 'Screen Shake']].map(([k, l]) => `<div class="vrow"><label for="v_${k}">${l}</label><input type="range" id="v_${k}" data-v="${k}" min="0" max="100" step="5" value="${Math.round(vol(k) * 100)}"><span>${Math.round(vol(k) * 100)}%</span></div>`).join('');
   } else {
@@ -6562,6 +6602,8 @@ function openLocker(tab) {
   P.querySelectorAll('[data-sc]').forEach(b => b.onclick = () => { SV.team.c = +b.dataset.sc; persist(); applyTeam(); openLocker(); });
   P.querySelectorAll('[data-v]').forEach(r => { r.addEventListener('keydown', e => e.stopPropagation()); r.addEventListener('input', () => { SV.vol = SV.vol || {}; SV.vol[r.dataset.v] = +r.value; persist(); applyVol(); r.nextElementSibling.textContent = r.value + '%'; }); r.addEventListener('change', () => { if (r.dataset.v === 'sfx') tone(660, 0.12, 'triangle', 0.06);  }); });
   P.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => { const k = b.dataset.sw; SV[k] = k === 'rollTeams' ? SV.rollTeams === false : !SV[k]; persist(); b.setAttribute('aria-checked', String(k === 'rollTeams' ? SV.rollTeams !== false : !!SV[k])); });
+  P.querySelectorAll('[data-tr]').forEach(b => b.onclick = () => { SV.style = { ...(SV.style || {}), trail: b.dataset.tr }; persist(); openLocker('style'); });
+  P.querySelectorAll('[data-hb]').forEach(b => b.onclick = () => { SV.style = { ...(SV.style || {}), band: +b.dataset.hb }; persist(); openLocker('style'); });
   const inp = $('nameIn');
   if (inp) { inp.addEventListener('keydown', e => e.stopPropagation()); inp.addEventListener('change', () => { const v = inp.value.replace(/[^A-Za-z ]/g, '').trim().slice(0, 14); if (v) { SV.team.name = v.toUpperCase(); persist(); applyTeam(); openLocker(); } }); }
 }
@@ -6738,8 +6780,9 @@ function newCup() {
   tourney = { round: 0, me };
 }
 // ---- update log ----
-const GAME_VERSION = 70;
+const GAME_VERSION = 71;
 const UPDATES = [
+  [71, 'Style And Auto CPU', ['A new Style tab in the Locker: ball trails (Sparkle, Fire, Rainbow, Stardust, Bubbles, Lightning, Love, Gold Rush) and headbands, unlocked as you level up.', 'Auto CPU difficulty: it eases off when it\u2019s ahead and gets sharper when it\u2019s behind, so games stay close.']],
   [70, 'Polish', ['Speech bubbles over reacting players, like Yes!, No, Nope and question marks, so you can read every moment.', 'Announcer subtitles sit below the players on computers.', 'Trophy pop-ups always appear in the top-right corner.', 'Stat lines say 1 Pt instead of 1 Pts.']],
   [69, 'Player Reactions', ['Teammates run over for high fives and chest bumps, or point at the scorer.', 'The team that got scored on facepalms, shrugs, argues, kicks the floor, puts hands on knees or can\u2019t watch.', 'Blockers wag a finger, stealers flex, airballs get a head grab.', 'Warm-ups during the intro: claps, stretches and bounces.', 'Winners dance and losers slump after the final buzzer.', 'Landing dust after big drops.']],
   [68, 'Celebrations Second Act', ['Arena: confetti cannons and the crowd erupts while you strut off.', 'Ice: a knee slide across the rink. Moon: floaty moon hops.', 'Beach: surf across the court. Bounce House: three flips.', 'Snow: a snowman builds itself. Heavy: aftershocks bounce everyone.', 'Street: toprock steps and bass rings. Rain: float away on your umbrella. Ranch: reel your lasso catch in.', 'Street Court draws faster.']],
@@ -6797,6 +6840,7 @@ function hypeAdd(i, v) {
 // ---- per frame: contest clocks, earthquakes, magnets ----
 function frameExtras(el) {
   if (paused || attract) return;
+  ballTrail(el);
   if (tut && tutorial() && state === 'play') tutAdapt();
   if (contest && !contestOpen && state === 'play') {
     contest.t -= el;
