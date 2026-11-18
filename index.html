@@ -242,7 +242,7 @@ kbd.b{box-shadow:inset 0 calc(var(--k)*-3.5) 0 var(--blue),0 calc(var(--k)*2) 0 
           <button type="button" data-d="legend" aria-pressed="false">Legend</button>
         </div>
       </div>
-      <div class="lvl" id="lvlStrip"><b id="lvlN">Level 1</b><span class="xpbar"><i id="lvlBar"></i></span><small id="lvlTxt">0 / 100 XP</small><button type="button" id="bVer" class="verbtn">v68 Updates</button></div>
+      <div class="lvl" id="lvlStrip"><b id="lvlN">Level 1</b><span class="xpbar"><i id="lvlBar"></i></span><small id="lvlTxt">0 / 100 XP</small><button type="button" id="bVer" class="verbtn">v69 Updates</button></div>
     </div>
     <aside class="howto" aria-label="How to play">
       <h2>How to play</h2>
@@ -596,6 +596,7 @@ function startRound(fresh = true) {
   }
   if (contest && contest.kind === 'dunk') contest.t = 9;
   if (tut) tut.needSetup = true;
+  if (!attract && !practice() && fresh) setTimeout(() => { for (const p of players) if (Math.random() < 0.7) react(p, pick(['clap', 'stretch', 'bounce', 'clap']), 1.1); }, 30);   // warm-ups during the intro card
   if (!attract && mode !== 4 && !SV.maps.includes(court.deco)) { SV.maps.push(court.deco); persist(); if (SV.maps.length >= 12) unlock('maps'); }
   goldenRound = !attract && !practice() && goalCount > 0 && Math.random() < 0.12;   // every so often: a golden ball worth double
   if (goldenRound) setTimeout(() => { pop('★ GOLDEN BALL ★', W / 2, 140, '#ffd34d'); pop('EVERY BASKET COUNTS DOUBLE', W / 2, 172, '#fff1b8'); tone(988, 0.2, 'triangle', 0.06); setTimeout(() => tone(1319, 0.3, 'triangle', 0.06), 120); }, 120);
@@ -1641,6 +1642,7 @@ const POP_SAY = new Set(['AIRBALL!', 'STEAL!', 'GET THAT OUTTA HERE!', 'REJECTED
 function pop(txt, x, y, c) {
   if (SAYCAT[txt]) call(SAYCAT[txt]);
   if (txt === 'AIRBALL!' && ball.shotTeam >= 0 && humanTeam(ball.shotTeam)) unlock('airball');
+  if (txt === 'AIRBALL!' && ball.thrower && !attract) react(ball.thrower, 'headgrab', 1.4);
   if (POP_HIDE.has(txt) || /^(CUTTING!|PASS IT OUT)/.test(txt)) return;   // cues the play makes obvious on its own
   if (POP_SAY.has(txt) || /^HOT HAND|CLUTCH MODE|^HYPE TIME|-0 RUN!$/.test(txt)) { if (!SAYCAT[txt] && !attract && state !== 'replay') say(txt.replace(' · ', '. ')); return; }   // the announcer calls it instead
   if (txt === 'STEAL!') { if (time - lastStealPop < 1.2) return; lastStealPop = time; }
@@ -1857,6 +1859,64 @@ function celebFxMore(p, layer, sc) {
     const ph = (u * 4) % 1, a = 1 - ph; ctx.strokeStyle = `rgba(255,79,163,${0.5 * a})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(p.x, GROUND + 2, 20 + ph * 90, 5 + ph * 16, 0, 0, 7); ctx.stroke();
     ctx.strokeStyle = `rgba(79,227,255,${0.35 * a})`; ctx.beginPath(); ctx.ellipse(p.x, GROUND + 2, 10 + ph * 60, 3 + ph * 10, 0, 0, 7); ctx.stroke();
   }
+}
+// ---- reactions: short body-language moments layered on top of normal play ----
+function react(p, kind, dur, extra) { if (!p || p.celeb || attract && kind !== 'dance') return; p.react = { kind, t: 0, dur, ...(extra || {}) }; }
+function teamReact(ti, scorer, big) {
+  if (practice()) return;
+  const shooter = scorer && scorer.team === ti ? scorer : null;
+  for (const p of players) {
+    if (p === shooter || p.celeb || p.down > 0) continue;
+    if (p.team === ti) react(p, shooter ? pick(['highfive', 'highfive', 'chestbump', 'point']) : 'flex', 2.4, { to: shooter });
+    else react(p, pick(big ? ['facepalm', 'kneel', 'headshake', 'turnaway', 'argue'] : ['shrug', 'kick', 'headshake', 'argue', 'facepalm']), 2.4);
+  }
+}
+function reactPose(p) {
+  const r = p.react; if (!r || p.celeb || ball.holder === p || p.dunkAnim || p.down > 0 || (teams[p.team].pressed && state === 'play')) return null;
+  const u = r.t, f = p.facing, s = Math.sin;
+  switch (r.kind) {
+    case 'highfive':  return r.slap ? { phi: 3.05, reach: 1, phiB: 0.6, lean: -0.1 * f } : { phi: 2.7, reach: 1, phiB: 0.5, lean: 0.15 * f };
+    case 'chestbump': return r.bump ? { phi: -0.6, reach: 1, phiB: -0.6, lean: -0.3 * f } : { phi: 2.9, reach: 1, phiB: 2.9, lean: 0.12 * f };
+    case 'point':     return { phi: 1.75 + s(u * 8) * 0.05, reach: 1, phiB: 0.4, lean: -0.06 * f };
+    case 'flex':      return { phi: 2.05, reach: 0.5, phiB: 2.05, lean: s(u * 6) * 0.05 };
+    case 'facepalm':  return { phi: 2.4, reach: 0.42, phiB: 0.25, lean: 0.18 * f };
+    case 'kneel':     return { phi: 0.28, reach: 1, phiB: 0.22, lean: 0.55 * f };                       // hands on knees
+    case 'shrug':     return { phi: 1.25 + Math.abs(s(u * 5)) * 0.15, reach: 0.55, phiB: 1.25 + Math.abs(s(u * 5)) * 0.15, lean: -0.05 * f };
+    case 'headshake': return { phi: 0.3, reach: 1, phiB: 0.3, lean: s(u * 12) * 0.09 };
+    case 'turnaway':  return { phi: 2.4, reach: 0.4, phiB: 2.3, lean: -0.25 * f };                       // can't watch
+    case 'argue':     return { phi: 2.3 + s(u * 9) * 0.6, reach: 1, phiB: 2.3 - s(u * 9) * 0.6, lean: s(u * 4.5) * 0.1 };
+    case 'kick':      return { phi: 0.5, reach: 1, phiB: 0.3, lean: u < 0.35 ? -0.2 * f : 0.1 * f };
+    case 'headgrab':  return { phi: 2.95, reach: 0.48, phiB: 2.95, lean: -0.14 * f };
+    case 'wag':       return { phi: 2.75 + s(u * 17) * 0.2, reach: 1, phiB: 0.4, lean: -0.08 * f };       // not in my house
+    case 'clap':      return { phi: 1.55 + (Math.sin(u * 16) > 0 ? 0.22 : 0), reach: 0.62, phiB: 1.55 + (Math.sin(u * 16) > 0 ? 0.22 : 0), lean: 0.05 * f };
+    case 'stretch':   return { phi: 3.05, reach: 1, phiB: 2.6, lean: Math.sin(u * 3) * 0.22 };
+    case 'bounce':    return { phi: 0.9, reach: 0.8, phiB: 0.9, lean: 0.12 * f };
+    case 'dance':     return Math.floor(u * 2.2) % 2 ? { phi: 2.7, reach: 1, phiB: 0.6, lean: 0.12 * f } : { phi: 0.6, reach: 0.7, phiB: 2.7, lean: -0.12 * f };
+    default: return null;
+  }
+}
+function reactStep(p, dt) {
+  // landing dust after big drops
+  if (!p.grounded) p.airVy = Math.max(p.airVy || 0, p.vy); else { if ((p.airVy || 0) > 620 && !attract) courtPuff(p.F.x, GROUND, 0.45, 4); p.airVy = 0; }
+  const r = p.react; if (!r) return;
+  r.t += dt; if (r.t > r.dur || p.celeb) { p.react = null; return; }
+  const u = r.t;
+  if ((r.kind === 'highfive' || r.kind === 'chestbump') && r.to && !r.done) {   // run over to the scorer
+    const q = r.to, dx = q.x - p.x; p.facing = Math.sign(dx) || p.facing;
+    if (Math.abs(dx) > 46) { if (p.grounded) { p.vx = Math.sign(dx) * 240; if (Math.random() < dt * 3) { p.vy = -200; p.grounded = false; } } }
+    else {
+      r.done = true;
+      if (r.kind === 'highfive') { r.slap = true; p.vy = -330; p.grounded = false; const mx = (p.hand.x + q.hand.x) / 2, my = Math.min(p.hand.y, q.hand.y) - 6;
+        for (let i = 0; i < 16; i++) spark(mx, my, pick(['#ffffff', '#ffd34d', teams[p.team].color]), rand(-160, 160), rand(-180, 40), true); hiss(0.06, 0.08); tone(1200, 0.05, 'square', 0.04); }
+      else { r.bump = true; p.vy = -380; p.vx = Math.sign(dx) * 60; p.grounded = false; if (q.grounded && !q.celeb) { q.vy = -300; q.grounded = false; } tone(140, 0.15, 'sine', 0.1, 0.6); shake = Math.max(shake, 4); }
+    }
+  }
+  if (r.kind === 'clap' && Math.floor(u * 5.1) !== r.cl) { r.cl = Math.floor(u * 5.1); if (r.cl % 2) hiss(0.03, 0.025); }
+  if (r.kind === 'bounce' && p.grounded && Math.floor(u * 3) !== r.bn) { r.bn = Math.floor(u * 3); p.vy = -160; p.grounded = false; }
+  if (r.kind === 'kick' && u > 0.3 && !r.kicked) { r.kicked = true; courtPuff(p.F.x + p.facing * 12, GROUND, 0.6, 5); tone(90, 0.12, 'sine', 0.06); }
+  if (r.kind === 'dance' && p.grounded && Math.floor(u * 2.2) !== r.beat) { r.beat = Math.floor(u * 2.2); p.vy = -240; p.vx = rand(-40, 40); p.grounded = false; }
+  if (r.kind === 'headshake' || r.kind === 'kneel' || r.kind === 'facepalm' || r.kind === 'turnaway') { if (p.grounded) p.vx *= 0.8; }
+  if (r.kind === 'headgrab' && Math.random() < dt * 4) spark(p.Hd.x + rand(-10, 10), p.Hd.y - 10, '#bfe6ff', rand(-20, 20), rand(-60, -20), false);   // sweat
 }
 function celebFly(p, c, u, t0, t1, amp, hgt) {
   // fly a figure-eight across the court between t0 and t1, then drift back down
@@ -2400,6 +2460,7 @@ function jumpAngle(p) {
 }
 function leanTarget(p) {
   if (p.celeb) return celebPose(p).lean;
+  { const r = reactPose(p); if (r) return r.lean; }
   // a lob is coming: square up and stand tall so the jump goes straight up into it
   if (ball.lob === p && !ball.holder) return clamp((hoops[p.team].cx - p.x) / 200, -1, 1) * 0.32 + Math.sin(time * p.swayF + p.wob) * 0.03;
   if (p.mood === 'sad') return -p.facing * 0.1 + Math.sin(time * 1.4 + p.wob) * 0.05;
@@ -2848,6 +2909,7 @@ function updateArms(dt) {
       if ((p.wind > 0.45 || teams[p.team].onFire) && Math.random() < dt * 2.2 && !p.dunkAnim) particles.push({ x: p.Hd.x + rand(-4, 4), y: p.Hd.y - p.headR * 0.5, vx: rand(-70, 70) + p.vx * 0.2, vy: rand(-150, -70), c: '#cfeeff', life: rand(0.4, 0.7), max: 1, g: 900, s: rand(1.2, 2.2) });
       if (p.dizzy > 0) p.dizzy -= dt; }
     if (p.celeb) { const c = celebPose(p); target = c.phi; reachT = c.reach; rate = 18; }
+    else if (reactPose(p)) { const c = reactPose(p); target = c.phi; reachT = c.reach; rate = 16; }
     if (p.dunkAnim) p.phi = dunkPhi(p.dunkAnim);
     else {
       if (Math.abs(target - p.phi) > Math.PI) p.phi += Math.round((target - p.phi) / (Math.PI * 2)) * Math.PI * 2;   // take the short way round
@@ -3061,7 +3123,7 @@ function updateBall(dt) {
         hitstop = Math.max(hitstop, 0.1); slowT = Math.max(slowT, 0.4); shake = Math.max(shake, 16); flashA = Math.max(flashA, 0.3);
         camFocus(p, 1.1); roar(1.2, 0.12); tone(110, 0.25, 'square', 0.07, 0.5); hiss(0.2, 0.08);
         rings.push({ x: ball.x, y: ball.y, t: 0, c: '#ff4f6d', big: 0.5 });
-        p.mood = 'happy'; p.moodT = 1.1;                           // the blocker flexes
+        p.mood = 'happy'; p.moodT = 1.1; react(p, 'wag', 1.3);      // the blocker wags a finger: not in my house
       }
     }
     if (collideCircle(p.Hd.x, p.Hd.y, p.headR, 0.55, p.Hd.vx, p.Hd.vy) && gtH && p.team !== ball.shotTeam) ball.goaltend = gtH;
@@ -3092,7 +3154,7 @@ function interactions() {
       if (shielded || Math.random() > 0.55) { p.stealCD = 0.5; continue; }   // reached in and missed: a beat to recover
       h.stealCD = 0.9; p.stealCD = 0.6;   // the player who got picked can't instantly grab it back
       p.swipeT = 0.2; fxSwipes.push({ x: ball.x, y: ball.y, d: Math.sign(p.hv.x) || p.facing, t: 0 });
-      knockLoose(p.hv); ball.stolenAt = time; if (t.stats) t.stats.steals++; hypeAdd(teams.indexOf(t), 0.2); pop('STEAL!', p.Hd.x, p.Hd.y - 50, '#ffffff'); break;
+      knockLoose(p.hv); ball.stolenAt = time; if (t.stats) t.stats.steals++; hypeAdd(teams.indexOf(t), 0.2); react(p, 'flex', 0.7); pop('STEAL!', p.Hd.x, p.Hd.y - 50, '#ffffff'); break;
     }
   }
   // dropped when the holder falls over
@@ -3229,6 +3291,7 @@ function scored(ti, hp) {
     if (ball.dunk && ball.dunkName) { if (Object.values(MAP_DUNK).some(d => d.name === ball.dunkName)) unlock('sig'); if (!SV.dunks.includes(ball.dunkName)) { SV.dunks.push(ball.dunkName); persist(); if (SV.dunks.length >= 15) unlock('dunks15'); } }
   }
   if (!attract) callScore(txt, ti, scorer);
+  if (!attract && sh === ti) teamReact(ti, scorer, !!(ball.green || ball.dunk || ball.oop));
   // cool plays get a slow-motion replay cutscene
   const winner = !practice() && teams[ti].score + pts >= WIN;
   if (!attract && !practice() && txt !== 'OWN GOAL' && (winner || ((ball.shatter || ball.poster) && round - lastReplayRound >= (WIN >= 100 ? 4 : 2)) || ((banner.big || ball.dunk || (ball.green && deep && sh === ti)) && round - lastReplayRound >= (WIN >= 100 ? 6 : 3)))) {
@@ -3338,7 +3401,8 @@ function animate(dt) {
       if (c.kind === 'NIGHT NIGHT' && (c.z = (c.z || 0) - dt) <= 0) { c.z = 0.35; pop('z', p.Hd.x + p.facing * 16, p.Hd.y - 24, '#c9d6ff'); }
       if (c.kind === 'ICE COLD' && Math.random() < dt * 24) spark(p.hand.x + rand(-8, 8), p.hand.y + rand(-6, 6), '#bfe6ff', rand(-30, 30), rand(-80, -20));
     }
-    if (state === 'scored' && p.mood === 'happy' && !p.celeb && p.grounded && !(p.down > 0) && Math.random() < dt * 3.2) {
+    reactStep(p, dt);
+    if (state === 'scored' && p.mood === 'happy' && !p.celeb && !p.react && p.grounded && !(p.down > 0) && Math.random() < dt * 3.2) {
       p.vy = -rand(260, 380) * Math.sqrt(court.g / 1400); p.vx = rand(-40, 40); p.grounded = false; p.y = GROUND - 1;
     }
     // the back arm follows its own spring, so it lags and swings
@@ -3349,6 +3413,7 @@ function animate(dt) {
     else if (p.trail && p.trail.length) p.trail.shift();
     p.pointT = Math.max(0, (p.pointT || 0) - dt);
     if (p.celeb) tgt = celebPose(p).phiB;
+    else if (reactPose(p)) tgt = reactPose(p).phiB;
     else if (waiting) tgt = 3.0 + Math.sin(time * 9) * 0.12;          // hand up, calling for it
     else if (p.pointT > 0) tgt = 1.9;                                // pointing at the receiver
     else if (p.dunkAnim) tgt = p.dunkAnim.kind === 'slam' ? p.phi - 0.1 : 1.5;
@@ -6167,6 +6232,7 @@ function showOver(w) {
   tone(98, 0.9, 'sawtooth', 0.05); tone(104, 0.9, 'square', 0.03);   // the horn
   for (let i = 0; i < 90; i++) { const c = pick([t.color, t.dark, '#ffffff', MUSTARD]); particles.push({ x: rand(0, W), y: rand(-40, 0), vx: rand(-60, 60), vy: rand(40, 160), c, life: rand(2, 3.2), max: 3.2, g: 260, s: rand(3, 6) }); }
   afterGame(w);
+  for (const p of players) { p.celeb = null; react(p, p.team === w ? 'dance' : pick(['kneel', 'facepalm', 'headshake']), 9); }
   { const tl = $('overTitle').textContent.length; $('overTitle').style.fontSize = tl > 16 ? 'calc(var(--k)*34)' : tl > 11 ? 'calc(var(--k)*40)' : ''; }   // long team names stay on two lines
   $('over').style.setProperty('--red', teams[0].color); $('over').style.setProperty('--blue', teams[1].color);
   $('stats').querySelectorAll('.hd.l').forEach(e => e.style.color = teams[0].color); $('stats').querySelectorAll('.hd.r').forEach(e => e.style.color = teams[1].color);
@@ -6649,8 +6715,9 @@ function newCup() {
   tourney = { round: 0, me };
 }
 // ---- update log ----
-const GAME_VERSION = 68;
+const GAME_VERSION = 69;
 const UPDATES = [
+  [69, 'Player Reactions', ['Teammates run over for high fives and chest bumps, or point at the scorer.', 'The team that got scored on facepalms, shrugs, argues, kicks the floor, puts hands on knees or can\u2019t watch.', 'Blockers wag a finger, stealers flex, airballs get a head grab.', 'Warm-ups during the intro: claps, stretches and bounces.', 'Winners dance and losers slump after the final buzzer.', 'Landing dust after big drops.']],
   [68, 'Celebrations Second Act', ['Arena: confetti cannons and the crowd erupts while you strut off.', 'Ice: a knee slide across the rink. Moon: floaty moon hops.', 'Beach: surf across the court. Bounce House: three flips.', 'Snow: a snowman builds itself. Heavy: aftershocks bounce everyone.', 'Street: toprock steps and bass rings. Rain: float away on your umbrella. Ranch: reel your lasso catch in.', 'Street Court draws faster.']],
   [67, 'Refine Pass', ['Street Court and the arena crowds run faster.', 'Announcer subtitles move up top on touch screens so they never cover the buttons.', 'Trophy pop-ups no longer cover the game-over screen.', 'The menu says Random Teams when random matchups are on.', 'A Morning Fall Corp credit in Settings.']],
   [66, 'Smooth Motion', ['Slow motion and dunks no longer stutter: the game moves every frame, even on slower computers.', 'Replays are smoother too.']],
