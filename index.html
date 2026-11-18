@@ -1918,6 +1918,28 @@ function reactStep(p, dt) {
   if (r.kind === 'headshake' || r.kind === 'kneel' || r.kind === 'facepalm' || r.kind === 'turnaway') { if (p.grounded) p.vx *= 0.8; }
   if (r.kind === 'headgrab' && Math.random() < dt * 4) spark(p.Hd.x + rand(-10, 10), p.Hd.y - 10, '#bfe6ff', rand(-20, 20), rand(-60, -20), false);   // sweat
 }
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+function statLine(m) { return [plural(m.pts, 'Pt'), plural(m.dunks, 'Dunk'), plural(m.greens, 'Green')].join(', '); }
+const EMOTE = { highfive: ['!', '#ffd34d'], chestbump: ['!!', '#ffd34d'], point: ['Yes!', '#5dff7a'], flex: ['★', '#ffd34d'], facepalm: ['...', '#cdbbdb'], kneel: ['...', '#cdbbdb'],
+  shrug: ['?', '#bfe6ff'], headshake: ['No', '#ff7a7a'], turnaway: ['><', '#ff7a7a'], argue: ['#!', '#ff4f6d'], kick: ['#', '#ff4f6d'], headgrab: ['!?', '#ff9d3d'], wag: ['Nope', '#ff4f6d'], dance: ['♪', '#ff6fd8'] };
+function drawEmotes() {
+  // a little speech bubble over each player who's reacting, so you can read the moment at a glance
+  if (attract || state === 'replay') return;
+  for (const p of players) {
+    const r = p.react, e = r && EMOTE[r.kind]; if (!e || p.celeb || p.iceShatter) continue;
+    const a = clamp(Math.min(r.t / 0.12, (r.dur - r.t) / 0.25, 1), 0, 1), pop = r.t < 0.25 ? 1 + Math.sin(r.t / 0.25 * Math.PI) * 0.25 : 1;
+    if (a <= 0) continue;
+    const txt = r.kind === 'dance' && Math.floor(r.t * 2.2) % 2 ? '♫' : e[0], x = p.Hd.x, y = p.Hd.y - 44 * p.scale - Math.sin(r.t * 5) * 2;
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(x, y); ctx.scale(pop, pop);
+    ctx.font = `700 13px ${TEXT}`; const w = Math.max(22, ctx.measureText(txt).width + 14);
+    ctx.fillStyle = INKD; rr(-w / 2 - 1.5, -12.5, w + 3, 23, 9); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-5, 9); ctx.lineTo(0, 16); ctx.lineTo(5, 9); ctx.fill();
+    ctx.fillStyle = INK; rr(-w / 2, -11, w, 20, 8); ctx.fill();
+    ctx.fillStyle = e[1]; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 0, 0);
+    ctx.restore();
+  }
+  ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
+}
 function celebFly(p, c, u, t0, t1, amp, hgt) {
   // fly a figure-eight across the court between t0 and t1, then drift back down
   if (u < t0) return false;
@@ -5984,7 +6006,7 @@ function draw() {
   for (const r of rings) { ctx.globalAlpha = clamp(1 - r.t * 2.2, 0, 1); ctx.strokeStyle = r.c; ctx.lineWidth = 5 * (1 - r.t * 1.6); ctx.beginPath(); ctx.ellipse(r.x, r.y, (14 + r.t * 420) * r.big, (6 + r.t * 140) * r.big, 0, 0, 7); ctx.stroke(); }
   ctx.globalAlpha = 1;
   drawOrb();
-  drawGreenAuras(); players.forEach(drawPlayer); drawStuns(); for (const p of players) if (p.celeb && !p.iceShatter) celebFx(p, 'over', p.scale);
+  drawGreenAuras(); players.forEach(drawPlayer); drawStuns(); drawEmotes(); for (const p of players) if (p.celeb && !p.iceShatter) celebFx(p, 'over', p.scale);
   drawGreenBall(); drawBall(); drawGolden();
   if (ball.holder && !ball.frozen) {   // the gripping hand sits over the ball
     const h = ball.holder, sc = h.scale;
@@ -6359,7 +6381,8 @@ function say(txt, force) {
   // the play-by-play shows as a subtitle along the bottom of the screen
   if (!SV.voice || attract || !txt) return;
   const n = performance.now(); if (!force && n - lastSay < 1400) return; lastSay = n;
-  const t = tc(String(txt));
+  let t = String(txt).trim();
+  if (t === t.toUpperCase()) t = t.charAt(0) + t.slice(1).toLowerCase();   // shouty pop text becomes a normal sentence
   sub = { t, at: n, dur: clamp(1500 + t.length * 45, 1900, 4600) };
 }
 function drawSubs() {
@@ -6372,7 +6395,7 @@ function drawSubs() {
   const ww = w => ctx.measureText(w).width; ctx.font = `700 16px ${TEXT}`; const whoW = ww(who); ctx.font = `600 16px ${TEXT}`;
   for (const w of words) { const test = line ? line + ' ' + w : w; if (ww(test) + (lines.length ? 0 : whoW) > 560 && line) { lines.push(line); line = w; } else line = test; }
   if (line) lines.push(line);
-  const lh = 22, bw = Math.max(...lines.map((l, i) => ww(l) + (i ? 0 : whoW))) + 28, bh = lines.length * lh + 14, bx = W / 2 - bw / 2, by = isTouch ? 124 : H - 74 - bh;   // on touch screens it sits up top, clear of the buttons
+  const lh = 22, bw = Math.max(...lines.map((l, i) => ww(l) + (i ? 0 : whoW))) + 28, bh = lines.length * lh + 14, bx = W / 2 - bw / 2, by = isTouch ? 124 : H - 8 - bh;   // on touch screens it sits up top, clear of the buttons
   ctx.fillStyle = 'rgba(8,6,14,.72)'; rr(bx, by, bw, bh, 8); ctx.fill();
   lines.forEach((l, i) => {
     let x = W / 2 - (ww(l) + (i ? 0 : whoW)) / 2; const y = by + 7 + lh / 2 + i * lh;
@@ -6441,7 +6464,7 @@ const toastQ = []; let toastBusy = false;
 function toast(head, body) { toastQ.push([head, body]); if (!toastBusy) nextToast(); }
 function nextToast() {
   const t = toastQ.shift(); if (!t) { toastBusy = false; return; } toastBusy = true;
-  const el = $('toast'); el.innerHTML = `<b>${t[0]}</b>${t[1]}`; el.classList.toggle('top', state === 'over' || !$('over').hidden || !$('panel').hidden); el.classList.add('on');
+  const el = $('toast'); el.innerHTML = `<b>${t[0]}</b>${t[1]}`; el.classList.toggle('top', true);   // always the top-right corner: clear of subtitles, sheets and the action el.classList.add('on');
   try { tone(784, 0.12, 'triangle', 0.05); setTimeout(() => tone(1175, 0.2, 'triangle', 0.05), 110); } catch (e) {}
   setTimeout(() => { el.classList.remove('on'); setTimeout(nextToast, 380); }, 2600);
 }
@@ -6596,7 +6619,7 @@ function afterGame(w) {
   // MVP
   const best = Object.values(mvpT).sort((a, b) => b.pts - a.pts || b.dunks - a.dunks)[0];
   $('mvp').hidden = !best;
-  if (best) $('mvp').innerHTML = `<span class="n" style="background:${teams[best.team].color}">${best.num}</span><span><b>MVP: ${pn(best.pname)}</b><small>${best.pts} Pts, ${best.dunks} Dunks, ${best.greens} Greens</small></span>`;
+  if (best) $('mvp').innerHTML = `<span class="n" style="background:${teams[best.team].color}">${best.num}</span><span><b>MVP: ${pn(best.pname)}</b><small>${statLine(best)}</small></span>`;
   // XP bar fills from where you were
   $('xpRow').hidden = !xp;
   if (xp) {
@@ -6612,7 +6635,7 @@ function needHalf() { return !attract && !practice() && !halfDone && (mode === 1
 function showHalftime() {
   halfDone = true; htOpen = true; paused = true; wipe = null;
   const lead = i => Object.values(mvpT).filter(m => m.team === i).sort((a, b) => b.pts - a.pts)[0];
-  const card = i => { const m = lead(i), t = teams[i]; return `<div class="stat" style="border:2px solid ${t.color}"><span>${tc(t.name)} Leader</span><b style="color:${t.color}">${m ? pn(m.pname) : '-'}</b><span>${m ? `${m.pts} Pts, ${m.dunks} Dunks, ${m.greens} Greens` : 'Still Warming Up'}</span></div>`; };
+  const card = i => { const m = lead(i), t = teams[i]; return `<div class="stat" style="border:2px solid ${t.color}"><span>${tc(t.name)} Leader</span><b style="color:${t.color}">${m ? pn(m.pname) : '-'}</b><span>${m ? statLine(m) : 'Still Warming Up'}</span></div>`; };
   const row = (l, k) => `<div class="stat"><b>${teams[0].stats[k]} - ${teams[1].stats[k]}</b><span>${l}</span></div>`;
   openPanel('Halftime', `<div class="ht"><div class="sc"><span style="color:${teams[0].color}">${tc(teams[0].name)} ${teams[0].score}</span> - <span style="color:${teams[1].color}">${teams[1].score} ${tc(teams[1].name)}</span></div>
     <div class="ld">${card(0)}${card(1)}</div><div class="cgrid">${row('Baskets', 'baskets')}${row('Dunks', 'dunks')}${row('Greens', 'greens')}${row('Blocks', 'blocks')}</div></div>`, [['Second Half', endHalftime, 'red']]);
@@ -6715,8 +6738,9 @@ function newCup() {
   tourney = { round: 0, me };
 }
 // ---- update log ----
-const GAME_VERSION = 69;
+const GAME_VERSION = 70;
 const UPDATES = [
+  [70, 'Polish', ['Speech bubbles over reacting players, like Yes!, No, Nope and question marks, so you can read every moment.', 'Announcer subtitles sit below the players on computers.', 'Trophy pop-ups always appear in the top-right corner.', 'Stat lines say 1 Pt instead of 1 Pts.']],
   [69, 'Player Reactions', ['Teammates run over for high fives and chest bumps, or point at the scorer.', 'The team that got scored on facepalms, shrugs, argues, kicks the floor, puts hands on knees or can\u2019t watch.', 'Blockers wag a finger, stealers flex, airballs get a head grab.', 'Warm-ups during the intro: claps, stretches and bounces.', 'Winners dance and losers slump after the final buzzer.', 'Landing dust after big drops.']],
   [68, 'Celebrations Second Act', ['Arena: confetti cannons and the crowd erupts while you strut off.', 'Ice: a knee slide across the rink. Moon: floaty moon hops.', 'Beach: surf across the court. Bounce House: three flips.', 'Snow: a snowman builds itself. Heavy: aftershocks bounce everyone.', 'Street: toprock steps and bass rings. Rain: float away on your umbrella. Ranch: reel your lasso catch in.', 'Street Court draws faster.']],
   [67, 'Refine Pass', ['Street Court and the arena crowds run faster.', 'Announcer subtitles move up top on touch screens so they never cover the buttons.', 'Trophy pop-ups no longer cover the game-over screen.', 'The menu says Random Teams when random matchups are on.', 'A Morning Fall Corp credit in Settings.']],
@@ -6758,7 +6782,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 .updh b{font:400 calc(var(--k)*18)/1.1 var(--display);color:var(--mustard)} .updh span{font:600 calc(var(--k)*12)/1 var(--text);color:var(--muted)}
 .upd ul{margin:calc(var(--k)*6) 0 0;padding-left:calc(var(--k)*18);color:var(--cream);font:500 calc(var(--k)*14)/1.4 var(--text)}
 </style>`);
-$('bVer').addEventListener('click', openUpdates);
+$('bVer').addEventListener('click', openUpdates); $('bVer').textContent = `v${GAME_VERSION} Updates`;
 setTimeout(() => { if ((SV.seenVer || 0) < GAME_VERSION && !$('menu').hidden && $('panel').hidden) { SV.seenVer = GAME_VERSION; persist(); whatsNew(); } }, 900);
 document.head.insertAdjacentHTML('beforeend', `<style>.credit{display:flex;flex-direction:column;align-items:center;gap:calc(var(--k)*3);margin:0 0 calc(var(--k)*12);padding:calc(var(--k)*12);background:var(--deep);border-radius:calc(var(--k)*12)}.credit b{font:400 calc(var(--k)*24)/1 var(--hype,Shrikhand),cursive;color:var(--mustard)}.credit span{font:600 calc(var(--k)*15)/1.2 var(--text);color:var(--cream)}.credit small{font:600 calc(var(--k)*11)/1 var(--text);color:var(--muted)}</style>`);
 function sfxDest() { if (!sfxBus) { sfxBus = ac.createGain(); sfxBus.gain.value = vol('sfx'); sfxBus.connect(ac.destination); } return sfxBus; }
