@@ -242,7 +242,7 @@ kbd.b{box-shadow:inset 0 calc(var(--k)*-3.5) 0 var(--blue),0 calc(var(--k)*2) 0 
           <button type="button" data-d="legend" aria-pressed="false">Legend</button>
         </div>
       </div>
-      <div class="lvl" id="lvlStrip"><b id="lvlN">Level 1</b><span class="xpbar"><i id="lvlBar"></i></span><small id="lvlTxt">0 / 100 XP</small><button type="button" id="bVer" class="verbtn">v63 Updates</button></div>
+      <div class="lvl" id="lvlStrip"><b id="lvlN">Level 1</b><span class="xpbar"><i id="lvlBar"></i></span><small id="lvlTxt">0 / 100 XP</small><button type="button" id="bVer" class="verbtn">v67 Updates</button></div>
     </div>
     <aside class="howto" aria-label="How to play">
       <h2>How to play</h2>
@@ -3361,11 +3361,12 @@ function drawBackground() {
   const d = court.deco;
   if (d === 'arena' || d === 'ice') {
     ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(0, 250, W, GROUND - 250);
-    for (const c of crowd) {
-      const j = Math.max(0, Math.sin(time * 9 + c.ph)) * 10 * crowdJump + Math.sin(time * 2 + c.ph) * 1.2;
-      ctx.fillStyle = c.c; ctx.globalAlpha = 0.16 + c.row * 0.045;
-      ctx.beginPath(); ctx.arc(c.x, c.y - j, 5, 0, 7); ctx.fill();
-      ctx.fillRect(c.x - 6, c.y - j + 5, 12, 10);
+    // the crowd, drawn in batches: one path per colour and row instead of two draws per fan
+    if (!crowd.groups || crowd.groups.n !== crowd.length) { const m = new Map(); for (const c of crowd) { const k = c.c + '|' + c.row; if (!m.has(k)) m.set(k, []); m.get(k).push(c); } crowd.groups = [...m.values()]; crowd.groups.n = crowd.length; }
+    for (const grp of crowd.groups) {
+      ctx.fillStyle = grp[0].c; ctx.globalAlpha = 0.16 + grp[0].row * 0.045; ctx.beginPath();
+      for (const c of grp) { const j = Math.max(0, Math.sin(time * 9 + c.ph)) * 10 * crowdJump + Math.sin(time * 2 + c.ph) * 1.2; ctx.moveTo(c.x + 5, c.y - j); ctx.arc(c.x, c.y - j, 5, 0, 7); ctx.rect(c.x - 6, c.y - j + 5, 12, 10); }
+      ctx.fill();
     }
     ctx.globalAlpha = 1;
     // photographers' flashes in the stands
@@ -3458,13 +3459,13 @@ function drawBackground() {
     // brick wall with spray paint, chain-link fence, street lamps
     ctx.fillStyle = '#4a2a26'; ctx.fillRect(0, GROUND - 210, W, 210);
     ctx.fillStyle = 'rgba(0,0,0,.25)';
-    for (let y = GROUND - 210; y < GROUND; y += 14) for (let x = ((y / 14) % 2) * 22; x < W; x += 44) ctx.fillRect(x, y, 42, 1.5), ctx.fillRect(x, y, 1.5, 14);
+    ctx.beginPath(); for (let y = GROUND - 210; y < GROUND; y += 14) for (let x = ((y / 14) % 2) * 22; x < W; x += 44) { ctx.rect(x, y, 42, 1.5); ctx.rect(x, y, 1.5, 14); } ctx.fill();   // mortar lines in one go
     ctx.save(); ctx.translate(300, GROUND - 130); ctx.rotate(-0.08); ctx.font = `58px ${HYPE}`; ctx.textAlign = 'center'; ctx.lineJoin = 'round';
     ctx.lineWidth = 9; ctx.strokeStyle = '#16171f'; ctx.strokeText('Hoop', 0, 0); ctx.fillStyle = '#ff4fa3'; ctx.fillText('Hoop', 0, 0);
     ctx.translate(230, 30); ctx.rotate(0.12); ctx.strokeText('Havoc', 0, 0); ctx.fillStyle = '#4fe3ff'; ctx.fillText('Havoc', 0, 0); ctx.restore(); ctx.lineJoin = 'miter';
     ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(760, GROUND - 120, 26, 0, 7); ctx.fill(); ctx.fillStyle = '#16171f'; ctx.beginPath(); ctx.arc(752, GROUND - 126, 4, 0, 7); ctx.arc(768, GROUND - 126, 4, 0, 7); ctx.fill();
     ctx.strokeStyle = 'rgba(200,210,220,.22)'; ctx.lineWidth = 1;
-    for (let x = -300; x < W; x += 16) { ctx.beginPath(); ctx.moveTo(x, GROUND - 280); ctx.lineTo(x + 280, GROUND); ctx.moveTo(x + 280, GROUND - 280); ctx.lineTo(x, GROUND); ctx.stroke(); }
+    ctx.beginPath(); for (let x = -300; x < W; x += 16) { ctx.moveTo(x, GROUND - 280); ctx.lineTo(x + 280, GROUND); ctx.moveTo(x + 280, GROUND - 280); ctx.lineTo(x, GROUND); } ctx.stroke();   // the whole fence in one stroke
     for (const lx of [160, 800]) {
       ctx.strokeStyle = '#2a2d36'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(lx, GROUND); ctx.lineTo(lx, 70); ctx.lineTo(lx + 40, 70); ctx.stroke();
       const g = ctx.createLinearGradient(0, 74, 0, GROUND); g.addColorStop(0, 'rgba(255,220,140,.32)'); g.addColorStop(1, 'rgba(255,220,140,0)');
@@ -6083,6 +6084,7 @@ function showOver(w) {
   tone(98, 0.9, 'sawtooth', 0.05); tone(104, 0.9, 'square', 0.03);   // the horn
   for (let i = 0; i < 90; i++) { const c = pick([t.color, t.dark, '#ffffff', MUSTARD]); particles.push({ x: rand(0, W), y: rand(-40, 0), vx: rand(-60, 60), vy: rand(40, 160), c, life: rand(2, 3.2), max: 3.2, g: 260, s: rand(3, 6) }); }
   afterGame(w);
+  { const tl = $('overTitle').textContent.length; $('overTitle').style.fontSize = tl > 16 ? 'calc(var(--k)*34)' : tl > 11 ? 'calc(var(--k)*40)' : ''; }   // long team names stay on two lines
   $('over').style.setProperty('--red', teams[0].color); $('over').style.setProperty('--blue', teams[1].color);
   $('stats').querySelectorAll('.hd.l').forEach(e => e.style.color = teams[0].color); $('stats').querySelectorAll('.hd.r').forEach(e => e.style.color = teams[1].color);
   $('over').hidden = false; $('bAgain').focus();
@@ -6182,6 +6184,8 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 .sheet.over h2{font-size:calc(var(--k)*50)}
 #toast{position:absolute;left:50%;bottom:calc(var(--k)*14);transform:translate(-50%,24px);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;background:var(--ink);border:calc(var(--k)*2.5) solid var(--mustard);border-radius:calc(var(--k)*12);padding:calc(var(--k)*8) calc(var(--k)*18);color:var(--cream);font:600 calc(var(--k)*13)/1.25 var(--text);text-align:center;z-index:40;box-shadow:0 calc(var(--k)*5) 0 var(--deep)}
 #toast.on{opacity:1;transform:translate(-50%,0)}
+#toast.top{bottom:auto;top:calc(var(--k)*62);left:auto;right:calc(var(--k)*10);transform:translate(0,-12px);max-width:calc(var(--k)*200)}
+#toast.top.on{transform:translate(0,0)}
 #toast b{display:block;font:400 calc(var(--k)*19)/1.1 var(--display);color:var(--mustard)}
 .ht{display:grid;gap:calc(var(--k)*10);text-align:center}
 .ht .sc{font:400 calc(var(--k)*30)/1 var(--display)}
@@ -6219,7 +6223,7 @@ function drawSubs() {
   const ww = w => ctx.measureText(w).width; ctx.font = `700 16px ${TEXT}`; const whoW = ww(who); ctx.font = `600 16px ${TEXT}`;
   for (const w of words) { const test = line ? line + ' ' + w : w; if (ww(test) + (lines.length ? 0 : whoW) > 560 && line) { lines.push(line); line = w; } else line = test; }
   if (line) lines.push(line);
-  const lh = 22, bw = Math.max(...lines.map((l, i) => ww(l) + (i ? 0 : whoW))) + 28, bh = lines.length * lh + 14, bx = W / 2 - bw / 2, by = H - 74 - bh;
+  const lh = 22, bw = Math.max(...lines.map((l, i) => ww(l) + (i ? 0 : whoW))) + 28, bh = lines.length * lh + 14, bx = W / 2 - bw / 2, by = isTouch ? 124 : H - 74 - bh;   // on touch screens it sits up top, clear of the buttons
   ctx.fillStyle = 'rgba(8,6,14,.72)'; rr(bx, by, bw, bh, 8); ctx.fill();
   lines.forEach((l, i) => {
     let x = W / 2 - (ww(l) + (i ? 0 : whoW)) / 2; const y = by + 7 + lh / 2 + i * lh;
@@ -6288,7 +6292,7 @@ const toastQ = []; let toastBusy = false;
 function toast(head, body) { toastQ.push([head, body]); if (!toastBusy) nextToast(); }
 function nextToast() {
   const t = toastQ.shift(); if (!t) { toastBusy = false; return; } toastBusy = true;
-  const el = $('toast'); el.innerHTML = `<b>${t[0]}</b>${t[1]}`; el.classList.add('on');
+  const el = $('toast'); el.innerHTML = `<b>${t[0]}</b>${t[1]}`; el.classList.toggle('top', state === 'over' || !$('over').hidden || !$('panel').hidden); el.classList.add('on');
   try { tone(784, 0.12, 'triangle', 0.05); setTimeout(() => tone(1175, 0.2, 'triangle', 0.05), 110); } catch (e) {}
   setTimeout(() => { el.classList.remove('on'); setTimeout(nextToast, 380); }, 2600);
 }
@@ -6318,8 +6322,9 @@ function applyTeam() {
   const T = SV.team || {}, c = TEAM_COLORS[T.c || 0] || TEAM_COLORS[0];
   teams[0].name = (T.name || 'HOT DOGS').toUpperCase(); teams[0].color = c[0]; teams[0].dark = c[1];
   const nm = tc(teams[0].name);
-  $('b1p').querySelector('small').textContent = `You're The ${nm}`; $('b1p').style.background = c[0];
-  if (!document.body.classList.contains('touch')) $('b2p').querySelector('small').textContent = `${nm} Vs Ice Pops${SV.riv && (SV.riv.r || SV.riv.b) ? `, Series ${SV.riv.r}-${SV.riv.b}` : ''}`;
+  const rnd = SV.rollTeams !== false && !SV.useMine;
+  $('b1p').querySelector('small').textContent = rnd ? 'Random Teams Vs The CPU' : `You're The ${nm}`; $('b1p').style.background = c[0];
+  if (!document.body.classList.contains('touch')) $('b2p').querySelector('small').textContent = `${rnd ? 'Random Teams' : nm + ' Vs Ice Pops'}${SV.riv && (SV.riv.r || SV.riv.b) ? `, Series ${SV.riv.r}-${SV.riv.b}` : ''}`;
   $('b2p').style.background = `linear-gradient(104deg,${c[0]} 0 49.6%,var(--blue) 50.4% 100%)`;
 }
 // ---- panels ----
@@ -6373,7 +6378,7 @@ function openLocker(tab) {
       ['Steals', car('steals')], ['Cups Won', car('cups')], ['Courts Played', `${SV.maps.length}/${COURTS.length}`], ['Dunks Landed', `${SV.dunks.length}/${DUNKS.length + Object.keys(MAP_DUNK).length}`]];
     body = `<div class="cgrid">${st.map(([l, v]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('')}</div>`;
   } else if (lockerTab === 'settings') {
-    body = [['music', 'Music'], ['sfx', 'Sound Effects'], ['shake', 'Screen Shake']].map(([k, l]) => `<div class="vrow"><label for="v_${k}">${l}</label><input type="range" id="v_${k}" data-v="${k}" min="0" max="100" step="5" value="${Math.round(vol(k) * 100)}"><span>${Math.round(vol(k) * 100)}%</span></div>`).join('');
+    body = '<div class="credit"><b>Hoop Havoc</b><span>A Morning Fall Corp Game</span><small>v' + GAME_VERSION + '</small></div>' + [['music', 'Music'], ['sfx', 'Sound Effects'], ['shake', 'Screen Shake']].map(([k, l]) => `<div class="vrow"><label for="v_${k}">${l}</label><input type="range" id="v_${k}" data-v="${k}" min="0" max="100" step="5" value="${Math.round(vol(k) * 100)}"><span>${Math.round(vol(k) * 100)}%</span></div>`).join('');
   } else {
     const n = ACH.filter(a => SV.ach[a[0]]).length;
     body = `<p style="margin:0 0 10px">${n} of ${ACH.length} unlocked.</p><div class="agrid">${ACH.map(a => `<div class="ach${SV.ach[a[0]] ? '' : ' off'}"><i>${SV.ach[a[0]] ? '★' : '?'}</i><div><b>${a[1]}</b><span>${a[2]}</span></div></div>`).join('')}</div>`;
@@ -6561,8 +6566,12 @@ function newCup() {
   tourney = { round: 0, me };
 }
 // ---- update log ----
-const GAME_VERSION = 63;
+const GAME_VERSION = 67;
 const UPDATES = [
+  [67, 'Refine Pass', ['Street Court and the arena crowds run faster.', 'Announcer subtitles move up top on touch screens so they never cover the buttons.', 'Trophy pop-ups no longer cover the game-over screen.', 'The menu says Random Teams when random matchups are on.', 'A Morning Fall Corp credit in Settings.']],
+  [66, 'Smooth Motion', ['Slow motion and dunks no longer stutter: the game moves every frame, even on slower computers.', 'Replays are smoother too.']],
+  [65, 'New Logo', ['An HH logo, blue over red, for the website tab and home screen.']],
+  [64, 'Website', ['Hoop Havoc is now on GitHub Pages with its own icon.']],
   [63, 'Update Log', ['A What’s New popup after each update, plus this list of every update.', 'The version number is shown on the menu.']],
   [62, 'First To 100 For 2 Players', ['A new head-to-head marathon mode in Modes.']],
   [61, '3D Diamonds And Better Celebrations', ['Crystal Cave diamonds are real spinning 3D gems.', 'Every green celebration gets a confetti burst and a spotlight.', 'Rooftop and Cloud Kingdom celebrations fly across the sky.', 'Lightning on the castle sword, roses in the Colosseum, candy rain, a disco floor and a pirate treasure chest.']],
@@ -6600,6 +6609,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 </style>`);
 $('bVer').addEventListener('click', openUpdates);
 setTimeout(() => { if ((SV.seenVer || 0) < GAME_VERSION && !$('menu').hidden && $('panel').hidden) { SV.seenVer = GAME_VERSION; persist(); whatsNew(); } }, 900);
+document.head.insertAdjacentHTML('beforeend', `<style>.credit{display:flex;flex-direction:column;align-items:center;gap:calc(var(--k)*3);margin:0 0 calc(var(--k)*12);padding:calc(var(--k)*12);background:var(--deep);border-radius:calc(var(--k)*12)}.credit b{font:400 calc(var(--k)*24)/1 var(--hype,Shrikhand),cursive;color:var(--mustard)}.credit span{font:600 calc(var(--k)*15)/1.2 var(--text);color:var(--cream)}.credit small{font:600 calc(var(--k)*11)/1 var(--text);color:var(--muted)}</style>`);
 function sfxDest() { if (!sfxBus) { sfxBus = ac.createGain(); sfxBus.gain.value = vol('sfx'); sfxBus.connect(ac.destination); } return sfxBus; }
 function applyVol() { if (sfxBus) sfxBus.gain.value = vol('sfx'); if (music.vol) music.vol.gain.value = vol('music'); }
 // ---- hype meter ----
