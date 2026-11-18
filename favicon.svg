@@ -1,1 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#21162f"/><circle cx="32" cy="32" r="23" fill="#f2802e" stroke="#120b1c" stroke-width="3.5"/><g fill="none" stroke="#120b1c" stroke-width="3" stroke-linecap="round"><path d="M9 32h46"/><path d="M32 9v46"/><path d="M15.5 15.5c7 5 9.5 10.5 9.5 16.5s-2.5 11.5-9.5 16.5"/><path d="M48.5 15.5c-7 5-9.5 10.5-9.5 16.5s2.5 11.5 9.5 16.5"/></g><circle cx="24" cy="21" r="4" fill="#ffb066" opacity=".7"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#21162f"/>
+<defs><path id="h" d="M0 0h7v8h10V0h7v22h-7v-8H7v8H0z"/></defs>
+<g transform="skewX(-10) translate(11 6)" stroke-linejoin="round">
+<use href="#h" x="2" y="2" fill="#120b1c" stroke="#120b1c" stroke-width="5"/><use href="#h" fill="#2f7de1" stroke="#fff0cf" stroke-width="3" paint-order="stroke"/>
+</g>
+<g transform="skewX(-10) translate(24 32)" stroke-linejoin="round">
+<use href="#h" x="2" y="2" fill="#120b1c" stroke="#120b1c" stroke-width="5"/><use href="#h" fill="#e8483b" stroke="#fff0cf" stroke-width="3" paint-order="stroke"/>
+</g></svg>
