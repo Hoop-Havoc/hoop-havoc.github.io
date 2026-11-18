@@ -3364,7 +3364,7 @@ function scored(ti, hp) {
   O.onFire = false; O.streak = 0; T.streak++; T.stats.best = Math.max(T.stats.best, T.streak);
   if (real) { if (ball.green) T.stats.greens++; T.stats.baskets++; if (ball.oop) T.stats.oops++; else if (ball.dunk) T.stats.dunks++; else if (deep) T.stats.deep++; }
   if (T.onFire && sh === ti && ball.fire && --T.fireLeft <= 0) { T.onFire = false; T.streak = 0; pop('COOLED OFF', W / 2, 160, '#7fd4ff'); }
-  if (T.streak >= 3 && !T.onFire) { T.onFire = true; T.fireLeft = 3; if (scorer && scorer.team === ti) setTimeout(() => quip(scorer, ["I'm on fire!", "Can't miss!", 'Too hot!', 'Feeling it!'], true, 1.6), 400); pop('ON FIRE!', hp.cx, hp.rimY - 70, '#ff4f6d'); roar(1.4, 0.12); }
+  if (T.streak >= 3 && !T.onFire) { T.onFire = true; T.fireLeft = 3; { const fs = ball.thrower; if (fs && fs.team === ti) setTimeout(() => quip(fs, ["I'm on fire!", "Can't miss!", 'Too hot!', 'Feeling it!'], true, 1.6), 400); } pop('ON FIRE!', hp.cx, hp.rimY - 70, '#ff4f6d'); roar(1.4, 0.12); }
   for (const p of players) p.mood = p.team === ti ? 'happy' : 'sad';
   teams.forEach((tm, i) => { const c = clutch(i); if (c && !tm.clutchOn && !attract) pop(`${tm.name.toUpperCase()}: CLUTCH MODE · BIGGER GREENS`, W / 2, 185, '#5dff7a'); tm.clutchOn = c; });
   const scorer = ball.oop || ball.dunk ? players.find(p => p.team === ti && (p.hang > 0 || p === ball.thrower)) : ball.thrower;
@@ -5139,7 +5139,7 @@ function drawHUD() {
   }
   ctx.restore();
   // controls reminder for the first couple of points
-  if (!attract && round <= 2 && state !== 'scored' && !isTouch) {
+  if (!attract && !autoPlay && round <= 2 && state !== 'scored' && !isTouch) {
     const one = mode !== 2;
     keyHint(14, H - 50, [['W', one ? 'Hop, Hold To Shoot' : 'Hop, Shoot'], ['E', 'Lob'], ['Q', 'Pass']], teams[0].color, false);
     if (!one) keyHint(W - 14, H - 50, [['↑', 'Hop, Shoot'], ['↓', 'Lob'], ['←', 'Pass']], teams[1].color, true);
@@ -6282,6 +6282,7 @@ function frame(now) {
   draw();
   requestAnimationFrame(frame);
 }
+document.head.insertAdjacentHTML('beforeend', '<style>body.auto #tL,body.auto #tR,body.auto #pL,body.auto #pR,body.auto #lL,body.auto #lR{display:none!important}</style>');
 function setGameUI(on) {
   document.body.classList.toggle('ingame', on);
   $('menu').hidden = on; $('bPause').hidden = !on;
@@ -6293,7 +6294,9 @@ const practice = () => (mode === 3 || mode === 4) && !attract;
 const tutorial = () => mode === 4 && !attract;
 const solo = () => teamSize === 1 && !attract && (mode === 1 || mode === 2);   // 1v1: one hooper a side
 let pstats = { shots: 0, greens: 0, makes: 0, dunks: 0 };
+let autoPlay = false, autoGames = 0;
 function startGame(m, target = 21, tour = false) {
+  autoPlay = tour === 'auto'; document.body.classList.toggle('auto', autoPlay);
   if (tour !== 'daily') daily = null; if (tour !== 'contest') contest = null; contestOpen = false; reel = null;
   if (tour !== true) { tourney = null; Object.assign(teams[1], DEF1); }
   applyTeam(); htOpen = false; $('panel').hidden = true; pendingStory = null;
@@ -6305,7 +6308,12 @@ function startGame(m, target = 21, tour = false) {
   $('over').hidden = true; $('pause').hidden = true; paused = false;
   setGameUI(true); newMatch(false);
 }
+function startAuto() {
+  startGame(2, 21, 'auto'); autoGames++; teams[0].cpu = teams[1].cpu = true; document.body.classList.add('auto');
+  if (autoGames === 1) toast('Auto Mode', 'The CPU plays forever. Press Esc to stop.');
+}
 function toMenu() {
+  autoPlay = false; autoGames = 0; document.body.classList.remove('auto');
   WIN = 21; tourney = null; daily = null; contest = null; contestOpen = false; reel = null; setTimeout(applyTeam, 0); Object.assign(teams[1], DEF1); htOpen = false; $('panel').hidden = true;
   paused = false; $('pause').hidden = true; $('over').hidden = true; tut = null; $('bSkip').hidden = true;
   teams.forEach(t => { t.cpu = true; }); setGameUI(false); newMatch(true);
@@ -6342,6 +6350,7 @@ function showOver(w) {
   }
   tone(98, 0.9, 'sawtooth', 0.05); tone(104, 0.9, 'square', 0.03);   // the horn
   for (let i = 0; i < 90; i++) { const c = pick([t.color, t.dark, '#ffffff', MUSTARD]); particles.push({ x: rand(0, W), y: rand(-40, 0), vx: rand(-60, 60), vy: rand(40, 160), c, life: rand(2, 3.2), max: 3.2, g: 260, s: rand(3, 6) }); }
+  if (autoPlay) { $('over').hidden = true; say(`${tc(t.name)} win it, ${teams[w].score} to ${teams[1 - w].score}. Next game coming up.`, true); setTimeout(() => { if (autoPlay && state === 'over') startAuto(); }, 6000); return; }
   afterGame(w);
   for (const p of players) { p.celeb = null; react(p, p.team === w ? 'dance' : pick(['kneel', 'facepalm', 'headshake']), 9); }
   { const tl = $('overTitle').textContent.length; $('overTitle').style.fontSize = tl > 16 ? 'calc(var(--k)*34)' : tl > 11 ? 'calc(var(--k)*40)' : ''; }   // long team names stay on two lines
@@ -6363,7 +6372,7 @@ $('bQuit').addEventListener('click', toMenu);
 $('bRestart').addEventListener('click', () => {
   if (contest) startContest(contest.kind); else if (daily) startGame(1, 11, 'daily');
   else if (tourney) { const o = TOURNEY[Math.min(3, tourney.round)]; startGame(1, o.to, true); if (tourney.me) Object.assign(teams[0], tourney.me); }
-  else if (tutorial()) startGame(4); else startGame(mode, WIN);
+  else if (tutorial()) startGame(4); else if (autoPlay) startAuto(); else startGame(mode, WIN);
 });
 $('bAgain').addEventListener('click', () => again());   // a rematch keeps the same target (21 or 100)
 $('bMenu').addEventListener('click', toMenu);
@@ -6564,12 +6573,13 @@ function nextToast() {
 }
 // ---- trophies, XP, levels ----
 function unlock(id) {
-  if (attract || mode === 4 || SV.ach[id]) return;
+  if (attract || autoPlay || mode === 4 || SV.ach[id]) return;
   const a = ACH.find(x => x[0] === id); if (!a) return;
   SV.ach[id] = Date.now(); persist(); toast(`Trophy: ${a[1]}`, a[2] + '. +25 XP'); gainXP(25);
 }
 function lvlInfo(xp = SV.xp) { let L = 1, need = 100; while (xp >= need) { xp -= need; L++; need = 100 + 60 * (L - 1); } return { L, cur: xp, need }; }
 function gainXP(n) {
+  if (autoPlay) return;
   const b = lvlInfo().L; SV.xp += n; persist(); const a = lvlInfo().L;
   if (a >= 10) unlock('lvl10');
   if (a > b) { const col = TEAM_COLORS.find(c => c[2] === a); toast(`Level ${a}!`, col ? `${col[3]} jerseys unlocked in the Locker.` : 'Keep hooping.'); if (a >= 5) unlock('lvl5'); }
@@ -6604,6 +6614,7 @@ function openPanel(title, html, buttons) {
 function closePanel() { $('panel').hidden = true; if (!$('menu').hidden) { syncLevel(); syncMenuBtns(); } }
 function syncMenuBtns() { const c = lockedCourt(); $('bCourt').textContent = c ? 'Court ✓' : 'Court'; $('bRules').textContent = Object.values(SV.rules).some(Boolean) ? 'Rules ✓' : 'Rules'; }
 const MODES = [
+  ['Auto Mode', 'Sit back. The CPU plays game after game, forever. Music and sound stay on.', () => startAuto()],
   ['Practice', 'Shoot around on one court. R rolls a new one.', () => startGame(3)],
   ['Tutorial', 'Learn every move, or pick one lesson to practice on repeat.', () => openLessons(false)],
   ['First To 100', 'A long game against the CPU.', () => startGame(1, 100)],
@@ -6745,7 +6756,7 @@ function showHalftime() {
   [392, 523, 659, 784, 659, 784].forEach((f, i) => setTimeout(() => tone(f, 0.18, 'square', 0.04), i * 140));
   const a = teams[0].score, b = teams[1].score;
   say(a === b ? `Halftime. All square at ${a}.` : `That's halftime. The ${tc(teams[a > b ? 0 : 1].name)} lead ${Math.max(a, b)} to ${Math.min(a, b)}.`, true);
-  setTimeout(() => { if (htOpen) endHalftime(); }, 14000);
+  setTimeout(() => { if (htOpen) endHalftime(); }, autoPlay ? 5000 : 14000);
 }
 function endHalftime() { if (!htOpen) return; htOpen = false; closePanel(); paused = false; startRound(true); }
 document.head.insertAdjacentHTML('beforeend', `<style>
@@ -6841,8 +6852,9 @@ function newCup() {
   tourney = { round: 0, me };
 }
 // ---- update log ----
-const GAME_VERSION = 74;
+const GAME_VERSION = 75;
 const UPDATES = [
+  [75, 'Auto Mode', ['New in Modes: Auto Mode. The CPU plays game after game forever, with music, sound and subtitles on. Great background noise for studying.', 'No XP or trophies are given in Auto Mode. Press Esc to stop.']],
   [74, 'More Moments', ['Players talk at more moments: calling for the ball when open, catching passes, catching fire, own goals, getting posterized, frozen or stunned.', 'A Restart button on the pause screen.', '8 new trophies: Marathon, Dunk Contest Star, Sniper, Daily Grinder, Hype Machine, Chaos Survivor, Green Machine and All-Star.']],
   [73, 'Twice The Trash Talk', ['Every reaction has twice as many lines, from "Gimme five!" and "Pickpocket!" to "Are you blind?!" and "Don\u2019t replay that!".', 'More warm-up chatter before each point.']],
   [72, 'Better Speech Bubbles', ['Players say real lines: "Up top!", "That was a foul!", "Lucky shot.", "Not today!", "My bad!" and lots more.', 'Comic-style bubbles in each team\u2019s color with a tail pointing at the speaker.', 'Bubbles stack instead of overlapping, and warm-up chatter like "Lock in!" during the intro.']],
