@@ -926,6 +926,7 @@ function pollPads() {
   }
 }
 function humanPressed(ti) {
+  if (ti === 1 && netHost()) return netIn.press;
   if (padHeld[ti]) return true;
   if (ti === 0) return !!(keys.KeyW || keys.Space || touchL || ((mode === 1 || mode === 3 || mode === 4) && keys.ArrowUp));
   return !!((mode === 2 && keys.ArrowUp) || touchR);
@@ -980,7 +981,7 @@ cv.addEventListener('pointerdown', e => {
   e.preventDefault(); audio();
   if (state === 'replay') { endReplay(); return; }
   if (tutorial() && tut && TUT[tut.step].final) { toMenu(); return; }
-  const r = cv.getBoundingClientRect(), side = mode === 2 && e.clientX - r.left > r.width / 2 ? 1 : 0;
+  const r = cv.getBoundingClientRect(), side = mode === 2 && !netHost() && e.clientX - r.left > r.width / 2 ? 1 : 0;
   ptrs.set(e.pointerId, side); syncPtrs();
   try { cv.setPointerCapture(e.pointerId); } catch (_) {}
 });
@@ -5139,7 +5140,7 @@ function drawHUD() {
   }
   ctx.restore();
   // controls reminder for the first couple of points
-  if (!attract && !autoPlay && round <= 2 && state !== 'scored' && !isTouch) {
+  if (!attract && !autoPlay && !net && round <= 2 && state !== 'scored' && !isTouch) {
     const one = mode !== 2;
     keyHint(14, H - 50, [['W', one ? 'Hop, Hold To Shoot' : 'Hop, Shoot'], ['E', 'Lob'], ['Q', 'Pass']], teams[0].color, false);
     if (!one) keyHint(W - 14, H - 50, [['↑', 'Hop, Shoot'], ['↓', 'Lob'], ['←', 'Pass']], teams[1].color, true);
@@ -6213,6 +6214,7 @@ let lastTitle = '';
 function frame(now) {
   { const tt = attract ? 'Hoop Havoc' : practice() ? 'Practice | Hoop Havoc' : `${tc(teams[0].name)} ${teams[0].score}-${teams[1].score} ${tc(teams[1].name)} | Hoop Havoc`; if (tt !== lastTitle) { lastTitle = tt; document.title = tt; } }
   pollPads();
+  if (netGuest()) { last = now; netGuestFrame(now); draw(); requestAnimationFrame(frame); return; }
   const el = Math.min(0.05, (now - last) / 1000) * (rules().turbo && state !== 'replay' ? 1.2 : 1); last = now;
   frameExtras(el);
   // auto quality: if it's been chugging for a few seconds in play, drop to FX Lite (once per session)
@@ -6277,6 +6279,7 @@ function frame(now) {
     if (simT > 0) { const n = Math.max(1, Math.ceil(simT / DT - 1e-6)), sdt = simT / n; for (let i = 0; i < n; i++) update(sdt); }
     stateUpdate(el);
   }
+  if (netHost()) netTick(now);
   const dim = state === 'replay';
   if (dim !== hudDim) { hudDim = dim; $('hudBtns').classList.toggle('dim', dim); }
   draw();
@@ -6296,6 +6299,7 @@ const solo = () => teamSize === 1 && !attract && (mode === 1 || mode === 2);   /
 let pstats = { shots: 0, greens: 0, makes: 0, dunks: 0 };
 let autoPlay = false, autoGames = 0;
 function startGame(m, target = 21, tour = false) {
+  if (tour !== 'online' && net) netClose();
   autoPlay = tour === 'auto'; document.body.classList.toggle('auto', autoPlay);
   if (tour !== 'daily') daily = null; if (tour !== 'contest') contest = null; contestOpen = false; reel = null;
   if (tour !== true) { tourney = null; Object.assign(teams[1], DEF1); }
@@ -6313,12 +6317,14 @@ function startAuto() {
   if (autoGames === 1) toast('Auto Mode', 'The CPU plays forever. Press Esc to stop.');
 }
 function toMenu() {
+  if (net) netClose();
   autoPlay = false; autoGames = 0; document.body.classList.remove('auto');
   WIN = 21; tourney = null; daily = null; contest = null; contestOpen = false; reel = null; setTimeout(applyTeam, 0); Object.assign(teams[1], DEF1); htOpen = false; $('panel').hidden = true;
   paused = false; $('pause').hidden = true; $('over').hidden = true; tut = null; $('bSkip').hidden = true;
   teams.forEach(t => { t.cpu = true; }); setGameUI(false); newMatch(true);
 }
 function togglePause() {
+  if (netGuest() && paused) { paused = false; $('pause').hidden = true; return; }
   if (attract || state === 'over' || htOpen) return;
   paused = !paused; $('pause').hidden = !paused;
   if (paused) { $('pauseScore').textContent = practice() ? tc(court.name) : `${tc(teams[0].name)} ${teams[0].score} - ${teams[1].score} ${tc(teams[1].name)}  |  ${tc(court.name)}`; $('bResume').focus(); }
@@ -6613,7 +6619,262 @@ function openPanel(title, html, buttons) {
 }
 function closePanel() { $('panel').hidden = true; if (!$('menu').hidden) { syncLevel(); syncMenuBtns(); } }
 function syncMenuBtns() { const c = lockedCourt(); $('bCourt').textContent = c ? 'Court ✓' : 'Court'; $('bRules').textContent = Object.values(SV.rules).some(Boolean) ? 'Rules ✓' : 'Rules'; }
+
+// ---- online play: PeerJS (free, browser to browser). The host's game is the real one; the guest just draws what it sends ----
+let net = null, netIn = { press: false }, netSfx = [], netBuf = [], netOff = Infinity, netLastSend = 0, netHoopKey = '', netHpT = 0, netGPress = false, netOverShown = false, netGC = '';
+const netHost = () => !!(net && net.host && net.ready), netGuest = () => !!(net && !net.host && net.ready);
+const NET_ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const netCode = () => Array.from({ length: 4 }, () => NET_ABC[Math.floor(Math.random() * NET_ABC.length)]).join('');
+function netLoadPeer() {
+  if (window.Peer || window.__netTest) return Promise.resolve();
+  return new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js'; s.onload = ok; s.onerror = () => no(new Error('load')); document.head.appendChild(s); });
+}
+// a tiny wrapper so the game doesn't care whether it's PeerJS or the local test channel
+function netWrapPeer(c) { const w = { send: o => { try { if (c.open) c.send(o); } catch (e) {} }, close: () => { try { c.close(); } catch (e) {} } }; c.on('data', d => netRecv(d)); c.on('close', () => netLost()); c.on('error', () => netLost()); return w; }
+function netWrapTest(code, host) {
+  const bc = new BroadcastChannel('hh-net-' + code), me = host ? 'h' : 'g';
+  bc.onmessage = e => { const m = e.data; if (m.from === me) return; if (m.d && m.d.t === 'hello' && host && net && !net.ready) { netConnected(netWrapTestConn(bc, me)); return; } if (m.d && m.d.t === 'bye') { netLost(); return; } if (net && net.ready) netRecv(m.d); };
+  return bc;
+}
+function netWrapTestConn(bc, me) { return { send: o => bc.postMessage({ from: me, d: o }), close: () => { try { bc.postMessage({ from: me, d: { t: 'bye' } }); bc.close(); } catch (e) {} } }; }
+function netMsg(t) { const m = $('nMsg'); if (m) m.innerHTML = t; }
+function netClose(quiet) {
+  if (!net) return;
+  const n = net; net = null; netBuf = []; netLast = null; netFull = null; netOff = Infinity; netIn.press = false; netOverShown = false;
+  document.body.classList.remove('net', 'netH', 'netG');
+  try { n.conn && n.conn.send({ t: 'bye' }); } catch (e) {}
+  setTimeout(() => { try { n.conn && n.conn.close(); } catch (e) {} try { n.peer && n.peer.destroy(); } catch (e) {} try { n.bc && n.bc.close(); } catch (e) {} }, 150);
+  clearTimeout(n.timer);
+}
+function netLost() {
+  if (!net) return;
+  const was = net.ready; netClose(true);
+  if (was) { toMenu(); toast('Online Game Over', 'Your friend left or the connection dropped.'); }
+}
+function netFail(t) { netClose(true); netMsg(t); }
+function netHostGame() {
+  netClose(true); const code = netCode(); net = { host: true, ready: false, code };
+  netMsg('Setting up...');
+  if (window.__netTest) { net.bc = netWrapTest(code, true); netShowCode(code); return; }
+  netLoadPeer().then(() => {
+    if (!net || net.code !== code) return;
+    const peer = new Peer('hoophavoc-' + code.toLowerCase()); net.peer = peer;
+    peer.on('open', () => netShowCode(code));
+    peer.on('connection', c => { if (net && !net.ready) c.on('open', () => netConnected(netWrapPeer(c))); else c.close(); });
+    peer.on('error', e => { if (e.type === 'unavailable-id') { netHostGame(); return; } if (!net || !net.ready) netFail(netErr(e)); });
+  }).catch(() => netFail("Couldn't load online play. Check your internet, then try again."));
+}
+function netShowCode(code) { netMsg(`Your code is <b class="ncode">${code}</b><br>Tell your friend to pick Join and type it in. Waiting for them...`); }
+function netJoinGame() {
+  const code = (($('nCode') || {}).value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length !== 4) { netMsg('Type the 4-letter code from your friend.'); return; }
+  netClose(true); net = { host: false, ready: false, code }; netMsg('Connecting...');
+  net.timer = setTimeout(() => { if (net && !net.ready) netFail("Couldn't connect. Check the code. Some networks, like school Wi-Fi, block online play."); }, 15000);
+  if (window.__netTest) { net.bc = netWrapTest(code, false); const c = netWrapTestConn(net.bc, 'g'); net.conn = c; c.send({ t: 'hello' }); net.ready = true; netGuestStart(); return; }
+  netLoadPeer().then(() => {
+    if (!net || net.code !== code) return;
+    const peer = new Peer(); net.peer = peer;
+    peer.on('open', () => { const c = peer.connect('hoophavoc-' + code.toLowerCase(), { reliable: true, serialization: 'json' }); c.on('open', () => { if (!net) return; net.conn = netWrapPeer(c); net.ready = true; clearTimeout(net.timer); net.conn.send({ t: 'hello' }); netGuestStart(); }); });
+    peer.on('error', e => { if (!net || !net.ready) netFail(e.type === 'peer-unavailable' ? 'No game with that code. Check it and try again.' : netErr(e)); });
+  }).catch(() => netFail("Couldn't load online play. Check your internet, then try again."));
+}
+const netErr = e => e && (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error') ? "Couldn't reach the online server. Some networks, like school Wi-Fi, block online play." : "Something went wrong. Try again.";
+function netConnected(conn) {
+  if (!net) return;
+  net.conn = conn; net.ready = true; clearTimeout(net.timer);
+  closePanel(); netNewGame();
+}
+function netNewGame() {
+  startGame(2, 21, 'online');
+  document.body.classList.add('net', 'netH');
+  teams[0].cpu = teams[1].cpu = false; netIn.press = false; netHpT = 0; netHoopKey = '';
+  toast('Online', 'You are on the left. Your friend is on the right.');
+}
+function netGuestStart() {
+  closePanel(); contest = null; daily = null; tourney = null; reel = null; tut = null; autoPlay = false; contestOpen = false;
+  mode = 2; attract = false; paused = false; $('pause').hidden = true; $('over').hidden = true; netOverShown = false;
+  document.body.classList.add('net', 'netG'); setGameUI(true); audio();
+  netMsg(''); toast('Online', "You're on the right. Waiting for the host...");
+}
+function openOnline() {
+  openPanel('Play Online', `<p style="margin:0 0 12px">Play a friend on another device. One of you hosts and gets a code. The other joins with it.</p>
+    <div class="nrow"><button class="btn" id="nHost" type="button"><b>Host A Game</b></button></div>
+    <div class="nrow"><label class="nlbl" for="nCode">Friend's code</label><input id="nCode" maxlength="4" autocomplete="off" spellcheck="false" placeholder="ABCD"><button class="btn alt" id="nJoin" type="button"><b>Join</b></button></div>
+    <p id="nMsg" class="nmsg" aria-live="polite"></p>`, [['Back', () => { netClose(true); openModes(); }]]);
+  $('nHost').onclick = netHostGame; $('nJoin').onclick = netJoinGame;
+  $('nCode').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') netJoinGame(); });
+}
+document.head.insertAdjacentHTML('beforeend', `<style>
+.nrow{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin:10px 0}
+.nlbl{font-weight:800}
+#nCode{width:7.5em;font:inherit;font-size:1.3em;font-weight:900;letter-spacing:.2em;text-align:center;text-transform:uppercase;padding:8px 10px;border-radius:12px;border:3px solid var(--line,#fff3);background:#0003;color:inherit}
+.nmsg{min-height:3.2em;text-align:center;margin:12px 0 0;line-height:1.45}
+.ncode{display:inline-block;font-size:2.2em;letter-spacing:.18em;color:#ffd34d;margin:4px 0}
+body.netH #tR,body.netH #pR,body.netH #lR,body.netG #tL,body.netG #pL,body.netG #lL,body.net #bRestart{display:none!important}
+</style>`);
+
+// ---- encoding: numbers trimmed, links between objects turned into small tags ----
+const NET_SKIP = v => (typeof HTMLElement !== 'undefined' && v instanceof HTMLElement) || (typeof HTMLCanvasElement !== 'undefined' && v instanceof HTMLCanvasElement) || (typeof OffscreenCanvas !== 'undefined' && v instanceof OffscreenCanvas) || (typeof CanvasGradient !== 'undefined' && v instanceof CanvasGradient) || (typeof CanvasPattern !== 'undefined' && v instanceof CanvasPattern) || (typeof ImageData !== 'undefined' && v instanceof ImageData) || (typeof AudioNode !== 'undefined' && v instanceof AudioNode) || (typeof Image !== 'undefined' && v instanceof Image) || v instanceof Map || v instanceof Set;
+function netEnc(v, refs, d, seen) {
+  if (typeof v === 'number') return Number.isInteger(v) ? v : Number.isFinite(v) ? Math.round(v * 100) / 100 : null;
+  if (v === null || typeof v !== 'object') return typeof v === 'function' ? undefined : v;
+  if (d > 0 && refs.has(v)) return refs.get(v);
+  if (seen.has(v) || d > 7 || NET_SKIP(v)) return undefined;
+  if (ArrayBuffer.isView(v)) return { $f: Array.from(v, x => Math.round(x * 10) / 10) };
+  seen.add(v);
+  let o;
+  if (Array.isArray(v)) o = v.map(x => { const e = netEnc(x, refs, d + 1, seen); return e === undefined ? null : e; });
+  else { o = {}; for (const k in v) { const e = netEnc(v[k], refs, d + 1, seen); if (e !== undefined) o[k] = e; } }
+  seen.delete(v);
+  return o;
+}
+function netTop(o, refs, seen) { const r = {}; for (const k in o) { const e = netEnc(o[k], refs, 1, seen); if (e !== undefined) r[k] = e; } return r; }
+function netDec(v, ctx) {
+  if (v === null || typeof v !== 'object') return v;
+  if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) v[i] = netDec(v[i], ctx); return v; }
+  if (v.$p !== undefined) return ctx.players[v.$p] || null;
+  if (v.$t !== undefined) return teams[v.$t];
+  if (v.$h !== undefined) return hoops[v.$h] || null;
+  if (v.$b !== undefined) return ctx.ball || null;
+  if (v.$f !== undefined) return Float32Array.from(v.$f);
+  for (const k in v) v[k] = netDec(v[k], ctx);
+  return v;
+}
+// the game globals the drawing code reads (checked at start: anything missing or not settable is left out)
+const NET_G = ['state', 'stateT', 'round', 'WIN', 'chaos', 'goldenRound', 'banner', 'pops', 'sub', 'flashA', 'shake', 'greenFx', 'greenBurst', 'timeScale', 'slowT', 'hitstop', 'wind', 'orb', 'powerT', 'meterFx', 'rings', 'wipe', 'crowdJump', 'quakeT',
+  'fxStreaks', 'fxFlares', 'fxBulbs', 'fxSwipes', 'fxSkids', 'goalCount', 'halfDone', 'roundStart', 'quietIntro', 'replay', 'attack', 'recentDunks', 'blockReplay', 'htOpen', 'lastTouchT', 'pendingReplay', 'mvpT', 'shots', 'greenBurst', 'paused']
+  .filter((n, i, a) => a.indexOf(n) === i && n !== 'paused').filter(n => { try { eval(`${n} = ${n};`); return true; } catch (e) { return false; } });
+const netGet = eval(`() => ({ ${NET_G.join(', ')} })`);
+const netSet = eval(`o => { ${NET_G.map(n => `if ('${n}' in o) ${n} = o.${n};`).join(' ')} }`);
+function netRefs(snapPlayers) {
+  const m = new Map();
+  players.forEach((p, i) => m.set(p, { $p: i })); if (snapPlayers) snapPlayers.forEach((p, i) => m.set(p, { $p: i }));
+  teams.forEach((t, i) => m.set(t, { $t: i })); hoops.forEach((h, i) => m.set(h, { $h: i })); m.set(ball, { $b: 1 });
+  return m;
+}
+function netTick(now) {
+  if (now - netLastSend < 40) return; netLastSend = now;
+  const sn = state === 'replay' && replay && rec.length ? replayFrame() : snap();
+  sn.parts = sn.parts.slice(-40).map(q => ({ ...q, x: Math.round(q.x), y: Math.round(q.y), vx: Math.round(q.vx || 0), vy: Math.round(q.vy || 0) }));
+  const refs = netRefs(sn.players), seen = new Set();
+  const ci = COURTS.findIndex(c => c.deco === court.deco);
+  const hk = [ci, court.g, BALLS.indexOf(ballT), BODIES.indexOf(body), HOOP_TYPES.indexOf(hoopT), round].join(',');
+  const pk = { t: 's', n: now, s: { ...netTop({ time: sn.time, hoops: sn.hoops, nets: sn.nets, parts: sn.parts }, refs, seen), players: sn.players.map(p => netTop(p, refs, seen)), ball: netTop(sn.ball, refs, seen) }, g: netTop(netGet(), refs, seen), tm: teams.map(t => { const o = netTop(t, refs, seen); delete o.ai; delete o.roster; return o; }),
+    c: [cam.x, cam.y, cam.z].map(v => Math.round(v * 100) / 100), hk, fx: netSfx.splice(0), ov: !$('over').hidden, pz: paused };
+  if (hk !== netHoopKey || now - netHpT > 2000) { netHoopKey = hk; netHpT = now; pk.hp = hoops.map(h => { const o = netTop(h, refs, seen); delete o.net; return o; }); pk.ro = teams.map(t => netEnc(t.roster, refs, 1, seen)); }
+  const kf = !netLast || now - netLast.t > 1500 || netLast.p0 !== players[0] || netLast.n !== pk.s.players.length;
+  if (kf) netLast = { t: now, p0: players[0], n: pk.s.players.length, pl: [], tm: [], g: {} };
+  const dif = (o, last) => { const r = {}; for (const k in o) { const j = JSON.stringify(o[k]); if (kf || last[k] !== j) { r[k] = o[k]; last[k] = j; } } return r; };
+  pk.s.players = pk.s.players.map((p, i) => dif(p, netLast.pl[i] || (netLast.pl[i] = {})));
+  pk.tm = pk.tm.map((t, i) => dif(t, netLast.tm[i] || (netLast.tm[i] = {})));
+  pk.g = dif(pk.g, netLast.g); if (kf) pk.kf = 1;
+  netLast.nets = netLast.nets || []; pk.s.nets = pk.s.nets.map((n, i) => { const j = JSON.stringify(n); if (!kf && netLast.nets[i] === j) return 0; netLast.nets[i] = j; return n; });   // a net only goes out when it moves
+  net.conn.send(pk);
+}
+let netLast = null, netFull = null;
+// host: what the guest pressed
+function netRecv(m) {
+  if (!m || !net) return;
+  if (net.host) {
+    if (m.t === 'in') { const was = netIn.press; netIn.press = !!m.p; if (m.p && !was && !paused) { if (state === 'replay') endReplay(); else { teams[1].latch = true; if (state === 'play') contestPress(1); } } }
+    else if (m.t === 'lob' && !paused) lobFor(1);
+    else if (m.t === 'pass' && !paused) passFor(1);
+    else if (m.t === 'again' && state === 'over') netNewGame();
+    else if (m.t === 'bye') netLost();
+    return;
+  }
+  if (m.t === 'bye') { netLost(); return; }
+  if (m.t !== 's') return;
+  // rebuild the full picture from the changes
+  if (m.kf) netFull = { pl: [], tm: [], g: {} }; else if (!netFull) return;
+  const mg = (o, base) => { for (const k in o) base[k] = o[k]; return JSON.parse(JSON.stringify(base)); };
+  m.s.players = m.s.players.map((p, i) => mg(p, netFull.pl[i] || (netFull.pl[i] = {})));
+  m.tm = m.tm.map((t, i) => mg(t, netFull.tm[i] || (netFull.tm[i] = {})));
+  m.g = mg(m.g, netFull.g);
+  netFull.nets = netFull.nets || []; m.s.nets = (m.s.nets || []).map((n, i) => n === 0 ? netFull.nets[i] : (netFull.nets[i] = n));
+  const rn = performance.now(); netOff = Math.min(netOff, rn - m.n); if (rn - m.n - netOff > 1500) netOff = rn - m.n;   // our best guess at the host's clock
+  for (const f of m.fx || []) { try { netSfxPlay(f); } catch (e) {} }
+  if (m.hp) {
+    if (m.hk !== netGC) {
+      netGC = m.hk; const [ci, g, bi, bo, hi] = m.hk.split(',').map(Number);
+      court = COURTS[ci] ? (COURTS[ci].g === g ? COURTS[ci] : { ...COURTS[ci], g }) : court; ballT = BALLS[bi] || ballT; body = BODIES[bo] || body; hoopT = HOOP_TYPES[hi] || hoopT;
+      setupHoops();
+    }
+    const hp = netDec(m.hp, { players: [], ball: null }); hp.forEach((h, i) => { if (hoops[i] && h) for (const k in h) if (k !== 'net' && h[k] !== null) hoops[i][k] = h[k]; });
+  }
+  if (m.ro) m.ro.forEach((r, i) => { teams[i].roster = netDec(r, {}); });
+  netBuf.push(m); if (netBuf.length > 12) netBuf.shift();
+}
+// guest: draw the host's game ~90ms behind, gliding between snapshots
+function netGuestFrame(now) {
+  // send our button state
+  const pr = !!(keys.KeyW || keys.Space || keys.ArrowUp || touchL || touchR || padHeld[0] || padHeld[1]);
+  if (pr !== netGPress) { netGPress = pr; net.conn.send({ t: 'in', p: pr ? 1 : 0 }); }
+  if (!netBuf.length) return;
+  const rt = now - netOff - 90;
+  while (netBuf.length > 2 && netBuf[1].n <= rt) netBuf.shift();
+  const A = netBuf[0], B = netBuf[1];
+  const a = netUnpack(A), b = B ? netUnpack(B) : null;
+  const f = b ? clamp((rt - A.n) / Math.max(1, B.n - A.n), 0, 1) : 0, P = f > 0.5 && B ? B : A, pd = f > 0.5 && b ? b : a;
+  const sn = b ? blendSnap(a.s, b.s, f) : a.s;
+  players = sn.players; ball = sn.ball; time = sn.time; particles = sn.parts;
+  sn.hoops.forEach((v, i) => hoops[i] && setHoopVals(hoops[i], v));
+  if (sn.nets) sn.nets.forEach((n, i) => { const h = hoops[i]; if (n && h && h.net && n.length === h.net.p.length) h.net.p = n; });
+  const keepPause = paused;
+  netSet(pd.g);
+  paused = keepPause;
+  if (sub && sub.at !== undefined && !sub._g) { sub._g = 1; sub.at += netOff + 90; }   // subtitle timing is on the host's clock
+  pd.tm.forEach((t, i) => Object.assign(teams[i], t));
+  if (state === 'replay' && replay) { rec = [sn]; replay = { ...replay, pos: 0, i0: 0, i1: 0 }; }
+  const c = P.c; if (b && A.c && B.c) { cam.x = lerp(A.c[0], B.c[0], f); cam.y = lerp(A.c[1], B.c[1], f); cam.z = lerp(A.c[2], B.c[2], f); } else if (c) { cam.x = c[0]; cam.y = c[1]; cam.z = c[2]; }
+  cam.t = 0; cam.focus = null;
+  // the final buzzer
+  if (P.ov && !netOverShown) { netOverShown = true; const w = teams[0].score > teams[1].score ? 0 : 1; netShowOver(w); }
+  if (!P.ov && netOverShown) { netOverShown = false; $('over').hidden = true; }
+}
+function netUnpack(m) {
+  if (m._u) return m._u;
+  const s = m.s, ctx = { players: s.players, ball: s.ball };
+  netDec(s.players, ctx); s.ball = netDec(s.ball, ctx); ctx.ball = s.ball; netDec(s.parts, ctx);
+  s.nets = (s.nets || []).map(n => n ? (n.$f ? Float32Array.from(n.$f) : Float32Array.from(n)) : null);
+  const g = netDec(m.g, ctx), tm = m.tm.map(t => netDec(t, ctx));
+  return (m._u = { s, g, tm });
+}
+function netShowOver(w) {
+  const t = teams[w], nice = n => String(n).split(' ').map(x => x.charAt(0) + x.slice(1).toLowerCase()).join(' ');
+  $('overTitle').textContent = w === 1 ? 'You Win!' : `${nice(t.name)} Win!`; $('overTitle').style.color = t.color;
+  $('overSub').textContent = w === 1 ? 'You beat your friend online.' : 'Your friend takes this one. Ask for a rematch.';
+  $('fsL').textContent = teams[0].score; $('fsR').textContent = teams[1].score;
+  const lbl = $('bAgain').querySelector('b'); if (lbl) lbl.textContent = 'Rematch';
+  $('over').hidden = false; tone(98, 0.9, 'sawtooth', 0.05); tone(104, 0.9, 'square', 0.03);
+}
+// sound: the host's sound calls get replayed on the guest
+function netSfxPlay(f) { const fn = { t: tone, h: hiss, r: roar }[f[0]]; if (fn) NET_RAW[f[0]](...f[1]); }
+const NET_RAW = { t: tone, h: hiss, r: roar };
+tone = function (...a) { if (netHost() && netSfx.length < 40) netSfx.push(['t', a.map(x => typeof x === 'number' ? Math.round(x * 1000) / 1000 : x)]); return NET_RAW.t(...a); };
+hiss = function (...a) { if (netHost() && netSfx.length < 40) netSfx.push(['h', a]); return NET_RAW.h(...a); };
+roar = function (...a) { if (netHost() && netSfx.length < 40) netSfx.push(['r', a]); return NET_RAW.r(...a); };
+{ const _lob = lobFor, _pass = passFor;
+  lobFor = ti => { if (netGuest()) { net.conn.send({ t: 'lob' }); return; } return _lob(ti); };
+  passFor = ti => { if (netGuest()) { net.conn.send({ t: 'pass' }); return; } return _pass(ti); }; }
+// keys while online: the host uses W/E/Q or the arrows for the left side; the guest's keys go to the host
+const NET_KEYS = { KeyW: 'KeyW', Space: 'KeyW', ArrowUp: 'KeyW', KeyE: 'KeyE', ArrowDown: 'KeyE', KeyQ: 'KeyQ', ArrowLeft: 'KeyQ' };
+addEventListener('keydown', e => {
+  if (!net || !net.ready || !NET_KEYS[e.code] || !$('panel').hidden || (e.target && e.target.tagName === 'INPUT')) return;
+  e.preventDefault(); e.stopImmediatePropagation(); if (e.repeat) return; audio();
+  const k = NET_KEYS[e.code];
+  if (netGuest()) { keys[e.code] = true; if (k === 'KeyE') lobFor(1); if (k === 'KeyQ') passFor(1); return; }
+  keys[k] = true;
+  if (paused || attract) return;
+  if (state === 'replay') { endReplay(); return; }
+  if (k === 'KeyW') { teams[0].latch = true; if (state === 'play') contestPress(0); }
+  if (k === 'KeyE') lobFor(0); if (k === 'KeyQ') passFor(0);
+}, true);
+addEventListener('keyup', e => { if (net && net.ready && NET_KEYS[e.code]) { keys[e.code] = false; if (netHost()) keys[NET_KEYS[e.code]] = !!(Object.keys(NET_KEYS).some(c => c !== e.code && NET_KEYS[c] === NET_KEYS[e.code] && keys[c])); } }, true);
+addEventListener('beforeunload', () => { try { net && net.conn && net.conn.send({ t: 'bye' }); } catch (e) {} });
+
 const MODES = [
+  ['Play Online', 'Play a friend on another device with a room code.', () => openOnline()],
   ['Auto Mode', 'Sit back. The CPU plays game after game, forever. Music and sound stay on.', () => startAuto()],
   ['Practice', 'Shoot around on one court. R rolls a new one.', () => startGame(3)],
   ['Tutorial', 'Learn every move, or pick one lesson to practice on repeat.', () => openLessons(false)],
@@ -6689,6 +6950,8 @@ function openBracket() {
     [[`Play ${TOURNEY[r].label}`, () => { const o = TOURNEY[r]; closePanel(); Object.assign(teams[1], { name: o.name, color: o.color, dark: o.dark }); startGame(1, o.to, true); if (tourney.me) Object.assign(teams[0], tourney.me); }, 'red'], ['Quit', () => { tourney = null; if (state === 'over') toMenu(); else closePanel(); }]]);
 }
 function again() {
+  if (netHost()) { netNewGame(); return; }
+  if (netGuest()) { net.conn.send({ t: 'again' }); $('over').hidden = true; toast('Rematch', 'Asked the host for a rematch.'); return; }
   if (daily) { startGame(1, 11, 'daily'); return; }
   if (tourney) { if (tourney.round >= 4) newCup(); $('over').hidden = true; openBracket(); return; }
   startGame(mode, WIN);
@@ -6756,7 +7019,7 @@ function showHalftime() {
   [392, 523, 659, 784, 659, 784].forEach((f, i) => setTimeout(() => tone(f, 0.18, 'square', 0.04), i * 140));
   const a = teams[0].score, b = teams[1].score;
   say(a === b ? `Halftime. All square at ${a}.` : `That's halftime. The ${tc(teams[a > b ? 0 : 1].name)} lead ${Math.max(a, b)} to ${Math.min(a, b)}.`, true);
-  setTimeout(() => { if (htOpen) endHalftime(); }, autoPlay ? 5000 : 14000);
+  setTimeout(() => { if (htOpen) endHalftime(); }, autoPlay || netHost() ? 6000 : 14000);
 }
 function endHalftime() { if (!htOpen) return; htOpen = false; closePanel(); paused = false; startRound(true); }
 document.head.insertAdjacentHTML('beforeend', `<style>
@@ -6852,8 +7115,9 @@ function newCup() {
   tourney = { round: 0, me };
 }
 // ---- update log ----
-const GAME_VERSION = 75;
+const GAME_VERSION = 76;
 const UPDATES = [
+  [76, 'Play Online', ['New in Modes: Play Online. Host a game to get a 4-letter code, and your friend joins with it on their own device.', 'The host plays on the left with W/E/Q or the arrows. The friend plays on the right. Rematch works from both sides.', 'Some networks, like school Wi-Fi, block online play.']],
   [75, 'Auto Mode', ['New in Modes: Auto Mode. The CPU plays game after game forever, with music, sound and subtitles on. Great background noise for studying.', 'No XP or trophies are given in Auto Mode. Press Esc to stop.']],
   [74, 'More Moments', ['Players talk at more moments: calling for the ball when open, catching passes, catching fire, own goals, getting posterized, frozen or stunned.', 'A Restart button on the pause screen.', '8 new trophies: Marathon, Dunk Contest Star, Sniper, Daily Grinder, Hype Machine, Chaos Survivor, Green Machine and All-Star.']],
   [73, 'Twice The Trash Talk', ['Every reaction has twice as many lines, from "Gimme five!" and "Pickpocket!" to "Are you blind?!" and "Don\u2019t replay that!".', 'More warm-up chatter before each point.']],
