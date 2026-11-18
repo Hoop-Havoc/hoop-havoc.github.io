@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#21162f"/>
-<defs><path id="h" d="M0 0h7v8h10V0h7v22h-7v-8H7v8H0z"/></defs>
-<g transform="skewX(-10) translate(11 6)" stroke-linejoin="round">
-<use href="#h" x="2" y="2" fill="#120b1c" stroke="#120b1c" stroke-width="5"/><use href="#h" fill="#2f7de1" stroke="#fff0cf" stroke-width="3" paint-order="stroke"/>
-</g>
-<g transform="skewX(-10) translate(24 32)" stroke-linejoin="round">
-<use href="#h" x="2" y="2" fill="#120b1c" stroke="#120b1c" stroke-width="5"/><use href="#h" fill="#e8483b" stroke="#fff0cf" stroke-width="3" paint-order="stroke"/>
-</g></svg>
