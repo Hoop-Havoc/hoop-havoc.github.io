@@ -1780,8 +1780,8 @@ function cpuThink(ti, dt) {
       const facing = Math.sin(me.a) * dir > -0.05;
       if (holding && dx < 220 && dx > 50) {   // in range: gather for a beat (your chance to get set), then take off
         if (!a.gather) a.gather = time + rand(0.3, 0.6);
-        if (time >= a.gather && facing) { press(0.07); a.gather = 0; }
-      } else { a.gather = 0; if (facing) press(0.07); }
+        if (time >= a.gather && (facing || time > a.gather + 0.45)) { press(0.07); a.gather = 0; }
+      } else { a.gather = 0; if (facing || Math.random() < 0.08) press(0.07); }
     }
     a.timer = 0.08; return;
   }
@@ -2288,10 +2288,12 @@ function drawShape(k, x, y, s, r) {
   ctx.restore();
 }
 function ballTrail(el) {
-  const k = (SV.style || {}).trail; if (!k || k === 'none' || ball.holder || state === 'replay') return;
+  const k = (SV.style || {}).trail; if (!k || k === 'none' || ball.holder || state === 'replay') { ball._rib = null; return; }
   const from = ball.shot ? ball.shotTeam : ball.thrower ? ball.thrower.team : -1; if (from < 0 || !myTeam(from)) return;
-  if (Math.hypot(ball.vx, ball.vy) < 120) return;
-  const x = ball.x, y = ball.y, n = Math.random() < el * 50 ? 1 : 0; if (!n) return;
+  const sp = Math.hypot(ball.vx, ball.vy); if (sp < 120) { ball._rib = null; return; }
+  ball._rib = (ball._rib || []).filter(q => time - q.t < 0.22); ball._rib.push({ x: ball.x, y: ball.y, t: time });   // ribbon points
+  ball._td = (ball._td || 0) + sp * el; if (ball._td < 16) return; ball._td %= 16;   // a particle every 16 px: an even, steady trail
+  const x = ball.x, y = ball.y;
   const hue = (time * 1100) % 360;
   switch (k) {
     case 'sparkle': spark(x + rand(-5, 5), y + rand(-5, 5), pick(['#ffffff', '#fff1a8']), rand(-30, 30), rand(-30, 30), false); break;
@@ -5756,11 +5758,11 @@ function drawHUD() {
   // what's special about this game / this point, right under the scoreboard
   { const tags = []; if (!practice()) { if (rules().by2) tags.push(['Win by 2', MUSTARD]); if (goldenRound) tags.push(['Double points', '#ffd34d']); if (chaos && HAVOC[chaos]) tags.push(['Havoc: ' + HAVOC[chaos].name, HAVOC[chaos].c, 1, 'Havoc: ']); }
     const sAge = time - roundStart, sA = attract || tutorial() || practice() || state === 'intro' ? 0 : clamp((10 - sAge) / 0.8, 0, 1) * clamp((sAge - INTRO) / 0.3, 0, 1);
-    if (sA > 0) for (const [lab, nm, col] of stipList(false)) tags.push([lab + ': ' + nm, col, sA, lab + ': ']);
+    if (sA > 0) for (const [lab, nm] of stipList(false)) tags.push([lab + ': ' + nm, lab === 'Ball' ? '#ff9a4d' : lab === 'Players' ? '#5fe07a' : '#6fc4ff', sA, lab + ': ']);
     if (tags.length) { ctx.font = `700 12px ${TEXT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const txt = tags.map(t => t[0]).join('   '), tw = ctx.measureText(txt).width + 22 + tags.length * 12, yy = by + bh + 14;
       ctx.globalAlpha = Math.max(...tags.map(t => t[2] == null ? 1 : t[2])); ctx.fillStyle = 'rgba(18,11,28,.82)'; rr(cx - tw / 2, yy - 10, tw, 20, 10); ctx.fill(); ctx.globalAlpha = 1; let x = cx - tw / 2 + 11; ctx.textAlign = 'left';
       for (const [t, c, a, pre] of tags) { ctx.globalAlpha = a == null ? 1 : a; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x + 4, yy + 0.5, 4, 0, 7); ctx.fill(); x += 12;
-        if (pre) { ctx.fillText(pre, x, yy + 1); const pw = ctx.measureText(pre).width; ctx.fillStyle = CREAM; ctx.fillText(t.slice(pre.length), x + pw, yy + 1); } else ctx.fillText(t, x, yy + 1);
+        if (pre) { ctx.fillText(pre, x, yy + 1); const pw = ctx.measureText(pre).width; ctx.fillStyle = c; ctx.fillText(t.slice(pre.length), x + pw, yy + 1); } else ctx.fillText(t, x, yy + 1);
         x += ctx.measureText(t + '   ').width; } ctx.globalAlpha = 1; } }
   // status chips hang under each team's tab
   let side = 0;
@@ -5800,7 +5802,7 @@ function drawHUD() {
   // controls reminder for the first couple of points
   if (!attract && !autoPlay && !net && round <= 2 && state !== 'scored' && !isTouch) {
     const one = mode !== 2, ga = ctx.globalAlpha; ctx.globalAlpha = ga * clamp((time - roundStart) / 0.4, 0, 1) * (round === 2 ? clamp((roundStart + 8 - time) / 1, 0, 1) : 1);
-    keyHint(14, H - 50, [['W', one ? 'Hop, Hold To Shoot' : 'Hop, Shoot'], ['E', 'Lob'], ['Q', 'Pass']], teams[0].color, false);
+    keyHint(14, H - 50, one ? [['W/↑', 'Hop, Hold To Shoot'], ['E/↓', 'Lob'], ['Q/←', 'Pass']] : [['W', 'Hop, Shoot'], ['E', 'Lob'], ['Q', 'Pass']], teams[0].color, false);
     if (!one) keyHint(W - 14, H - 50, [['↑', 'Hop, Shoot'], ['↓', 'Lob'], ['←', 'Pass']], teams[1].color, true);
     ctx.globalAlpha = ga;
   }
@@ -7127,7 +7129,11 @@ function togglePause() {
     const inf = []; if (!practice()) { inf.push(tourney ? 'Tournament' : daily ? 'Daily challenge' : net && net.ready ? 'Online' : autoPlay ? 'CPU vs CPU' : mode === 2 ? '2 players' : contest ? 'Contest' : 'Vs the CPU'); inf.push('first to ' + WIN); if (rules().by2) inf.push('win by 2'); if (chaos && HAVOC[chaos]) inf.push('Havoc round: ' + HAVOC[chaos].name); if (goldenRound) inf.push('double points this point'); }
     $('pauseInfo').innerHTML = inf.filter(x => !/^first to/i.test(x)).map(x => `<span class="pchip">${x.replace(/^./, m => m.toUpperCase())}</span>`).join('');
     const key = (k, t) => `<span><kbd>${k}</kbd> ${t}</span>`;
-    $('pauseKeys').innerHTML = isTouch ? '' : `<div><b style="color:${teams[0].color}">Left</b>${key('W', 'hop, hold to shoot')}${key('E', 'lob')}${key('Q', 'pass')}</div>` + (mode === 2 && !(net && net.ready) ? `<div><b style="color:${teams[1].color}">Right</b>${key('↑', 'hop, hold to shoot')}${key('↓', 'lob')}${key('←', 'pass')}</div>` : '');
+    const goal = tutorial() ? 'Finish this lesson. Back and Next move between lessons.' : contest ? (contest.kind === 'dunk' ? `Dunk ${Math.min(contest.n + 1, contest.max)} of ${contest.max}. Score so far: ${contest.total}. Bronze 90, silver 110, gold 130.` : `Makes ${contest.makes} of ${contest.shots}. ${Math.max(0, Math.ceil(contest.t))} seconds left.`)
+      : daily ? `Daily challenge: ${daily.goal[1]}.` : tourney ? `${TOURNEY[Math.min(3, tourney.round)].name || 'Tournament'}: win to move on.` : practice() ? 'Free shooting. Turn on Big green to learn the timing.' : autoPlay ? 'Sit back: CPU vs CPU plays on its own.'
+      : `First to ${WIN}${rules().by2 ? ', win by 2' : ''}.`;
+    $('pauseInfo').insertAdjacentHTML('afterbegin', `<div class="pgoal"><b>Goal</b><span>${goal}</span></div>`);
+    $('pauseKeys').innerHTML = isTouch ? '' : mode !== 2 || (net && net.ready) ? `<div><b style="color:${teams[0].color}">You</b>${key('W or ↑', 'hop, hold to shoot')}${key('E or ↓', 'lob')}${key('Q or ←', 'pass')}</div>` : `<div><b style="color:${teams[0].color}">Left</b>${key('W', 'hop, hold to shoot')}${key('E', 'lob')}${key('Q', 'pass')}</div>` + (mode === 2 && !(net && net.ready) ? `<div><b style="color:${teams[1].color}">Right</b>${key('↑', 'hop, hold to shoot')}${key('↓', 'lob')}${key('←', 'pass')}</div>` : '');
     const tb = i => `<div class="pteam" style="--tc:${teams[i].color}"><span>${niceName(teams[i].name)}</span><b>${teams[i].score}</b></div>`;
     $('pauseScore').innerHTML = practice() ? `<div class="pcourt">${niceName(court.name)}</div>` : `${tb(0)}<div class="pmid"><small>${niceName(court.name)}</small><small>First to ${WIN}</small></div>${tb(1)}`; $('bResume').focus(); }
 }
@@ -8346,7 +8352,7 @@ body:not(.ingame) #pracBar{display:none!important}
 #pause .pteam span{font:700 calc(var(--k)*15)/1.1 var(--pixel,inherit);text-align:center}#pause .pteam b{font:700 calc(var(--k)*40)/1 var(--pixel,inherit)}
 #pause .pmid{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;padding:0 6px;color:var(--muted,#c9b8e0)}#pause .pmid small{font-size:calc(var(--k)*12);white-space:nowrap}
 #pause .pcourt{font:700 calc(var(--k)*22)/1.2 var(--pixel,inherit);color:var(--mustard)}
-#pause .pinfo{display:flex;flex-wrap:wrap;gap:6px;margin:0}#pause .pchip{padding:4px 10px;background:rgba(255,240,207,.1);border:2px solid rgba(255,240,207,.18);font-size:calc(var(--k)*12);font-weight:700}
+#pause .pinfo{display:flex;flex-wrap:wrap;gap:6px;margin:0}#pause .pgoal{flex:1 1 100%;display:flex;flex-direction:column;gap:2px;padding:8px 10px;background:rgba(255,190,46,.12);border:2px solid rgba(255,190,46,.45)}#pause .pgoal b{color:var(--mustard);font-size:calc(var(--k)*11)}#pause .pgoal span{font-size:calc(var(--k)*14);font-weight:700}#pause .pchip{padding:4px 10px;background:rgba(255,240,207,.1);border:2px solid rgba(255,240,207,.18);font-size:calc(var(--k)*12);font-weight:700}
 #pause .pkeys{display:flex;flex-direction:column;gap:6px;font-size:calc(var(--k)*12)}#pause .pkeys div{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 #pause #pauseHint{margin:0;font-size:calc(var(--k)*12);opacity:.75}
 #pause .row{display:flex;flex-direction:column;gap:8px;margin:0}#pause .row .btn{width:100%;justify-content:center}
@@ -8380,8 +8386,20 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhMobile">
   #wrap{border-radius:0!important;box-shadow:none!important}
 }
 </style>`);
-const GAME_VERSION = 105;
+setInterval(() => { try { syncPrac(); } catch (e) {} }, 200);   // never stale: the practice toolbar follows the game, not the last practice session
+const TRAIL_RIB = { sparkle: '#fff1a8', fire: '#ff8a3d', stars: '#ffd34d', bubbles: '#a8e4ff', lightning: '#bfe6ff', love: '#ff8ac0', gold: '#ffd34d', notes: '#7fe3ff', snow: '#ffffff', leaves: '#e8732f', coins: '#ffd34d', bats: '#7a4aa0', comet: '#7fe3ff', petals: '#ffb7d5', galaxy: '#c79bff', crowns: '#ffd34d', diamonds: '#bfefff', dragon: '#5fd068', legend: '#ffd34d' };
+function drawTrailRibbon() {   // a soft tapered streak behind the ball, like a Hive trail
+  const r = ball._rib; if (!r || r.length < 2 || state === 'replay') return; const k = (SV.style || {}).trail; if (!k || k === 'none') return;
+  ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; const gc = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter';
+  for (let i = 1; i < r.length; i++) { const a = r[i - 1], b = r[i], age = clamp((time - b.t) / 0.22, 0, 1), f = (1 - age) * (i / r.length);
+    ctx.strokeStyle = k === 'rainbow' || k === 'pixels' ? `hsla(${(b.t * 900) % 360},95%,62%,${0.55 * f})` : (TRAIL_RIB[k] || '#ffffff') + Math.round(150 * f).toString(16).padStart(2, '0');
+    ctx.lineWidth = ball.r * 1.3 * f + 1; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+  ctx.globalCompositeOperation = gc; ctx.restore();
+}
+{ const db0 = drawBall; drawBall = function () { drawTrailRibbon(); return db0.apply(this, arguments); }; }
+const GAME_VERSION = 106;
 const UPDATES = [
+  [106, 'Goals and trails', ['The practice toolbar only ever shows in practice. It no longer sticks around in other modes, Auto mode or the menus.', 'The setup tag under the scoreboard is colour-coded: Ball in orange, Players in green, Hoop in blue.', 'Trails look smoother: a soft streak follows the ball with evenly spaced hearts, bolts, stars and more.', 'The tutorial dunker never freezes before going up.', 'Pausing shows your goal for the mode: the daily challenge, your dunk contest score so far, the tournament round and more.', 'In one-player games, the arrow keys work as well as W, E and Q. The pause menu and controls guide now say so.']],
   [105, 'Phones and polish', ['Fixed menus not closing when you pressed Done, OK or Back.', 'On phones held sideways the court fills the whole height of the screen.', 'The Hype button on phones is smaller and calmer, tucked under the scoreboard.', 'The controls guide is tidier and fades away after the first points.', 'In the jungle, the snakes chase him all the way off screen.']],
   [104, 'Backflip fix', ['Bouncy Castle backflips no longer get stuck against the wall or knocked sideways. The shooter jogs to open floor, then flips cleanly.']],
   [103, 'Online names', ['If your friend quits an online game, a popup tells you, with the final score and a button to play online again.', 'The tutorial dunker is smarter: it hops into range, gathers for a beat, then attacks the rim, so blocking it feels like the real thing.', 'Set a username in the Locker. Online, both of your players use it, and your team is called your username plus your team name.']],
