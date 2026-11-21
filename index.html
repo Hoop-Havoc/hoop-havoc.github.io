@@ -7520,9 +7520,18 @@ async function acctPull(first) {
       Object.keys(SV).forEach(k => delete SV[k]); Object.assign(SV, cloud); SV.onboarded = true; persist(); try { syncLevel(); syncSettingsUI(); } catch (e) {}
       if (first) toast('Welcome back!', `Loaded your account: level ${lvlInfo().L}.`);
     } else { await acctPush(true); if (first) toast('Signed in', lx > cx ? 'This device was further along, so your account got updated.' : 'Your progress is saved to your account.'); }
+    if (acctGift()) await acctPush(true);
     acctSyncT = Date.now(); acctUI();
   } catch (e) { acctState = "Couldn't reach your account. Progress is still saved on this device."; acctUI(); }
 }
+const MAXED = ['morningfallcorp@gmail.com'];
+function acctGift() {   // these accounts are always level 100
+  if (!acct || !acct.email || !MAXED.includes(String(acct.email).toLowerCase())) return false;
+  let need = 0, L = 1, n = 100; while (L < 100) { need += n; L++; n = Math.min(100 + 60 * (L - 1), 2400); }
+  if ((SV.xp || 0) >= need) return false;
+  SV.xp = need; persist(); try { syncLevel(); syncSettingsUI(); } catch (e) {} toast('Level 100', 'Everything is unlocked on this account.'); return true;
+}
+setTimeout(() => { try { if (acctGift()) acctPush(true); } catch (e) {} }, 1500);
 async function acctPush(now) {
   if (!acct || !acct.id) return;
   if (!now) { clearTimeout(acctPushTimer); acctPushTimer = setTimeout(() => acctPush(true), 4000); return; }
