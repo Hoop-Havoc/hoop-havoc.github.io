@@ -641,15 +641,15 @@ function startRound(fresh = true) {
     wind = 0;   // calm air unless a Havoc storm rolls in
   }
   chaos = null;
-  if (!fresh && court.windy && wind) wind = -Math.sign(wind) * rand(120, 210);   // the wind turns around every point, so nobody keeps the good side
+  wind = 0;   // the wind turns around every point, so nobody keeps the good side
   if (fresh && !attract && !practice() && !daily && goalCount > 1 && !rules().calm && !rules().nohavoc && (rules().allhavoc || round - lastHavoc >= 3 && Math.random() < 0.09)) {   // now and then: a Havoc Round
-    chaos = pick(['blackout', 'quake', 'storm', 'mega', 'super', 'giant', 'tiny', 'moon', 'bowl', 'stilts'], lastHavocKind); lastHavoc = round; lastHavocKind = chaos;
+    chaos = pick(['blackout', 'quake', 'mega', 'super', 'giant', 'tiny', 'moon', 'bowl', 'stilts'], lastHavocKind); lastHavoc = round; lastHavocKind = chaos;
     if (chaos === 'giant') ballT = BALLS[7];
     if (chaos === 'tiny') hoopT = HOOP_TYPES[2];
     if (chaos === 'moon') court = { ...court, g: Math.round(court.g * 0.5) };
     if (chaos === 'bowl') ballT = BALLS[2];
     if (chaos === 'stilts') body = BODIES[1];
-    if (chaos === 'storm') wind = (goalCount % 2 ? -1 : 1) * 300;
+    wind = 0;
     if (chaos === 'mega') hoopT = HOOP_TYPES[1];
     if (chaos === 'super') ballT = BALLS[5];
     const hv = HAVOC[chaos];
@@ -678,6 +678,7 @@ function newMatch(isAttract) {
   teams.forEach(t => { t.score = 0; t.streak = 0; t.onFire = false; t.stats = { baskets: 0, dunks: 0, oops: 0, deep: 0, blocks: 0, steals: 0, best: 0, greens: 0, lead: 0 }; t.run = 0; t.deficit = 0; t.cbDone = false; });
   const used = new Set(); teams.forEach(t => t.roster = makeRoster(used)); lastReplayRound = -9;
   { const st = (SV.style || {}).star, S = STARS.find(x => x[1] === st); if (S && !attract && !(net && net.ready) && lvlInfo().L >= S[0]) Object.assign(teams[0].roster[0], { pname: S[1].toUpperCase(), num: S[2], band: true }); }
+  if (SV.pname && !attract && !(net && net.ready) && !tutorial()) teams[0].roster[0].pname = SV.pname;
   mvpT = {}; halfDone = false; highlights = []; shots = []; teams.forEach(t => { t.hype = 0; t.hypeUntil = 0; t.hypeReady = false; });
   round = 0; startRound();
 }
@@ -1986,7 +1987,7 @@ function celebExtra(p, c, dt) {
       if (u > 2.6 && !c.yee) { c.yee = 1; quip(p, ['Yeehaw!', 'Giddy up!'], true, 1.2); tone(660, 0.12, 'triangle', 0.05); setTimeout(() => tone(880, 0.2, 'triangle', 0.05), 120); }
       break;
     case 'FLIPS':   // every landing bounces the castle floor; the last flip sticks the landing
-      if (p.grounded && c.air) { c.air = false; rings.push({ x: p.x, y: GROUND, t: 0, c: '#ff8fcf', big: 0.35 }); courtPuff(p.x, GROUND, 0.6, 4); if ((c.n || 0) >= 3 && !c.stuck) { c.stuck = 1; for (let i = 0; i < 24; i++) particles.push({ x: p.Hd.x, y: p.Hd.y - 20, vx: rand(-260, 260), vy: rand(-360, -80), c: pick(['#ffd34d', '#ff8fcf', '#ffffff']), life: 1.2, max: 1.2, g: 500, s: rand(4, 6), shape: 'star' }); quip(p, ['Stuck it!', '10 out of 10!'], true, 1.2); } }
+      if (p.grounded && c.air) { c.air = false; rings.push({ x: p.x, y: GROUND, t: 0, c: '#ff8fcf', big: 0.35 }); courtPuff(p.x, GROUND, 0.6, 4); if ((c.n || 0) >= 4 && !c.stuck) { c.stuck = 1; ['10', '10', '10'].forEach((v, i) => setTimeout(() => pop(v, p.x + (i - 1) * 60, GROUND - 210, ['#ff8fcf', '#ffd34d', '#7fe3ff'][i]), 300 + i * 160)); roar(1, 0.08); for (let i = 0; i < 24; i++) particles.push({ x: p.Hd.x, y: p.Hd.y - 20, vx: rand(-260, 260), vy: rand(-360, -80), c: pick(['#ffd34d', '#ff8fcf', '#ffffff']), life: 1.2, max: 1.2, g: 500, s: rand(4, 6), shape: 'star' }); quip(p, ['Stuck it!', '10 out of 10!'], true, 1.2); } }
       if (!p.grounded) c.air = true;
       break;
     case 'FLAG PLANT':   // a rocket lifts off behind them
@@ -2349,12 +2350,12 @@ function celebTick(p, c, dt) {
       if (Math.random() < dt * 34) spark(p.F.x - f * 32 * p.scale, Math.min(GROUND, p.F.y) - 3, pick(['#ffffff', '#cfefff', '#7fd4ff']), -f * rand(40, 150), -rand(60, 190), true);
       break;
     case 'FLIPS':
-      if (p.grounded && (c.n || 0) < 3 && !(c.fl > 0)) {
-        c.n = (c.n || 0) + 1; c.fl = 1; c.t0 = u; const vy0 = 640 * Math.sqrt(g / 1400); c.T = Math.min(0.8, 0.85 * 2 * vy0 / g);
+      if (p.grounded && (c.n || 0) < 4 && !(c.fl > 0)) {
+        c.n = (c.n || 0) + 1; c.fl = 1; c.t0 = u; const big = c.n === 4, vy0 = (big ? 860 : 640) * Math.sqrt(g / 1400); c.T = Math.min(big ? 1.1 : 0.8, 0.85 * 2 * vy0 / g); c.turns = big ? 2 : 1; if (big) quip(p, ['Double backflip!', 'Watch this!'], true, 1);
         p.vy = -vy0; p.vx = 0; p.grounded = false; p.y = GROUND - 1; tone(330 + c.n * 110, 0.14, 'triangle', 0.05, 1.6);
       }
       if (c.fl > 0) {
-        const k = clamp((u - c.t0) / c.T, 0, 1); p.a = -f * Math.PI * 2 * ease(k); p.w = 0; syncPts(p);
+        const k = clamp((u - c.t0) / c.T, 0, 1); p.a = -f * Math.PI * 2 * (c.turns || 1) * ease(k); p.w = 0; syncPts(p);
         if (k >= 1) { c.fl = 0; p.a = 0; syncPts(p); for (let i = 0; i < 16; i++) spark(p.Hd.x, p.Hd.y - 10, pick([MUSTARD, teams[p.team].color, CREAM]), rand(-200, 200), rand(-280, -40), true); }
       }
       break;
@@ -3343,7 +3344,7 @@ function updateArms(dt) {
     if (p.celeb) { const c = celebPose(p); target = c.phi; reachT = c.reach; rate = 18; }
     else if (reactPose(p)) { const c = reactPose(p); target = c.phi; reachT = c.reach; rate = 16; }
     if (p.dunkAnim) { const da = p.dunkAnim, want = dunkPhi(da); if (da.phiIn === undefined) da.phiIn = p.phi;
-      const k = da.dur >= 0.36 ? clamp(da.t * da.dur / 0.05, 0, 1) : 1; let d0 = want - da.phiIn; d0 -= Math.round(d0 / (Math.PI * 2)) * Math.PI * 2;
+      const k = clamp(da.t * da.dur / (da.dur >= 0.36 ? 0.06 : 0.035), 0, 1); let d0 = want - da.phiIn; d0 -= Math.round(d0 / (Math.PI * 2)) * Math.PI * 2;
       p.phi = k < 1 ? da.phiIn + d0 * k * k * (3 - 2 * k) : want; p.dunkOutT = time; }
     else {
       if (time - (p.dunkOutT ?? -9) < 0.22) rate = 7;   // coming out of a slam: let the arm settle instead of snapping down
@@ -3541,7 +3542,8 @@ function updateBall(dt) {
       const hit = collideSeg(p.shoulder.x, p.shoulder.y, p.hand.x, p.hand.y, 6 * p.scale, 0.6,
         { vx: p.Hd.vx, vy: p.Hd.vy }, { vx: clamp(p.hv.x, -900, 900), vy: clamp(p.hv.y, -900, 900) });
       if (hit > 0 && gtH && p.team !== ball.shotTeam) ball.goaltend = gtH;   // swatted on its way down over the rim: goaltending
-      else if (hit > 70 && ball.shotTeam !== -1 && ball.shotTeam !== p.team && state === 'play' && !ball.pin) {
+      else if (hit > 0 && hit <= (p.grounded ? 70 : 34) && ball.shot && ball.shotTeam !== -1 && ball.shotTeam !== p.team && state === 'play' && !ball.pin) { ball.green = false; ball.vx *= 0.75; ball.vy += 60; }   // a fingertip: the shot is off, not swatted
+      else if (hit > (p.grounded ? 70 : 34) && ball.shotTeam !== -1 && ball.shotTeam !== p.team && state === 'play' && !ball.pin) {
         // GET THAT OUTTA HERE: the palm stops it dead for a beat, then slaps it away from the rim it was headed for
         const away = -Math.sign(hoops[ball.shotTeam].cx - ball.x) || -p.facing;
         let nx = ball.x - p.hand.x, ny = ball.y - p.hand.y; const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
@@ -3717,10 +3719,11 @@ function scored(ti, hp) {
         if (ball.oop) why.push(ball.oopSelf ? 'Off the self-lob' : 'Alley-oop');
         if (d.spin || d.kind === 'spin') why.push('Spin');
         if (ball.shatter) why.push('Broke the glass');
-        const base = 6.2 + (d.dur - 0.3) * 7 + (d.spin || d.kind === 'spin' ? 1 : 0) + (ball.oop ? 1.2 : 0) + (ball.oopSelf ? 0.5 : 0) + (d.kind === 'sig' ? 0.6 : 0) + (ball.shatter ? 1.5 : 0) + (fresh ? 0.4 : -2.4);
+        if (far > 200) why.push('From way out'); if (ball.oop && ball.oopPerfect) why.push('Perfect lob');
+        const base = 6.2 + (d.dur - 0.3) * 7 + (d.spin || d.kind === 'spin' ? 1 : 0) + (ball.oop ? 1.2 : 0) + (ball.oopSelf ? 0.5 : 0) + (d.kind === 'sig' ? 0.6 : 0) + (ball.shatter ? 1.5 : 0) + (far > 200 ? 1 : 0) + (ball.oop && ball.oopPerfect ? 0.6 : 0) + (fresh ? 0.4 : -2.4);
         why.forEach((w, i) => setTimeout(() => pop(w, hp.cx - Math.sign(hp.boardX - W / 2) * 160, 150 + i * 26, fresh || i ? '#7fe3ff' : '#ff4f6d'), 500 + i * 220));
-        const cards = [0, 1, 2].map(() => clamp(Math.round(base + rand(-0.9, 0.9)), 4, 10)), sum = cards[0] + cards[1] + cards[2];
-        contest.used.push(ball.dunkName); contest.total += sum; contest.last = { cards, t: time };
+        const spread = base > 8.5 ? 0.45 : 0.9, cards = [0, 1, 2].map(() => clamp(Math.round(base + rand(-spread, spread)), 4, 10)), sum = cards[0] + cards[1] + cards[2];
+        contest.used.push(ball.dunkName); contest.total += sum; contest.last = { cards, t: time }; roar(0.4 + sum / 40, 0.05 + sum / 600); if (sum >= 27) shake = Math.max(shake, 8);
         contest.log.push([tc(String(ball.dunkName || 'Dunk').toLowerCase()), sum]);
         setTimeout(() => { if (sum >= 30) say('A perfect thirty!', true); else if (sum >= 27) say(`${sum}! The judges loved it.`, true); else say(`${sum} points.`, true); tone(sum >= 27 ? 880 : 520, 0.25, 'triangle', 0.06); }, 1300);
       } else { contest.log.push(['No Dunk', 0]); contest.last = null; pop('DUNKS ONLY!', W / 2, 250, '#ff4f6d'); }
@@ -5712,7 +5715,6 @@ function drawHUD() {
   const tags = [];
   const stY = side ? by + bh + 72 : by + bh + 12, stH = 0;
   if (goldenRound) tags.push(['Golden Ball, Double Points', MUSTARD, 1]);
-  if (wind) tags.push([`Wind ${wind > 0 ? '→' : '←'}`, '#9fe8ff', 1]);
   if (tags.length) {
     ctx.font = `600 13px ${TEXT}`;
     const ws = tags.map(([t]) => ctx.measureText(t).width + 20), tw = ws.reduce((a, b) => a + b, 0) + (tags.length - 1) * 6;
@@ -6443,6 +6445,63 @@ function winnerGreen(hp) {
       ctx.globalAlpha = k; ctx.fillStyle = '#ffd34d'; drawShape('coin', x, y, 5, u * 8 + i); }
     ctx.globalAlpha = 1;
   }; }
+
+function gfxAdd(k, dur, fn, under) { const G0 = GFX[k]; if (!G0) return; const d0 = G0.draw; G0.dur = Math.max(G0.dur, dur); G0.draw = function (g, t, P, h) { if (under) fn(g, t, P, h); d0.call(this, g, t, P, h); if (!under) fn(g, t, P, h); }; }
+const fadeK = (t, a, b, out) => clamp((t - a) / 0.25, 0, 1) * clamp((b - t) / (out || 0.35), 0, 1);
+// Dusty Ranch: a lasso spins over the rim and cinches round it
+gfxAdd('ranch', 2.1, (g, t, P) => { const k = fadeK(t, 0.2, 2.1); if (k <= 0) return; const c = clamp((t - 0.9) / 0.4, 0, 1), r = lerp(P.R * 1.6, P.R * 1.05, ease(c)), y = lerp(P.cy - 70, P.cy, ease(c)), a = t * 9;
+  ctx.save(); ctx.globalAlpha = k; ctx.strokeStyle = '#c8a06a'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(P.cx, y, r, r * 0.28, Math.sin(a) * 0.08, 0, 7); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(P.cx + Math.cos(a) * r, y + Math.sin(a) * r * 0.28); ctx.quadraticCurveTo(P.cx + P.out * 80, y - 60, P.cx + P.out * 170, y - 90 + Math.sin(t * 6) * 8); ctx.stroke();
+  if (c >= 1) for (let i = 0; i < 3; i++) { const u = (t - 1.3 - i * 0.12); if (u > 0 && u < 0.5) { ctx.globalAlpha = k * (1 - u * 2); ctx.fillStyle = '#e8c890'; ctx.beginPath(); ctx.arc(P.cx + (i - 1) * 26, P.cy + 4 + u * 20, 6 + u * 24, 0, 7); ctx.fill(); } }
+  ctx.restore(); });
+// Bouncy Castle: a giant inflatable star bounces up out of the net
+gfxAdd('bounce', 2.2, (g, t, P) => { const k = fadeK(t, 0.1, 2.2); if (k <= 0) return; const b = Math.abs(Math.sin(t * 5.5)) * Math.max(0, 1 - t / 2.2), y = P.cy - 40 - b * 90, sq = 1 + (b < 0.1 ? 0.25 : 0) - b * 0.1;
+  ctx.save(); ctx.globalAlpha = k; ctx.translate(P.cx, y); ctx.rotate(Math.sin(t * 3) * 0.2); ctx.scale(1 / sq, sq); ctx.fillStyle = '#ffd34d'; drawShape('star', 0, 0, 30, 0); ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.arc(-8, -8, 5, 0, 7); ctx.fill(); ctx.restore(); });
+// Moon Base: an astronaut floats up and plants a flag on the rim, stars orbiting
+gfxAdd('moon', 2.4, (g, t, P) => { const k = fadeK(t, 0.2, 2.4); if (k <= 0) return; const e = ease(clamp((t - 0.2) / 0.8, 0, 1)), x = P.cx - P.out * 40, y = lerp(P.cy + 90, P.cy - 62, e) + Math.sin(t * 3) * 4;
+  ctx.save(); ctx.globalAlpha = k; ctx.fillStyle = '#f2f2f6'; ctx.beginPath(); ctx.arc(x, y, 12, 0, 7); ctx.fill(); ctx.fillRect(x - 9, y + 10, 18, 20); ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(x + 2, y, 7, -1.2, 1.2); ctx.fill();
+  ctx.strokeStyle = '#ddd'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x + 12, y + 20); ctx.lineTo(x + 12, y - 26); ctx.stroke(); ctx.fillStyle = '#ff4f6d'; ctx.fillRect(x + 12, y - 26, 22 + Math.sin(t * 8) * 2, 14);
+  for (let i = 0; i < 8; i++) { const a = t * 2 + i / 8 * 6.28; ctx.fillStyle = '#ffffff'; drawShape('star', P.cx + Math.cos(a) * P.R * 1.8, P.cy + Math.sin(a) * P.R * 0.5, 4, a); } ctx.restore(); });
+// Heavy Planet: the impact cracks the floor under the hoop and sends shockwaves along it
+gfxAdd('heavy', 2.0, (g, t, P) => { const k = fadeK(t, 0.15, 2.0, 0.5); if (k <= 0) return; ctx.save(); ctx.globalAlpha = k; const fy = GROUND - 2;
+  for (let i = 0; i < 3; i++) { const u = t - 0.15 - i * 0.18; if (u < 0 || u > 1) continue; ctx.strokeStyle = `rgba(255,170,90,${1 - u})`; ctx.lineWidth = 4; ctx.beginPath(); ctx.ellipse(P.cx, fy, 30 + u * 260, 6 + u * 18, 0, 0, 7); ctx.stroke(); }
+  ctx.strokeStyle = '#2a120c'; ctx.lineWidth = 3; for (let i = 0; i < 7; i++) { const a = Math.PI + i / 6 * Math.PI, L = 40 + hash(g.seed + i) * 70; ctx.beginPath(); ctx.moveTo(P.cx, fy); ctx.lineTo(P.cx + Math.cos(a) * L * 0.5 + 6, fy + Math.sin(a) * 6); ctx.lineTo(P.cx + Math.cos(a) * L, fy + Math.sin(a) * 9); ctx.stroke(); } ctx.restore(); }, true);
+// Under the Sea: a whale tail rises behind the rim and slaps a splash
+gfxAdd('water', 2.3, (g, t, P) => { const k = fadeK(t, 0.1, 2.3); if (k <= 0) return; const e = Math.sin(clamp(t / 1.4, 0, 1) * Math.PI), x = P.cx - P.out * 30, y = P.cy + 30 - e * 120;
+  ctx.save(); ctx.globalAlpha = k * 0.95; ctx.fillStyle = '#2b5f8a'; ctx.fillRect(x - 10, y, 20, 160); ctx.beginPath(); ctx.moveTo(x, y + 6); ctx.quadraticCurveTo(x - 30, y - 10, x - 60, y - 34); ctx.quadraticCurveTo(x - 30, y - 6, x, y - 2); ctx.quadraticCurveTo(x + 30, y - 6, x + 60, y - 34); ctx.quadraticCurveTo(x + 30, y - 10, x, y + 6); ctx.fill();
+  if (t > 1.2) for (let i = 0; i < 14; i++) { const u = t - 1.2, a = -Math.PI / 2 + (hash(g.seed + i) - 0.5) * 2.2, sp = 160 + hash(g.seed + i + 3) * 160; ctx.fillStyle = 'rgba(207,239,255,.85)'; ctx.beginPath(); ctx.arc(x + Math.cos(a) * sp * u, y - 20 + Math.sin(a) * sp * u + 300 * u * u, 4, 0, 7); ctx.fill(); }
+  ctx.restore(); }, true);
+// Volcano Island: lava pillars erupt from the floor either side of the hoop
+gfxAdd('lava', 2.1, (g, t, P) => { const k = fadeK(t, 0.1, 2.1, 0.5); if (k <= 0) return; ctx.save(); const gc = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter';
+  for (const s of [-1, 1]) { const x = P.cx + s * 110, h = Math.min(1, t / 0.4) * (240 + Math.sin(t * 9 + s) * 20); const gr = ctx.createLinearGradient(0, GROUND, 0, GROUND - h); gr.addColorStop(0, `rgba(255,80,20,${0.8 * k})`); gr.addColorStop(1, `rgba(255,220,80,${0.1 * k})`);
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(x - 18, GROUND); ctx.quadraticCurveTo(x - 10 + Math.sin(t * 12) * 6, GROUND - h * 0.6, x, GROUND - h); ctx.quadraticCurveTo(x + 10 + Math.sin(t * 11) * 6, GROUND - h * 0.6, x + 18, GROUND); ctx.fill(); }
+  ctx.globalCompositeOperation = gc; ctx.restore(); }, true);
+// Jungle Temple: a snake coils around the rim, rears up and hisses
+gfxAdd('jungle', 2.4, (g, t, P) => { const k = fadeK(t, 0.1, 2.4); if (k <= 0) return; const L = clamp(t / 0.8, 0, 1), turns = 1.6 * L, N = 40; ctx.save(); ctx.globalAlpha = k; ctx.lineCap = 'round';
+  const pt = q => { const a = q * turns * Math.PI * 2 + t * 1.5; return [P.cx + Math.cos(a) * P.R * 1.12, P.cy + Math.sin(a) * P.R * 0.3 - q * 14]; };
+  for (const [w, c] of [[13, INKD], [10, '#3f9e3a'], [3, '#ffd34d']]) { ctx.strokeStyle = c; ctx.lineWidth = w; if (w === 3) ctx.setLineDash([5, 7]); ctx.beginPath(); for (let i = 0; i <= N; i++) { const [x, y] = pt(i / N); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); ctx.setLineDash([]); }
+  const [hx0, hy0] = pt(1), rear = ease(clamp((t - 0.8) / 0.4, 0, 1)), hx = hx0, hy = hy0 - rear * 40;
+  ctx.strokeStyle = '#3f9e3a'; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(hx0, hy0); ctx.quadraticCurveTo(hx0 - 14, hy0 - rear * 20, hx, hy); ctx.stroke();
+  ctx.fillStyle = INKD; ctx.beginPath(); ctx.ellipse(hx, hy, 13, 10, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#4cb846'; ctx.beginPath(); ctx.ellipse(hx, hy, 11, 8.5, 0, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(hx - 4, hy - 3, 2.6, 0, 7); ctx.arc(hx + 4, hy - 3, 2.6, 0, 7); ctx.fill(); ctx.fillStyle = INKD; ctx.fillRect(hx - 4.6, hy - 5, 1.2, 4); ctx.fillRect(hx + 3.4, hy - 5, 1.2, 4);
+  if (rear > 0.5 && Math.sin(t * 14) > 0) { ctx.strokeStyle = '#ff3d5a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(hx, hy + 8); ctx.lineTo(hx, hy + 18); ctx.lineTo(hx - 3, hy + 22); ctx.moveTo(hx, hy + 18); ctx.lineTo(hx + 3, hy + 22); ctx.stroke(); }
+  ctx.restore(); });
+// Egyptian Sands: golden scarabs spiral out of the net
+gfxAdd('egypt', 2.1, (g, t, P) => { const k = fadeK(t, 0.2, 2.1); if (k <= 0) return; ctx.save(); ctx.globalAlpha = k;
+  for (let i = 0; i < 8; i++) { const u = t - 0.2 - i * 0.07; if (u < 0) continue; const a = i / 8 * 6.28 + u * 3, r = u * 120, x = P.cx + Math.cos(a) * r, y = P.cy - u * 90 + Math.sin(a) * r * 0.4;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(a + Math.PI / 2); ctx.fillStyle = '#2a6fd1'; ctx.beginPath(); ctx.ellipse(0, 0, 6, 8, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#ffd34d'; const f = Math.sin(t * 30 + i) * 0.5 + 0.5; ctx.beginPath(); ctx.ellipse(-6, -1, 6 * f + 2, 3, -0.5, 0, 7); ctx.ellipse(6, -1, 6 * f + 2, 3, 0.5, 0, 7); ctx.fill(); ctx.restore(); }
+  ctx.restore(); });
+// Pirate Ship: the Jolly Roger runs up a mast over the rim
+gfxAdd('pirate', 2.2, (g, t, P) => { const k = fadeK(t, 0.1, 2.2); if (k <= 0) return; const e = ease(clamp((t - 0.1) / 0.7, 0, 1)), x = P.cx + P.out * 10, top = P.cy - 150, fy = lerp(P.cy - 20, top, e);
+  ctx.save(); ctx.globalAlpha = k; ctx.strokeStyle = '#6a3a1a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x, P.cy - 4); ctx.lineTo(x, top - 6); ctx.stroke();
+  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.moveTo(x, fy); for (let i = 0; i <= 6; i++) ctx.lineTo(x + i * 9, fy + Math.sin(t * 9 + i) * 3); ctx.lineTo(x + 54, fy + 36 + Math.sin(t * 9 + 6) * 3); for (let i = 6; i >= 0; i--) ctx.lineTo(x + i * 9, fy + 36 + Math.sin(t * 9 + i) * 3); ctx.fill();
+  ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x + 27, fy + 14, 7, 0, 7); ctx.fill(); ctx.fillRect(x + 22, fy + 19, 10, 5); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(x + 17, fy + 22); ctx.lineTo(x + 37, fy + 32); ctx.moveTo(x + 37, fy + 22); ctx.lineTo(x + 17, fy + 32); ctx.stroke();
+  ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(x + 24.5, fy + 13, 1.8, 0, 7); ctx.arc(x + 29.5, fy + 13, 1.8, 0, 7); ctx.fill(); ctx.restore(); });
+// Disco Rink: an equaliser jumps round the rim while coloured spotlights sweep
+gfxAdd('disco', 2.3, (g, t, P) => { const k = fadeK(t, 0.1, 2.3); if (k <= 0) return; ctx.save(); const gc = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 4; i++) { const a = Math.PI / 2 + Math.sin(t * 2 + i * 1.6) * 0.6, c = ['255,79,216', '0,240,255', '255,211,77', '93,255,122'][i]; ctx.fillStyle = `rgba(${c},${0.18 * k})`; ctx.beginPath(); ctx.moveTo(P.cx, P.cy - 200); ctx.lineTo(P.cx + Math.cos(a - 0.12) * 420, P.cy - 200 + Math.sin(a - 0.12) * 420); ctx.lineTo(P.cx + Math.cos(a + 0.12) * 420, P.cy - 200 + Math.sin(a + 0.12) * 420); ctx.fill(); }
+  ctx.globalCompositeOperation = gc; ctx.globalAlpha = k; for (let i = 0; i < 12; i++) { const h = 8 + Math.abs(Math.sin(t * 10 + i * 1.3)) * 38, x = P.cx - 66 + i * 12; ctx.fillStyle = `hsl(${(i * 30 + t * 200) % 360},90%,60%)`; ctx.fillRect(x, P.cy - 24 - h, 9, h); }
+  ctx.restore(); });
 function startGreenBurst(hp) {
   const kind = GFX[court.deco] ? court.deco : 'arena', fx = GFX[kind];
   greenBurst = { x: hp.cx, y: hp.rimY + 8, t: 0, h: hp, kind, dur: fx.dur, seed: Math.floor(Math.random() * 1000) };
@@ -7433,8 +7492,9 @@ setInterval(() => {   // stat-based trophies
   }
 }, 500);
 // ---- your team ----
+function myColorIdx() { const L = typeof lvlInfo === 'function' ? lvlInfo().L : 1, c = (SV.team || {}).c || 0, ok = i => TEAM_COLORS[i] && (TEAM_COLORS[i][2] || 0) <= L; if (ok(c)) return c; const free = TEAM_COLORS.map((x, i) => i).filter(ok).sort((a, b) => (TEAM_COLORS[a][2] || 0) - (TEAM_COLORS[b][2] || 0)); return free.length ? free[0] : 0; }
 function applyTeam() {
-  const T = SV.team || {}, c = TEAM_COLORS[T.c || 0] || TEAM_COLORS[0];
+  const T = SV.team || {}, c = TEAM_COLORS[myColorIdx()];
   teams[0].name = (T.name || 'HOT DOGS').toUpperCase(); teams[0].color = c[0]; teams[0].dark = c[1];
   const nm = niceName(teams[0].name);
   const rnd = SV.rollTeams !== false && !SV.useMine;
@@ -7482,7 +7542,7 @@ function netLoadPeer() {
 function netWrapPeer(c) { const w = { send: o => { try { if (c.open) c.send(o); } catch (e) {} }, close: () => { try { c.close(); } catch (e) {} } }; c.on('data', d => netRecv(d)); c.on('close', () => netLost()); c.on('error', () => netLost()); return w; }
 function netWrapTest(code, host) {
   const bc = new BroadcastChannel('hh-net-' + code), me = host ? 'h' : 'g';
-  bc.onmessage = e => { const m = e.data; if (m.from === me) return; if (m.d && m.d.t === 'hello' && host && net && !net.ready) { netConnected(netWrapTestConn(bc, me)); return; } if (m.d && m.d.t === 'bye') { netLost(); return; } if (net && net.ready) netRecv(m.d); };
+  bc.onmessage = e => { const m = e.data; if (m.from === me) return; if (m.d && m.d.t === 'hello' && host && net && !net.ready) { if (m.d.me) net.guest = m.d.me; netConnected(netWrapTestConn(bc, me)); return; } if (m.d && m.d.t === 'bye') { netLost(); return; } if (net && net.ready) netRecv(m.d); };
   return bc;
 }
 function netWrapTestConn(bc, me) { return { send: o => bc.postMessage({ from: me, d: o }), close: () => { try { bc.postMessage({ from: me, d: { t: 'bye' } }); bc.close(); } catch (e) {} } }; }
@@ -7519,15 +7579,27 @@ function netJoinGame() {
   if (code.length !== 4) { netMsg('Type the 4-letter code from your friend.'); return; }
   netClose(true); net = { host: false, ready: false, code }; netMsg('Connecting...');
   net.timer = setTimeout(() => { if (net && !net.ready) netFail("Couldn't connect. Check the code. Some networks, like school Wi-Fi, block online play."); }, 15000);
-  if (window.__netTest) { net.bc = netWrapTest(code, false); const c = netWrapTestConn(net.bc, 'g'); net.conn = c; c.send({ t: 'hello' }); net.ready = true; netGuestStart(); return; }
+  if (window.__netTest) { net.bc = netWrapTest(code, false); const c = netWrapTestConn(net.bc, 'g'); net.conn = c; c.send({ t: 'hello', me: netMe() }); net.ready = true; netGuestStart(); return; }
   netLoadPeer().then(() => {
     if (!net || net.code !== code) return;
     const peer = new Peer(NET_OPTS); net.peer = peer;
-    peer.on('open', () => { const c = peer.connect('hoophavoc-' + code.toLowerCase(), { reliable: true, serialization: 'json' }); c.on('open', () => { if (!net) return; net.conn = netWrapPeer(c); net.ready = true; clearTimeout(net.timer); net.conn.send({ t: 'hello' }); netGuestStart(); }); });
+    peer.on('open', () => { const c = peer.connect('hoophavoc-' + code.toLowerCase(), { reliable: true, serialization: 'json' }); c.on('open', () => { if (!net) return; net.conn = netWrapPeer(c); net.ready = true; clearTimeout(net.timer); net.conn.send({ t: 'hello', me: netMe() }); netGuestStart(); }); });
     peer.on('error', e => { if (!net || !net.ready) netFail(e.type === 'peer-unavailable' ? 'No game with that code. Check it and try again.' : netErr(e)); });
   }).catch(() => netFail("Couldn't load online play. Check your internet, then try again."));
 }
 const netErr = e => e && (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error') ? "Couldn't reach the online server. Some networks, like school Wi-Fi, block online play." : "Something went wrong. Try again.";
+function netMe() { const c = TEAM_COLORS[myColorIdx()]; return { name: ((SV.team || {}).name || 'HOT DOGS').toUpperCase().slice(0, 14), color: c[0], dark: c[1], pn: (SV.pname || '').slice(0, 12) }; }
+function netSetTeam(i, me) {
+  if (!me || !teams[i]) return; const t = teams[i], o = teams[1 - i];
+  t.name = String(me.name || t.name).replace(/[^A-Z .'-]/gi, '').toUpperCase().slice(0, 14) || t.name;
+  let col = /^#[0-9a-f]{6}$/i.test(me.color) ? me.color : t.color, dk = /^#[0-9a-f]{6}$/i.test(me.dark) ? me.dark : t.dark;
+  if (i === 1 && o && !farApart(o.color, col)) { const alt = TEAM_COLORS.find(c => farApart(o.color, c[0])) || TEAM_COLORS[0]; col = alt[0]; dk = alt[1]; }   // a clash: the guest swaps to an away kit
+  t.color = col; t.dark = dk;
+  const pn = String(me.pn || '').replace(/[^A-Z .'-]/gi, '').toUpperCase().slice(0, 12);
+  if (pn) { if (t.roster && t.roster[0]) t.roster[0].pname = pn; const p = players.find(q => q.team === i); if (p) p.pname = pn; }
+  if (typeof refreshKeep === 'function') refreshKeep();
+}
+function netApplyTeams() { if (!net || !net.host) return; netSetTeam(0, netMe()); if (net.guest) netSetTeam(1, net.guest); }
 function netConnected(conn) {
   if (!net) return;
   net.conn = conn; net.ready = true; clearTimeout(net.timer);
@@ -7536,7 +7608,7 @@ function netConnected(conn) {
 function netNewGame() {
   startGame(2, 21, 'online');
   document.body.classList.add('net', 'netH');
-  teams[0].cpu = teams[1].cpu = false; netIn.press = false; netHpT = 0; netHoopKey = '';
+  teams[0].cpu = teams[1].cpu = false; netIn.press = false; netHpT = 0; netHoopKey = ''; netApplyTeams();
   toast('Online', 'You are on the left. Your friend is on the right.');
 }
 function netGuestStart() {
@@ -7625,6 +7697,7 @@ let netLast = null, netFull = null;
 function netRecv(m) {
   if (!m || !net) return;
   if (m.t === 'ping') { net.conn.send({ t: 'pong', c: m.c }); return; }
+  if (m.t === 'hello') { if (net.host && m.me) { net.guest = m.me; netApplyTeams(); } return; }
   if (m.t === 'pong') { const r = performance.now() - m.c; netPing = netPing ? netPing * 0.7 + r * 0.3 : r; return; }
   if (net.host) {
     if (m.t === 'in') { const was = netIn.press; netIn.press = !!m.p; if (m.p && !was && !paused) { if (state === 'replay') endReplay(); else { teams[1].latch = true; if (state === 'play') contestPress(1); } } }
@@ -7823,9 +7896,10 @@ function openRules() {
   $('panelBody').querySelectorAll('[data-r]').forEach(b => b.onclick = () => { const k = b.dataset.r; SV.rules[k] = !SV.rules[k]; if (SV.rules[k] && RULE_OFF[k]) SV.rules[RULE_OFF[k]] = false; persist(); sync(); });
 }
 let lockerTab = 'team';
-const LOCKER_ROOMS = [['team', 'Your Team'], ['style', 'Style'], ['career', 'Career'], ['trophies', 'Trophies'], ['settings', 'Settings']], LOCKER_ICON = {"team": "<path d=\"M8 3 3 6l2 5 2-1v11h10V10l2 1 2-5-5-3c-.5 1.5-2 2.5-4 2.5S8.5 4.5 8 3z\"/>", "style": "<path d=\"M10 2c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7zm8.5 10c.3 2.3 1.2 3.2 3.5 3.5-2.3.3-3.2 1.2-3.5 3.5-.3-2.3-1.2-3.2-3.5-3.5 2.3-.3 3.2-1.2 3.5-3.5z\"/>", "career": "<path d=\"M4 20V10h3v10zm6.5 0V4h3v16zM17 20v-7h3v7z\"/>", "trophies": "<path d=\"M7 3h10v3h3v2a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.6V17h3v3H8v-3h3v-2.4A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V6h3zm-1 5a2 2 0 0 0 1 1.7V8zm12 0v1.7A2 2 0 0 0 18 8z\"/>", "settings": "<path d=\"M10.3 2h3.4l.5 2.6 1.8.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.8 2.6.5v3.4l-2.6.5-.8 1.8 1.5 2.2-2.4 2.4-2.2-1.5-1.8.8-.5 2.6h-3.4l-.5-2.6-1.8-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.8L2 13.7v-3.4l2.6-.5.8-1.8-1.5-2.2 2.4-2.4 2.2 1.5 1.8-.8zM12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z\"/>"};
+const LOCKER_ROOMS = [['team', 'Team & Style'], ['career', 'Career'], ['trophies', 'Trophies'], ['settings', 'Settings']], LOCKER_ICON = {"team": "<path d=\"M8 3 3 6l2 5 2-1v11h10V10l2 1 2-5-5-3c-.5 1.5-2 2.5-4 2.5S8.5 4.5 8 3z\"/>", "style": "<path d=\"M10 2c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7zm8.5 10c.3 2.3 1.2 3.2 3.5 3.5-2.3.3-3.2 1.2-3.5 3.5-.3-2.3-1.2-3.2-3.5-3.5 2.3-.3 3.2-1.2 3.5-3.5z\"/>", "career": "<path d=\"M4 20V10h3v10zm6.5 0V4h3v16zM17 20v-7h3v7z\"/>", "trophies": "<path d=\"M7 3h10v3h3v2a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.6V17h3v3H8v-3h3v-2.4A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V6h3zm-1 5a2 2 0 0 0 1 1.7V8zm12 0v1.7A2 2 0 0 0 18 8z\"/>", "settings": "<path d=\"M10.3 2h3.4l.5 2.6 1.8.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.8 2.6.5v3.4l-2.6.5-.8 1.8 1.5 2.2-2.4 2.4-2.2-1.5-1.8.8-.5 2.6h-3.4l-.5-2.6-1.8-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.8L2 13.7v-3.4l2.6-.5.8-1.8-1.5-2.2 2.4-2.4 2.2 1.5 1.8-.8zM12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z\"/>"};
 let lockerShown = null;
 function openLocker(tab) {
+  if (tab === 'style') tab = 'team'; if (lockerTab === 'style') lockerTab = 'team';
   const fresh = $('panel').hidden || !$('panelBody').querySelector('.doors'), prev = fresh ? null : lockerShown, next = tab || lockerTab;
   if (!fresh) $('panelBody').dataset.quiet = '1';   // re-drawing the same room: no row-by-row entrance
   openLocker0(tab); lockerShown = next;
@@ -7843,19 +7917,20 @@ function openLocker0(tab) {
     const T = SV.team;
     body = `<div class="h3">Team Name</div><div class="pgrid">${TEAM_NAMES.map(n => `<button class="pick" type="button" data-n="${n}" aria-pressed="${String(T.name === n)}">${tc(n)}</button>`).join('')}</div>
       <div style="margin-top:10px;display:flex;gap:10px;align-items:center"><input class="namein" id="nameIn" maxlength="14" placeholder="Or type your own" value="${TEAM_NAMES.includes(T.name) ? '' : niceName(T.name)}" aria-label="Custom team name"><small style="color:var(--muted)">Letters and spaces, up to 14.</small></div>
+      <div class="h3" style="margin-top:12px">Your Player</div><div style="display:flex;gap:10px;align-items:center"><input class="namein" id="pnameIn" maxlength="12" placeholder="Your player's name" value="${SV.pname ? niceName(SV.pname) : ''}" aria-label="Your player's name"><small style="color:var(--muted)">Shows over your player, and online.</small></div>
       <div class="rlist" style="margin-top:12px"><button class="tog" type="button" role="switch" data-sw="rollTeams" aria-checked="${SV.rollTeams !== false}"><span>Random Matchups<small>Every normal game rolls two new teams in different colors.</small></span><i></i></button>
       <button class="tog" type="button" role="switch" data-sw="useMine" aria-checked="${!!SV.useMine}"><span>Always Play As My Team<small>With random matchups on, you keep this name and color and only the opponent changes.</small></span><i></i></button></div>
-      <div class="h3" style="margin-top:14px">Jersey Color</div><div class="swrow">${TEAM_COLORS.map((c, i) => `<button class="sw" type="button" data-sc="${i}" style="background:${c[0]}" aria-label="${c[3]}${I.L < c[2] ? ', unlocks at level ' + c[2] : ''}" aria-pressed="${String((T.c || 0) === i)}" ${I.L < c[2] ? 'disabled' : ''}>${I.L < c[2] ? `<small>Lv ${c[2]}</small>` : ''}</button>`).join('')}</div>`;
+      <div class="h3" style="margin-top:14px">Jersey Color</div><div class="swrow">${TEAM_COLORS.map((c, i) => [c, i]).sort((a, b) => (a[0][2] || 0) - (b[0][2] || 0) || a[1] - b[1]).map(([c, i]) => `<button class="sw" type="button" data-sc="${i}" style="background:${c[0]}" aria-label="${c[3]}${I.L < c[2] ? ', unlocks at level ' + c[2] : ''}" aria-pressed="${String(myColorIdx() === i)}" ${I.L < c[2] ? 'disabled' : ''}>${I.L < c[2] ? `<small>Lv ${c[2]}</small>` : ''}</button>`).join('')}</div>`;
   } else if (lockerTab === 'career') {
     const g = car('games'), w = car('wins'), cg = car('cpuGames');
     const st = [['Games', g], ['Wins Vs CPU', w], ['Win Rate', cg ? Math.round(w / cg * 100) + '%' : '-'], ['Best Win Streak', car('bestWs')], ['Points', car('points')], ['Dunks', car('dunks')], ['Greens', car('greens')], ['Blocks', car('blocks')],
       ['Steals', car('steals')], ['Cups Won', car('cups')], ['Courts Played', `${SV.maps.length}/${COURTS.length}`], ['Dunks Landed', `${SV.dunks.length}/${DUNKS.length + Object.keys(MAP_DUNK).length}`]];
     body = `<div class="cgrid">${st.map(([l, v]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('')}</div>`;
-  } else if (lockerTab === 'style') {
+  } if (lockerTab === 'team') {   // style lives in the same room as your team
     const st = SV.style || {}, lock = L => I.L < L;
-    body = `<p style="margin:0 0 8px">Your team's look. Unlock more as you level up.</p><div class="h3">Ball Trail</div><div class="pgrid">${TRAILS.map(([k, n, L]) => `<button class="pick" type="button" data-tr="${k}" aria-pressed="${String((st.trail || 'none') === k)}" ${lock(L) ? 'disabled' : ''}>${n}${lock(L) ? `<small>Level ${L}</small>` : ''}</button>`).join('')}</div>
+    body += `<div class="h3" style="margin-top:16px">Your Look</div><p style="margin:0 0 8px">Unlock more as you level up.</p><div class="h3">Ball Trail</div><div class="pgrid">${TRAILS.map(([k, n, L]) => `<button class="pick" type="button" data-tr="${k}" aria-pressed="${String((st.trail || 'none') === k)}" ${lock(L) ? 'disabled' : ''}>${n}${lock(L) ? `<small>Level ${L}</small>` : ''}</button>`).join('')}</div>
       <div class="h3">Star player</div><div class="pgrid">${[[0, 'None', 1, 0], ...STARS].map(([L, n, num]) => `<button class="pick" type="button" data-star="${L ? n : ''}" aria-pressed="${String((st.star || '') === (L ? n : ''))}" ${lock(L || 1) ? 'disabled' : ''}>${L ? n + ` <small>#${num}${lock(L) ? ', level ' + L : ''}</small>` : 'None'}</button>`).join('')}</div>
-      <div class="h3" style="margin-top:14px">Headband</div><div class="swrow">${BANDS.map(([c, n, L], i) => `<button class="sw" type="button" data-hb="${i}" style="background:${c || 'repeating-linear-gradient(45deg,#33244a 0 6px,#21162f 6px 12px)'}" aria-label="${n}${lock(L) ? ', unlocks at level ' + L : ''}" aria-pressed="${String((st.band || 0) === i)}" ${lock(L) ? 'disabled' : ''}>${lock(L) ? `<small>Lv ${L}</small>` : ''}</button>`).join('')}</div>`;
+      <div class="h3" style="margin-top:14px">Headband</div><div class="swrow">${BANDS.map((b, i) => [b, i]).sort((a, b) => (a[0][2] || 0) - (b[0][2] || 0) || a[1] - b[1]).map(([[c, n, L], i]) => `<button class="sw" type="button" data-hb="${i}" style="background:${c || 'repeating-linear-gradient(45deg,#33244a 0 6px,#21162f 6px 12px)'}" aria-label="${n}${lock(L) ? ', unlocks at level ' + L : ''}" aria-pressed="${String((st.band || 0) === i)}" ${lock(L) ? 'disabled' : ''}>${lock(L) ? `<small>Lv ${L}</small>` : ''}</button>`).join('')}</div>`;
   } else if (lockerTab === 'settings') {
     body = acctHTML() + '<div class="credit"><b>Hoop Havoc</b><span>A Morningfall Corp game</span><small>Beta v' + GAME_VERSION + '</small></div>' + `<div class="rlist" style="margin-bottom:12px"><button class="tog" type="button" role="switch" data-sw="replays" aria-checked="${SV.replays !== false}"><span>Instant replays<small>On: big plays and blocks get a slow-motion replay. Off: no replays during games (highlights still save).</small></span><i></i></button>
       <button class="tog" type="button" role="switch" data-sw="study" aria-checked="${!!SV.study}"><span>Study mix<small>A calmer crowd, softer sound effects and mellow music. Great with Auto Mode.</small></span><i></i></button>
@@ -7876,13 +7951,14 @@ function openLocker0(tab) {
   $('panelBody').querySelectorAll('[data-star]').forEach(b => b.onclick = () => { SV.style = SV.style || {}; SV.style.star = b.dataset.star; persist(); $('panelBody').querySelectorAll('[data-star]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); });
   const P = $('panelBody');
   P.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { openLocker(b.dataset.t); P.querySelector(`[data-t="${b.dataset.t}"]`)?.focus(); });
-  P.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { SV.team.name = b.dataset.n; persist(); applyTeam(); openLocker(); });
-  P.querySelectorAll('[data-sc]').forEach(b => b.onclick = () => { SV.team.c = +b.dataset.sc; persist(); applyTeam(); openLocker(); });
+  P.querySelectorAll('[data-n]').forEach(b => b.onclick = () => { SV.team.name = b.dataset.n; if (SV.rollTeams !== false && !SV.useMine) { SV.useMine = true; toast('Your team it is', 'You now always play as your team. Only the other team changes.'); } persist(); applyTeam(); openLocker(); });
+  P.querySelectorAll('[data-sc]').forEach(b => b.onclick = () => { SV.team.c = +b.dataset.sc; if (SV.rollTeams !== false && !SV.useMine) { SV.useMine = true; toast('Your colours it is', 'You now always wear your jersey. Only the other team changes.'); } persist(); applyTeam(); openLocker(); });
   P.querySelectorAll('[data-v]').forEach(r => { r.addEventListener('keydown', e => e.stopPropagation()); r.addEventListener('input', () => { SV.vol = SV.vol || {}; SV.vol[r.dataset.v] = +r.value; persist(); applyVol(); r.nextElementSibling.textContent = r.value + '%'; }); r.addEventListener('change', () => { if (r.dataset.v === 'sfx') tone(660, 0.12, 'triangle', 0.06);  }); });
   P.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => { const k = b.dataset.sw; const on = k === 'rollTeams' || k === 'replays'; SV[k] = on ? SV[k] === false : !SV[k]; persist(); if (k === 'study') applyVol(); b.setAttribute('aria-checked', String(on ? SV[k] !== false : !!SV[k])); });
   P.querySelectorAll('[data-tr]').forEach(b => b.onclick = () => { SV.style = { ...(SV.style || {}), trail: b.dataset.tr }; persist(); openLocker('style'); });
   P.querySelectorAll('[data-hb]').forEach(b => b.onclick = () => { SV.style = { ...(SV.style || {}), band: +b.dataset.hb }; persist(); openLocker('style'); });
   const inp = $('nameIn');
+  { const pi = $('pnameIn'); if (pi) { pi.addEventListener('keydown', e => e.stopPropagation()); pi.addEventListener('change', () => { const v = pi.value.replace(/[^A-Za-z .'-]/g, '').trim().slice(0, 12); SV.pname = v ? v.toUpperCase() : ''; persist(); toast(v ? 'Name saved' : 'Name cleared', v ? `Your player is now ${niceName(SV.pname)}.` : 'Your player gets a random name again.'); }); } }
   if (inp) { inp.addEventListener('keydown', e => e.stopPropagation()); inp.addEventListener('change', () => { const v = inp.value.replace(/[^A-Za-z ]/g, '').trim().slice(0, 14); if (v) { SV.team.name = v.toUpperCase(); persist(); applyTeam(); openLocker(); } }); }
 }
 $('bModes').addEventListener('click', openModes);
@@ -8044,10 +8120,10 @@ const TEAM_POOL = [
 function hueOf(h) { const n = parseInt(h.slice(1), 16), r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
   if (d < 0.12) return { h: -1, l: (mx + mn) / 2 };
   const hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return { h: (hh * 60 + 360) % 360, l: (mx + mn) / 2 }; }
-function farApart(c1, c2) { const a = hueOf(c1), b = hueOf(c2); if (a.h < 0 || b.h < 0) return a.h !== b.h || Math.abs(a.l - b.l) > 0.25; const dh = Math.abs(a.h - b.h); return Math.min(dh, 360 - dh) > 55; }
+function farApart(c1, c2) { const a = hueOf(c1), b = hueOf(c2); if (a.h < 0 && b.h < 0) return false; if (a.h < 0 || b.h < 0) return Math.abs(a.l - b.l) > 0.12 || true; const dh = Math.abs(a.h - b.h); return Math.min(dh, 360 - dh) > 55; }
 function rollTeams() {
   if (!SV.rollTeams && SV.rollTeams !== undefined) return;   // the Locker switch can turn random matchups off
-  const mine = SV.useMine ? [teams[0].name, teams[0].color, teams[0].dark] : null;
+  const myC = TEAM_COLORS[myColorIdx()], mine = SV.useMine ? [((SV.team || {}).name || 'HOT DOGS').toUpperCase(), myC[0], myC[1]] : null;
   const A = mine || pick(TEAM_POOL); let B, guard = 0;
   do { B = pick(TEAM_POOL); } while ((B[0] === A[0] || !farApart(A[1], B[1])) && guard++ < 50);
   Object.assign(teams[0], { name: A[0], color: A[1], dark: A[2] }); Object.assign(teams[1], { name: B[0], color: B[1], dark: B[2] });
@@ -8056,7 +8132,7 @@ function newCup() {
   const rollMe = SV.rollTeams !== false && !SV.useMine;
   let me = null;
   if (rollMe) { const A = pick(TEAM_POOL); me = { name: A[0], color: A[1], dark: A[2] }; }
-  const myCol = me ? me.color : (TEAM_COLORS[(SV.team || {}).c || 0] || TEAM_COLORS[0])[0], myName = me ? me.name : (SV.team || {}).name;
+  const myCol = me ? me.color : (TEAM_COLORS[myColorIdx()])[0], myName = me ? me.name : (SV.team || {}).name;
   const pool = TEAM_POOL.filter(t => t[0] !== myName && farApart(t[1], myCol)).sort(() => Math.random() - 0.5);
   TOURNEY.forEach((o, i) => { const t = pool[i % pool.length]; o.name = t[0]; o.color = t[1]; o.dark = t[2]; });
   tourney = { round: 0, me };
@@ -8130,7 +8206,7 @@ function decorateButtons(root) {
 }
 decorateButtons(); { let q = 0; new MutationObserver(() => { if (q) return; q = requestAnimationFrame(() => { q = 0; decorateButtons(); }); }).observe(document.body, { childList: true, subtree: true }); }
 document.head.insertAdjacentHTML('beforeend', `<style id="hhLocker">
-.doors{display:grid;grid-template-columns:repeat(5,1fr);gap:calc(var(--k)*8);margin:0 0 calc(var(--k)*12);perspective:600px}
+.doors{display:grid;grid-template-columns:repeat(4,1fr);gap:calc(var(--k)*8);margin:0 0 calc(var(--k)*12);perspective:600px}
 .door{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;min-height:calc(var(--k)*96);padding:calc(var(--k)*8) 4px calc(var(--k)*8);cursor:pointer;color:var(--cream);font:inherit;
   background:linear-gradient(90deg,rgba(0,0,0,.28),transparent 12%,transparent 88%,rgba(0,0,0,.28)),linear-gradient(180deg,rgba(255,255,255,.12),rgba(0,0,0,.25)),var(--dc,#3a2a52);border:3px solid var(--edge);box-shadow:inset 0 3px 0 rgba(255,255,255,.12),inset 0 -4px 0 rgba(0,0,0,.4),0 4px 0 var(--edge);
   transform-origin:left center;transition:transform .25s cubic-bezier(.2,.9,.25,1.1),filter .12s}
@@ -8140,7 +8216,7 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhLocker">
 .door i{display:grid;width:26px;height:26px;margin-top:40px}.door i svg{width:100%;height:100%;fill:currentColor}
 .door b{font:600 max(11px,calc(var(--k)*13))/1.1 var(--pixel);text-align:center}
 .door:hover{filter:brightness(1.15)}
-.door[data-t=team]{--dc:#b3243b}.door[data-t=style]{--dc:#7a3fb0}.door[data-t=career]{--dc:#2a62c4}.door[data-t=trophies]{--dc:#b8860b}.door[data-t=settings]{--dc:#1f8a7a}
+.door[data-t=team]{--dc:#b3243b}.door[data-t=career]{--dc:#2a62c4}.door[data-t=trophies]{--dc:#b8860b}.door[data-t=settings]{--dc:#1f8a7a}
 .door[aria-pressed="true"]{color:var(--cream)!important;border-color:var(--cream)!important}.door[aria-pressed="true"] .plate{background:var(--cream)!important}
 .door[aria-pressed="true"]{color:var(--mustard);border-color:var(--mustard);transform:rotateY(-14deg);background:linear-gradient(90deg,rgba(255,240,207,.22),transparent 40%),linear-gradient(180deg,rgba(255,255,255,.16),rgba(0,0,0,.2)),var(--dc,#3a2a52);box-shadow:inset 0 0 18px rgba(255,190,46,.25),0 4px 0 var(--edge),-8px 0 18px rgba(255,190,46,.25)}
 .door[aria-pressed="true"] .plate{background:var(--mustard)}
@@ -8155,8 +8231,11 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhLocker">
 @media (max-width:560px){.doors{gap:4px}.door b{font-size:10px}.door .vents{display:none}.door .plate{top:6px}.door i{margin-top:18px}.door{min-height:74px}}
 @media (prefers-reduced-motion:reduce){.room.from-r,.room.from-l{animation:none}.door{transition:none}}
 </style>`);
-const GAME_VERSION = 95;
+document.head.insertAdjacentHTML('beforeend', '<style>.sw[disabled]{opacity:.9}.sw[disabled] small{border-radius:50%;background:rgba(18,11,28,.4);color:#fff;text-shadow:0 1px 0 #000}</style>');
+const GAME_VERSION = 97;
 const UPDATES = [
+  [97, 'Map moments', ['New green and hoop animations on ten courts: a lasso on the ranch, a bouncing star in the bouncy castle, an astronaut on the moon, floor cracks on Heavy Planet, a whale tail under the sea, lava pillars on Volcano Island, a snake coiling the rim in the jungle, golden scarabs in the desert, the Jolly Roger on the pirate ship and an equaliser in the disco.', 'Bouncy Castle winners now do four flips, finishing with a double backflip and three 10s from the crowd.', 'Dunks ease into their first move instead of snapping.', 'Blocks: a defender in the air only needs a firm touch to swat a shot, and a fingertip knocks a shot off line.', 'Dunk contest: taking off from way out and perfect lobs score more, judges agree on great dunks, and you earn a bronze, silver or gold medal.']],
+  [96, 'Your team, your colours', ['Picking a team name or jersey colour in the Locker now means you wear it every game. Only the other team changes.', 'Two grey kits never face each other.', 'Fixed your jersey showing a colour you hadn\'t unlocked yet. New players start in red.', 'Jersey colours and headbands are in level order, and locked ones are easy to read.', 'Your Team and Style are now one locker room: Team & Style.', 'Wind is gone completely, including the wind arrows and the Wind storm Havoc round.', 'Give your player a name in the Locker. It shows over your player.', 'Online games use each person\'s own team name, jersey colour and player name. If both of you wear the same colour, the guest switches to an away kit.']],
   [95, 'Locker rooms', ['The Locker is now a row of colourful locker doors. Open one to walk into that room, and the room slides in from the side you came from.', 'Every mode has its own icon.']],
   [94, 'Even better courts', ['Point setups (like Ball: Beach ball) show in the small tag under the scoreboard for a few seconds, then fade.', 'More courts got props: umbrellas, puddles and lightning in Rainy Park, a windmill and tumbleweed on the ranch, coral, treasure and a jellyfish under the sea, embers on Volcano Island, a ghost in the graveyard, a sphinx and camel in the desert, cannons and a parrot on the pirate ship, a hot-air balloon in the clouds, pennants at the ice rink, a dragon over the castle and a lit-up disco floor.']],
   [93, 'Better courts', ['Beach Court has palm trees, a beach umbrella, a lifeguard chair, gulls and a sailboat.', 'Bounce House has inflatable castle towers and balloons.', 'Moon Base has craters, a lunar lander and a flag. Heavy Planet has red rocks, alien crystals and meteors.', 'Rooftop has a water tower, string lights and an antenna. Snow Day has a log cabin, snowmen and falling snow.', 'Crystal Cave has stalactites, glowing mushrooms and fireflies.']],
@@ -8378,6 +8457,7 @@ function finishContest() {
   contestOpen = true; paused = true;
   const c = contest, k = c.kind, score = c.total, prev = (SV.best && SV.best[k]) || 0, isRec = score > prev;
   if (isRec) { SV.best[k] = score; persist(); }
+  if (k === 'dunk') setTimeout(() => toast(score >= 130 ? 'Gold medal!' : score >= 110 ? 'Silver medal!' : score >= 90 ? 'Bronze medal!' : 'Keep practising', `${score} points from five dunks. Bronze 90, silver 110, gold 130.`), 400);
   if (k === 'dunk' && score >= 100) unlock('dunk100'); if (k === 'three' && score >= 20) unlock('three20');
   const xp = Math.round(k === 'dunk' ? score * 1.5 : score * 3); if (xp) gainXP(xp);
   const rows = c.log.map(([n, v], i) => `<div><em>Dunk ${i + 1}</em>${n}<span>${v} Points</span></div>`).join('');
