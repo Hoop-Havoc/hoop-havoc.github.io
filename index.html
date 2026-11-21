@@ -3993,6 +3993,7 @@ function stateUpdate(el) {
   for (const t of teams) t.pop = Math.max(0, (t.pop || 0) - el * 1.6);
   greenFx = Math.max(0, greenFx - el * 0.9);
   if (greenBurst && (greenBurst.t += el) > (greenBurst.dur || 1.4)) greenBurst = null;
+  try { stepDoom(el); } catch (e) { doom = null; }
   if (wipe && state !== 'scored') { wipe.t += el / 0.42; if (wipe.t >= 2) wipe = null; }
   shake *= Math.pow(0.01, el); crowdJump *= Math.pow(0.15, el);
   if (pregame) { pregame.t += el; if (pregame.t >= pregame.dur) pregame = null; else stateT = Math.max(stateT, INTRO * 0.6); }
@@ -5822,14 +5823,16 @@ function drawHUD() {
     ctx.beginPath(); ctx.moveTo(ax + d * 10, ay); ctx.lineTo(ax - d * 3, ay - 7.5); ctx.lineTo(ax - d * 3, ay + 7.5); ctx.closePath(); ctx.fill();
   }
   // what's special about this game / this point, right under the scoreboard
-  { const tags = []; if (!practice()) { if (rules().by2) tags.push(['Win by 2', MUSTARD]); if (goldenRound) tags.push(['Double points', '#ffd34d']); if (chaos && HAVOC[chaos]) tags.push(['Havoc: ' + HAVOC[chaos].name, HAVOC[chaos].c, 1, 'Havoc: ']); }
+  { const tags = []; if (!practice()) { if (rules().by2) tags.push(['Win by 2', MUSTARD]); if (goldenRound) tags.push(['Golden ball: double points', '#ffd34d', 1, 'Golden ball: ']); if (chaos && HAVOC[chaos]) tags.push(['Havoc: ' + HAVOC[chaos].name, HAVOC[chaos].c, 1, 'Havoc: ']); }
     const sAge = time - roundStart, sA = attract || tutorial() || practice() || state === 'intro' ? 0 : clamp((10 - sAge) / 0.8, 0, 1) * clamp((sAge - INTRO) / 0.3, 0, 1);
     if (sA > 0) for (const [lab, nm] of stipList(false)) tags.push([lab + ': ' + nm, lab === 'Ball' ? '#ff9a4d' : lab === 'Players' ? '#5fe07a' : '#6fc4ff', sA, lab + ': ']);
-    if (tags.length) { ctx.font = `700 12px ${TEXT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const txt = tags.map(t => t[0]).join('   '), tw = ctx.measureText(txt).width + 22 + tags.length * 12, yy = by + bh + 14;
+    const stipT = tags.filter(t => /^(Ball|Players|Hoop): /.test(t[3] || '')), mainT = tags.filter(t => !stipT.includes(t)); let rowY = by + bh + 14;
+    for (const row of [mainT, stipT]) { if (!row.length) continue; const tags = row;
+     { ctx.font = `700 12px ${TEXT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const txt = tags.map(t => t[0]).join('   '), tw = ctx.measureText(txt).width + 22 + tags.length * 12, yy = rowY; rowY += 24;
       ctx.globalAlpha = Math.max(...tags.map(t => t[2] == null ? 1 : t[2])); ctx.fillStyle = 'rgba(18,11,28,.82)'; rr(cx - tw / 2, yy - 10, tw, 20, 10); ctx.fill(); ctx.globalAlpha = 1; let x = cx - tw / 2 + 11; ctx.textAlign = 'left';
       for (const [t, c, a, pre] of tags) { ctx.globalAlpha = a == null ? 1 : a; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x + 4, yy + 0.5, 4, 0, 7); ctx.fill(); x += 12;
         if (pre) { ctx.fillText(pre, x, yy + 1); const pw = ctx.measureText(pre).width; ctx.fillStyle = c; ctx.fillText(t.slice(pre.length), x + pw, yy + 1); } else ctx.fillText(t, x, yy + 1);
-        x += ctx.measureText(t + '   ').width; } ctx.globalAlpha = 1; } }
+        x += ctx.measureText(t + '   ').width; } ctx.globalAlpha = 1; } } }
   // status chips hang under each team's tab
   let side = 0;
   for (let i = 0; i < 2; i++) {
@@ -5852,7 +5855,6 @@ function drawHUD() {
   const fresh = state === 'intro' || state === 'scored' || quietIntro ? 0 : clamp((INTRO + 3.6 - since) / 0.4, 0, 1);
   const tags = [];
   const stY = side ? by + bh + 72 : by + bh + 12, stH = 0;
-  if (goldenRound) tags.push(['Golden Ball, Double Points', MUSTARD, 1]);
   if (tags.length) {
     ctx.font = `600 13px ${TEXT}`;
     const ws = tags.map(([t]) => ctx.measureText(t).width + 20), tw = ws.reduce((a, b) => a + b, 0) + (tags.length - 1) * 6;
@@ -6641,12 +6643,72 @@ gfxAdd('disco', 2.3, (g, t, P) => { const k = fadeK(t, 0.1, 2.3); if (k <= 0) re
   for (let i = 0; i < 4; i++) { const a = Math.PI / 2 + Math.sin(t * 2 + i * 1.6) * 0.6, c = ['255,79,216', '0,240,255', '255,211,77', '93,255,122'][i]; ctx.fillStyle = `rgba(${c},${0.18 * k})`; ctx.beginPath(); ctx.moveTo(P.cx, P.cy - 200); ctx.lineTo(P.cx + Math.cos(a - 0.12) * 420, P.cy - 200 + Math.sin(a - 0.12) * 420); ctx.lineTo(P.cx + Math.cos(a + 0.12) * 420, P.cy - 200 + Math.sin(a + 0.12) * 420); ctx.fill(); }
   ctx.globalCompositeOperation = gc; ctx.globalAlpha = k; for (let i = 0; i < 12; i++) { const h = 8 + Math.abs(Math.sin(t * 10 + i * 1.3)) * 38, x = P.cx - 66 + i * 12; ctx.fillStyle = `hsl(${(i * 30 + t * 200) % 360},90%,60%)`; ctx.fillRect(x, P.cy - 24 - h, 9, h); }
   ctx.restore(); });
+
+// ---- green doom: the team that got scored on suffers something fitting for the court ----
+const DOOM_KIND = { haunted: 'zombie', lava: 'lava', ice: 'freeze', snow: 'freeze', water: 'wave', beach: 'wave', jungle: 'coconut', egypt: 'sink', pirate: 'cannon', moon: 'float', sky: 'float',
+  heavy: 'anvil', candy: 'goo', bounce: 'launch', ranch: 'tumble', rain: 'zap', castle: 'zap', cave: 'zap', neon: 'zap', disco: 'zap', rome: 'arrows', street: 'zap', arena: 'zap', roof: 'zap' };
+let doom = null;
+function startDoom(hp) {
+  if (attract || tutorial() || state === 'replay') return; const ti = hoops.indexOf(hp); if (ti < 0) return;
+  const losers = players.filter(p => p.team !== ti); if (!losers.length) return;
+  doom = { t: 0, kind: DOOM_KIND[court.deco] || 'zap', losers, hit: false, seed: Math.random() * 1000, side: Math.sign(W / 2 - losers[0].x) || 1 };
+}
+function doomHit(p, dir, dur) { p.down = 0; p.downCD = 0; knockDown(p, dir, dur); p.dizzy = Math.max(p.dizzy || 0, dur); p.mood = 'sad'; p.moodT = 2; }
+function stepDoom(el) {
+  const d = doom; if (!d) return; d.t += el; const k = d.kind;
+  if (d.t > 2.6 || state === 'over') { doom = null; return; }
+  const hitAt = { zombie: 0.55, lava: 0.85, freeze: 0.35, wave: 0.75, coconut: 0.7, sink: 0.4, cannon: 0.65, float: 0.3, anvil: 0.6, goo: 0.4, launch: 0.35, tumble: 0.8, zap: 0.45, arrows: 0.7 }[k] || 0.5;
+  if (!d.hit && d.t >= hitAt) { d.hit = true;
+    d.losers.forEach(p => { const dir = Math.sign(p.x - W / 2) || 1;
+      if (k === 'freeze') { p.frozenT = 1.6; p.vx = 0; tone(1400, 0.2, 'sine', 0.04); }
+      else if (k === 'goo') { p.gooT = 1.6; p.vx = 0; }
+      else if (k === 'float') { p.vy = -420; p.grounded = false; p.y = Math.min(p.y, GROUND - 1); p.dizzy = 1.6; }
+      else if (k === 'launch') { p.vy = -820; p.grounded = false; p.y = Math.min(p.y, GROUND - 1); p.w += dir * 8; p.dizzy = 1.6; }
+      else if (k === 'sink' || k === 'zombie') { p.vx = 0; doomHit(p, dir, 1.4); }
+      else { p.vx += (k === 'wave' || k === 'cannon' || k === 'tumble' ? d.side : dir) * 260; doomHit(p, k === 'wave' || k === 'cannon' || k === 'tumble' ? d.side : dir, 1.5); }
+      for (let i = 0; i < 14; i++) spark(p.x, p.y - 40, pick(k === 'lava' ? ['#ff3d1f', '#ff8a3d', '#ffd34d'] : k === 'freeze' ? ['#bfe6ff', '#ffffff'] : k === 'goo' ? ['#ff6fd8', '#ffb3ec'] : k === 'zombie' ? ['#6fae4a', '#3a5a2a'] : ['#ffe14d', '#ffffff']), rand(-200, 200), rand(-260, -40));
+    });
+    if (k === 'lava' || k === 'cannon' || k === 'anvil' || k === 'coconut') boom(0.12); else if (k === 'zap') { tone(60, 0.3, 'sawtooth', 0.06); shake = Math.max(shake, 5); } else if (k === 'zombie') hiss(0.5, 0.06);
+  }
+  d.losers.forEach(p => { if (p.frozenT > 0) { p.frozenT -= el; p.vx = 0; p.w *= 0.5; } if (p.gooT > 0) { p.gooT -= el; p.vx *= 0.3; } if ((k === 'sink' || k === 'zombie') && d.t > hitAt && d.t < hitAt + 1.2) p.vx = 0; });
+}
+function drawDoom() {
+  const d = doom; if (!d || attract) return; const k = d.kind, t = d.t, hitAt = d.hit ? 1 : 0;
+  ctx.save();
+  d.losers.forEach((p, i) => { const x = p.x, fy = GROUND;
+    if (k === 'zombie') { const up = ease(clamp((t - 0.15) / 0.4, 0, 1)) * (t > 2 ? Math.max(0, 1 - (t - 2) / 0.4) : 1), hx = x + 6, top = fy - 70 * up;
+      ctx.fillStyle = '#4a3a2a'; ctx.beginPath(); ctx.ellipse(hx, fy - 2, 26, 6, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#7fae5a'; ctx.strokeStyle = '#2e4420'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(hx - 8, fy); ctx.lineTo(hx - 7, top + 14); ctx.lineTo(hx + 7, top + 14); ctx.lineTo(hx + 8, fy); ctx.closePath(); ctx.fill(); ctx.stroke();
+      for (let f = 0; f < 4; f++) { const fx = hx - 9 + f * 6, curl = d.hit ? 6 : 0; ctx.beginPath(); ctx.moveTo(fx, top + 14); ctx.quadraticCurveTo(fx + curl, top - 4, fx + curl * 1.6, top + 2); ctx.lineWidth = 5; ctx.strokeStyle = '#7fae5a'; ctx.stroke(); }
+      ctx.fillStyle = '#5a3a6a'; ctx.fillRect(hx - 9, top + 22, 18, 5); }
+    else if (k === 'lava') { for (let b = 0; b < 3; b++) { const u = clamp((t - 0.2 - b * 0.08) / 0.65, 0, 1); if (u <= 0 || u >= 1) continue; const sx = W / 2 + (i - 0.5) * 60, bx = lerp(sx, x + (b - 1) * 14, u), by = lerp(-20, fy - 40, u) - Math.sin(u * Math.PI) * 120;
+        ctx.fillStyle = '#ff5a1f'; ctx.beginPath(); ctx.arc(bx, by, 11, 0, 7); ctx.fill(); ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(bx - 3, by - 3, 4.5, 0, 7); ctx.fill(); }
+      if (d.hit && t < 2.2) { ctx.globalAlpha = Math.max(0, 1 - (t - 0.85) / 1.4); ctx.fillStyle = '#ff6a1f'; ctx.beginPath(); ctx.ellipse(x, fy - 2, 30, 7, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1; } }
+    else if (k === 'freeze' && p.frozenT > 0) { const a = Math.min(1, p.frozenT / 0.3); ctx.globalAlpha = 0.55 * a; ctx.fillStyle = '#bfe6ff'; const h = p.L + p.headR * 2 + 16; rr(x - 26, fy - h, 52, h, 8); ctx.fill(); ctx.globalAlpha = 0.9 * a; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; rr(x - 26, fy - h, 52, h, 8); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x - 14, fy - h + 10); ctx.lineTo(x - 4, fy - h + 30); ctx.stroke(); ctx.globalAlpha = 1; }
+    else if (k === 'goo' && p.gooT > 0) { ctx.globalAlpha = Math.min(1, p.gooT / 0.3) * 0.85; ctx.fillStyle = '#ff6fd8'; ctx.beginPath(); ctx.ellipse(x, fy - 4, 34, 10, 0, 0, 7); ctx.fill(); for (let s2 = 0; s2 < 3; s2++) { ctx.beginPath(); ctx.ellipse(x - 14 + s2 * 14, fy - 14 - s2 % 2 * 6, 6, 10, 0, 0, 7); ctx.fill(); } ctx.globalAlpha = 1; }
+    else if (k === 'zap' && t > 0.3 && t < 0.75) { const a = 1 - (t - 0.3) / 0.45; ctx.strokeStyle = `rgba(255,240,140,${a})`; ctx.lineWidth = 5; ctx.shadowColor = '#fff'; ctx.shadowBlur = 16; ctx.beginPath(); let yy = 0, xx = x + 20; ctx.moveTo(xx, yy); while (yy < p.Hd.y) { yy += 38; xx += (Math.random() - 0.5) * 40; ctx.lineTo(xx, Math.min(yy, p.Hd.y)); } ctx.stroke(); ctx.shadowBlur = 0;
+      if (t < 0.5) { ctx.fillStyle = `rgba(255,255,255,${0.25 * a})`; ctx.fillRect(-50, -50, W + 100, H + 100); } }
+    else if (k === 'coconut' || k === 'anvil') { const u = clamp((t - 0.2) / 0.5, 0, 1); if (u < 1) { const y = lerp(-30, p.Hd.y - 10, u * u); if (k === 'anvil') { ctx.fillStyle = '#3a3a44'; ctx.fillRect(x - 22, y - 14, 44, 16); ctx.fillRect(x - 10, y, 20, 12); ctx.fillRect(x - 16, y + 12, 32, 6); } else { ctx.fillStyle = '#6a4a2a'; ctx.beginPath(); ctx.arc(x, y, 12, 0, 7); ctx.fill(); ctx.fillStyle = '#2a1a0a'; ctx.beginPath(); ctx.arc(x - 3, y - 3, 2, 0, 7); ctx.arc(x + 3, y - 3, 2, 0, 7); ctx.fill(); } }
+      else if (t < 1.8) for (let s2 = 0; s2 < 3; s2++) { const a = t * 6 + s2 * 2.1; ctx.fillStyle = '#ffd34d'; drawShape('star', p.Hd.x + Math.cos(a) * 18, p.Hd.y - 18 + Math.sin(a) * 6, 5, a); } }
+    else if (k === 'sink' && d.hit && t < 2.2) { ctx.fillStyle = 'rgba(200,160,80,.85)'; ctx.beginPath(); ctx.ellipse(x, fy - 3, 40 + Math.sin(t * 8) * 3, 9, 0, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(120,90,40,.7)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(x, fy - 3, 22, 5, t * 3, 0, 5); ctx.stroke(); }
+    else if (k === 'arrows') { for (let ar = 0; ar < 4; ar++) { const u = clamp((t - 0.25 - ar * 0.05) / 0.45, 0, 1); if (u <= 0) continue; const tx = x - 20 + ar * 13, ty = fy - 6, sx = tx - 220 * d.side, sy = -40, ax = lerp(sx, tx, u), ay = lerp(sy, ty, u) - Math.sin(u * Math.PI) * 60, ang = Math.atan2(ty - sy, tx - sx);
+        ctx.save(); ctx.translate(ax, ay); ctx.rotate(ang); ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(0, 0); ctx.stroke(); ctx.fillStyle = '#ccc'; ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-4, -4); ctx.lineTo(-4, 4); ctx.fill(); ctx.fillStyle = '#dc283c'; ctx.fillRect(-24, -3, 5, 6); ctx.restore(); } }
+  });
+  if (k === 'wave') { const u = clamp((t - 0.2) / 1.1, 0, 1); if (u > 0 && u < 1) { const L0 = d.losers[0].x, x = lerp(L0 - d.side * 360, L0 + d.side * 260, u), h = 150 * Math.sin(u * Math.PI);
+      ctx.fillStyle = 'rgba(60,150,220,.8)'; ctx.beginPath(); ctx.moveTo(x - d.side * 260, GROUND); ctx.quadraticCurveTo(x - d.side * 60, GROUND - h * 1.2, x, GROUND - h); ctx.quadraticCurveTo(x + d.side * 20, GROUND - h - 10, x + d.side * 30, GROUND); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(x - d.side * 40, GROUND - h * 0.9); ctx.quadraticCurveTo(x, GROUND - h - 12, x + d.side * 26, GROUND - h + 10); ctx.stroke(); } }
+  if (k === 'cannon') { const u = clamp((t - 0.25) / 0.4, 0, 1), L = d.losers[0]; if (u > 0 && u < 1) { const sx = L.x - d.side * 520, bx = lerp(sx, L.x, u), by = lerp(GROUND - 90, L.Hd.y + 20, u) - Math.sin(u * Math.PI) * 50; ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(bx, by, 10, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(200,200,200,.5)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(sx, GROUND - 90); ctx.lineTo(bx - d.side * 20, by); ctx.stroke(); } }
+  if (k === 'tumble') { const u = clamp((t - 0.1) / 1.2, 0, 1); if (u > 0 && u < 1) { const L = d.losers[0], x = lerp(L.x - d.side * 520, L.x + d.side * 300, u), y = GROUND - 26 - Math.abs(Math.sin(u * 14)) * 20; ctx.strokeStyle = '#a8865a'; ctx.lineWidth = 3; for (let r2 = 0; r2 < 8; r2++) { ctx.beginPath(); ctx.arc(x, y, 14 + r2 * 2.2, u * 30 + r2, u * 30 + r2 + 4); ctx.stroke(); } } }
+  ctx.restore();
+}
 function startGreenBurst(hp) {
+  try { startDoom(hp); } catch (e) {}
   const kind = GFX[court.deco] ? court.deco : 'arena', fx = GFX[kind];
   greenBurst = { x: hp.cx, y: hp.rimY + 8, t: 0, h: hp, kind, dur: fx.dur, seed: Math.floor(Math.random() * 1000) };
   if (fx.sfx) fx.sfx();
 }
-function drawGreenBurst() {
+function drawGreenBurst() { try { drawDoom(); } catch (e) { doom = null; } drawGreenBurst0(); }
+function drawGreenBurst0() {
   // a green make lights the rim itself (the ring flares, a tight ripple runs out), then the court's own show plays right at the rim
   const g = greenBurst, h = g && g.h, n = h && h.net; if (!n) return;
   const t = g.t; ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
@@ -7216,7 +7278,14 @@ function showOver(w) {
   const nice = n => n.split(' ').map(x => x.charAt(0) + x.slice(1).toLowerCase()).join(' ');
   $('overTitle').textContent = `${nice(t.name)} Win!`;
   $('overTitle').style.color = t.color;
-  $('overSub').textContent = mode === 1 ? (w === 0 ? 'You Beat The CPU.' : 'The CPU Takes This One.') : `First To ${WIN}.`;
+  const mySide = net && net.ready ? (net.host ? 0 : 1) : mode === 1 ? 0 : -1, myWin = mySide < 0 ? null : w === mySide;
+  $('overTitle').textContent = myWin === true ? 'Victory!' : myWin === false ? 'Defeat' : `${nice(t.name)} Win!`;
+  $('overSub').textContent = myWin === null ? `${nice(t.name)} take it, ${teams[w].score} to ${teams[1 - w].score}.` : `${nice(t.name)} win, ${teams[w].score} to ${teams[1 - w].score}.`;
+  { const O = $('over'); O.classList.remove('vwin', 'vlose', 'vtwo'); void O.offsetWidth; O.classList.add(myWin === false ? 'vlose' : myWin === true ? 'vwin' : 'vtwo'); O.style.setProperty('--wc', t.color);
+    let fx = O.querySelector('.ofx'); if (!fx) { fx = document.createElement('div'); fx.className = 'ofx'; fx.setAttribute('aria-hidden', 'true'); O.prepend(fx); }
+    fx.innerHTML = Array.from({ length: 36 }, (_, i) => `<i style="left:${Math.random() * 100}%;animation-delay:${(Math.random() * 1.2).toFixed(2)}s;animation-duration:${(1.8 + Math.random() * 1.6).toFixed(2)}s;background:${myWin === false ? 'rgba(170,190,230,.55)' : pick([t.color, '#ffd34d', '#ffffff', teams[1 - w].color])};--r:${Math.round(Math.random() * 360)}deg"></i>`).join('');
+    const cnt = (el, to) => { const t0 = performance.now(); const f = now => { const k = Math.min(1, (now - t0) / 900); el.textContent = Math.round(to * (1 - (1 - k) ** 3)); if (k < 1) requestAnimationFrame(f); }; requestAnimationFrame(f); };
+    cnt($('fsL'), teams[0].score); cnt($('fsR'), teams[1].score); }
   $('fsL').textContent = teams[0].score; $('fsR').textContent = teams[1].score;
   // box score: each stat gets a bar for each side, growing out from the middle
   const rows = [['Baskets', 'baskets'], ['Dunks', 'dunks'], ['Alley-oops', 'oops'], ['Deep shots', 'deep'], ['Greens', 'greens'], ['Blocks', 'blocks'], ['Steals', 'steals'], ['Best streak', 'best'], ['Biggest lead', 'lead']];
@@ -7227,7 +7296,7 @@ function showOver(w) {
     let rec = {}; try { rec = JSON.parse(localStorage.getItem('hh-record') || '{}') || {}; } catch (e) {}
     const r = rec[diff] || { w: 0, l: 0 }; if (w === 0) r.w++; else r.l++; rec[diff] = r;
     try { localStorage.setItem('hh-record', JSON.stringify(rec)); } catch (e) {}
-    $('overSub').textContent += ` Your ${tc(diff)} Record: ${r.w}-${r.l}`;
+
   }
   tone(98, 0.9, 'sawtooth', 0.05); tone(104, 0.9, 'square', 0.03);   // the horn
   for (let i = 0; i < 90; i++) { const c = pick([t.color, t.dark, '#ffffff', MUSTARD]); particles.push({ x: rand(0, W), y: rand(-40, 0), vx: rand(-60, 60), vy: rand(40, 160), c, life: rand(2, 3.2), max: 3.2, g: 260, s: rand(3, 6) }); }
@@ -7620,7 +7689,7 @@ function unlock(id) {
 function rewardsAt(L) { const r = []; TRAILS.forEach(t => t[2] === L && L > 1 && r.push(t[1] + ' ball trail')); BANDS.forEach(b => b[2] === L && L > 1 && r.push(b[1] + ' headband')); TEAM_COLORS.forEach(c => c[2] === L && L > 1 && r.push(c[3] + ' jerseys')); STARS.forEach(s => s[0] === L && r.push('Star player ' + s[1])); return r.length ? r : [L % 5 === 0 ? 'A big XP milestone' : 'Bragging rights']; }
 function lvlInfo(xp = SV.xp) { let L = 1, need = 100; while (xp >= need && L < 100) { xp -= need; L++; need = Math.min(100 + 60 * (L - 1), 2400); } return L >= 100 ? { L: 100, cur: need, need, max: true } : { L, cur: xp, need }; }
 function gainXP(n) {
-  if (autoPlay) return;
+  if (autoPlay) return; n = Math.round(n * 0.75);   // levelling is a bit more of a grind now
   const b = lvlInfo().L; SV.xp += n; persist(); const a = lvlInfo().L;
   if (a >= 10) unlock('lvl10');
   if (a > b) { toast(`Level ${a}!`, 'Unlocked: ' + rewardsAt(a).join(', ') + '.'); if (a >= 5) unlock('lvl5'); }
@@ -7923,7 +7992,7 @@ function netShowOver(w) {
   netRecord(w === 1);
   const t = teams[w], nice = n => String(n).split(' ').map(x => x.charAt(0) + x.slice(1).toLowerCase()).join(' ');
   $('overTitle').textContent = w === 1 ? 'You Win!' : `${nice(t.name)} Win!`; $('overTitle').style.color = t.color;
-  $('overSub').textContent = w === 1 ? 'You beat your friend online.' : 'Your friend takes this one. Ask for a rematch.';
+
   $('fsL').textContent = teams[0].score; $('fsR').textContent = teams[1].score;
   const lbl = $('bAgain').querySelector('b'); if (lbl) lbl.textContent = 'Rematch';
   $('over').hidden = false; tone(98, 0.9, 'sawtooth', 0.05); tone(104, 0.9, 'square', 0.03);
@@ -8040,15 +8109,18 @@ function openCourts() {
   $('panelBody').querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const d = b.dataset.c; SV.lock = null; if (!d) SV.rot = []; else SV.rot = SV.rot.includes(d) ? SV.rot.filter(x => x !== d) : [...SV.rot, d]; persist(); syncMenuBtns();
     $('panelBody').querySelectorAll('[data-c]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.c ? SV.rot.includes(x.dataset.c) : !SV.rot.length))); });
 }
+const RULE_GROUPS = [['Scoring', ['by2', 'quick', 'mercy', 'golden']], ['Speed and gravity', ['turbo', 'slow', 'lowg', 'highg']], ['Players and court', ['big', 'plain', 'samecourt']], ['Power-ups', ['nopow', 'frenzy']], ['Havoc rounds', ['allhavoc', 'nohavoc']]];
 const RULES = [['big', 'Big Heads', 'Everyone plays as a bobblehead.'], ['lowg', 'Low Gravity', 'Floaty jumps on every court.'], ['turbo', 'Turbo', 'The whole game runs 20% faster.'],
-  ['by2', 'Win By 2', 'You have to win by at least two points.'], ['nopow', 'No Power-Ups', 'Just basketball.'], ['frenzy', 'Power-Up Frenzy', 'Power-ups show up way more often.'],
+  ['by2', 'Win By 2', 'You must lead by two to win. Shown on the scoreboard all game.'], ['nopow', 'No Power-Ups', 'Just basketball.'], ['frenzy', 'Power-Up Frenzy', 'Power-ups show up about three times as often.'],
   ['slow', 'Slow Motion', 'The whole game runs 20% slower.'], ['highg', 'Heavy Gravity', 'Short, snappy jumps.'], ['allhavoc', 'Havoc Every Point', 'A Havoc round on every point.'], ['nohavoc', 'No Havoc Rounds', 'Never get a Havoc round.'],
-  ['quick', 'Quick Game', 'Normal games go to 11 instead of 21.'], ['mercy', 'Mercy Rule', 'Go up by 7 and the game is yours.'], ['samecourt', 'One Court', 'The whole game stays on the first court.'],
-  ['plain', 'Plain Points', 'No odd balls, bodies or hoops. Just the court.'], ['golden', 'Golden Every Point', 'Every basket is worth double.']];
+  ['quick', 'Quick Game', 'First to 11 instead of 21.'], ['mercy', 'Mercy Rule', 'Go up by 7 and the game is yours.'], ['samecourt', 'One Court', 'The whole game stays on the first court.'],
+  ['plain', 'Plain Points', 'Normal ball, normal players, normal hoops every point.'], ['golden', 'Golden Every Point', 'Every point uses the golden ball, so baskets count double.']];
 const RULE_ICON = {"big": "<circle cx=\"12\" cy=\"9\" r=\"7\"/><path d=\"M10 16h4v6h-4z\"/>", "lowg": "<path d=\"M12 2a6 6 0 0 1 6 6c0 5-6 9-6 9s-6-4-6-9a6 6 0 0 1 6-6z\" opacity=\".35\"/><circle cx=\"12\" cy=\"8\" r=\"3\"/><path d=\"M11 18h2v4h-2z\"/>", "turbo": "<path d=\"M13 2 4 14h7l-1 8 9-12h-7z\"/>", "by2": "<path d=\"M5 18V6h2v12zm4 0v-2c4-3 6-5 6-7a2 2 0 0 0-4 0H9a4 4 0 0 1 8 0c0 3-2 5-5 7h5v2z\"/>", "nopow": "<circle cx=\"12\" cy=\"12\" r=\"9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"/><path d=\"M5.6 4.2l14.2 14.2-1.4 1.4L4.2 5.6z\"/>", "frenzy": "<path d=\"M12 2l2.4 5.6 6 .6-4.5 4 1.3 6-5.2-3.1-5.2 3.1 1.3-6-4.5-4 6-.6z\"/>", "slow": "<circle cx=\"12\" cy=\"13\" r=\"8\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\"/><path d=\"M11 8h2v6h-2zM9 2h6v2H9z\"/>", "highg": "<path d=\"M11 3h2v12l4-4 1.4 1.4L12 18.8l-6.4-6.4L7 11l4 4z\"/><path d=\"M4 20h16v2H4z\"/>", "allhavoc": "<path d=\"M12 2 2 20h20zm-1 6h2v6h-2zm0 8h2v2h-2z\"/>", "nohavoc": "<path d=\"M12 2 2 20h20z\" opacity=\".35\"/><path d=\"M4.2 3.4l16.4 16.4-1.4 1.4L2.8 4.8z\"/>", "quick": "<circle cx=\"12\" cy=\"13\" r=\"8\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\"/><path d=\"M12 13V8h-2v7h5v-2z\"/><path d=\"M9 2h6v2H9z\"/>", "mercy": "<path d=\"M12 21s-8-5-8-11a5 5 0 0 1 8-4 5 5 0 0 1 8 4c0 6-8 11-8 11z\"/>", "samecourt": "<path d=\"M3 5h18v14H3zm2 2v10h6V7zm8 0v10h6V7z\"/>", "plain": "<circle cx=\"12\" cy=\"12\" r=\"9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\"/><path d=\"M3 12h18\" stroke=\"currentColor\" stroke-width=\"2\"/>", "golden": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 6l1.5 3.6 3.9.3-3 2.5.9 3.8L12 14.2l-3.3 2 .9-3.8-3-2.5 3.9-.3z\" fill=\"rgba(0,0,0,.35)\"/>"};
 const RULE_OFF = { golden: 'nopow', plain: 'big', big: 'plain', nopow: 'frenzy', frenzy: 'nopow', turbo: 'slow', slow: 'turbo', lowg: 'highg', highg: 'lowg', allhavoc: 'nohavoc', nohavoc: 'allhavoc' };
 function openRules() {
-  openPanel('Rules', `<div class="rlist">${RULES.map(r => `<button class="tog rtog" type="button" role="switch" data-r="${r[0]}" aria-checked="${String(!!SV.rules[r[0]])}"><em class="ric" data-keep aria-hidden="true"><svg viewBox="0 0 24 24">${RULE_ICON[r[0]] || ''}</svg></em><span>${r[1]}<small>${r[2]}</small></span><i></i></button>`).join('')}</div>`, [['Done', closePanel, 'red']]);
+  const tg = r => `<button class="tog rtog" type="button" role="switch" data-r="${r[0]}" aria-checked="${String(!!SV.rules[r[0]])}"><em class="ric" data-keep aria-hidden="true"><svg viewBox="0 0 24 24">${RULE_ICON[r[0]] || ''}</svg></em><span>${r[1]}<small>${r[2]}</small></span><i></i></button>`;
+  const on = Object.values(SV.rules).filter(Boolean).length;
+  openPanel('Rules', `<p style="margin:0 0 10px">Change how your games play. They apply to every game except daily challenges and contests, which have their own.${on ? ` <b style="color:var(--mustard)">${on} on.</b>` : ''}</p>${RULE_GROUPS.map(([g, ks]) => `<div class="h3 rgh">${g}</div><div class="rlist">${ks.map(k => RULES.find(r => r[0] === k)).filter(Boolean).map(tg).join('')}</div>`).join('')}`, [['Done', closePanel, 'red']]);
   const sync = () => $('panelBody').querySelectorAll('[data-r]').forEach(x => x.setAttribute('aria-checked', String(!!SV.rules[x.dataset.r])));
   $('panelBody').querySelectorAll('[data-r]').forEach(b => b.onclick = () => { const k = b.dataset.r; SV.rules[k] = !SV.rules[k]; if (SV.rules[k] && RULE_OFF[k]) SV.rules[RULE_OFF[k]] = false; persist(); sync(); });
 }
@@ -8184,6 +8256,7 @@ function afterGame(w) {
     const parts = []; if (S && !practice()) { parts.push(['Played', 40]); if (w === 0 || mode === 2) parts.push(['Win', 50]); if (S.baskets) parts.push(['Baskets', S.baskets * 4]); if (S.dunks + S.oops) parts.push(['Dunks', (S.dunks + S.oops) * 4]); if (S.greens) parts.push(['Greens', S.greens * 6]); if (S.blocks) parts.push(['Blocks', S.blocks * 5]); if (S.steals) parts.push(['Steals', S.steals * 4]); if (WIN >= 100) parts.push(['Marathon', 120]); if (tourney && tourney.round >= TOURNEY.length && w === 0) parts.push(['Champion', 250]); }
     if (net && net.ready && hasCustomTeam()) { const b = Math.round(xp * 0.5); xp += b; parts.push(['Your own team', b]); }
     const sum = parts.reduce((a, p) => a + p[1], 0); if (xp - sum > 0) parts.push(['Bonus', xp - sum]);
+    parts.forEach(p => p[1] = Math.round(p[1] * 0.75));
     const x0 = SV.xp; gainXP(xp); xpReveal(x0, SV.xp, parts);
   }
   say(tourney && tourney.round >= TOURNEY.length && w === 0 ? `The ${niceName(teams[0].name)} are champions!` : `And that's the ballgame! The ${niceName(teams[w].name)} win it, ${teams[w].score} to ${teams[1 - w].score}!`, true);
@@ -8476,14 +8549,35 @@ function drawTrailRibbon() {   // a soft tapered streak behind the ball, like a 
 { const db0 = drawBall; drawBall = function () { drawTrailRibbon(); return db0.apply(this, arguments); }; }
 document.head.insertAdjacentHTML('beforeend', `<style>
 #bCourt.set,#bRules.set{background:linear-gradient(180deg,#ffd34d,#e8a92a)!important;color:var(--ink,#1a1026)!important;text-shadow:none!important}
-.rtog{display:flex;align-items:center;gap:10px}.rtog .ric{display:grid;flex:0 0 30px;width:30px;height:30px;place-items:center;font-style:normal;background:rgba(255,240,207,.08);border:2px solid rgba(255,240,207,.15)}.rtog .ric svg{width:20px;height:20px;fill:currentColor}
+.rtog{display:flex;align-items:center;gap:10px}.rgh{margin:12px 0 6px!important}.rtog .ric{display:grid;flex:0 0 30px;width:30px;height:30px;place-items:center;font-style:normal;background:rgba(255,240,207,.08);border:2px solid rgba(255,240,207,.15)}.rtog .ric svg{width:20px;height:20px;fill:currentColor}
 .rtog[aria-checked="true"] .ric{background:var(--mustard);color:var(--ink,#1a1026);border-color:var(--mustard)}
 .oteam{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;margin:0 0 8px;background:linear-gradient(90deg,var(--tc),rgba(0,0,0,.25));border:3px solid var(--edge,#0b0612);color:#fff;text-shadow:2px 2px 0 rgba(0,0,0,.4)}
 .oteam small{display:block;font-size:11px;opacity:.85}.oteam b{display:block;font:700 20px/1.1 var(--pixel,inherit)}.oteam span{font-size:12px}
 .onudge{margin:0 0 12px;padding:8px 10px;border:2px dashed rgba(255,190,46,.6);color:var(--mustard);font-weight:700;font-size:13px}.onudge.ok{border-style:solid;color:#5fe07a;border-color:rgba(95,224,122,.6)}
 </style>`);
-const GAME_VERSION = 108;
+document.head.insertAdjacentHTML('beforeend', `<style id="hhOver">
+#over .ofx{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+#over .ofx i{position:absolute;top:-20px;width:9px;height:14px;border-radius:2px;animation:ofall linear infinite;transform:rotate(var(--r))}
+#over.vlose .ofx i{width:2px;height:22px;border-radius:0;animation-name:orain;animation-duration:.9s!important}
+@keyframes ofall{to{transform:translateY(110vh) rotate(calc(var(--r) + 540deg))}}@keyframes orain{to{transform:translate(-30px,110vh)}}
+#over .sheet{position:relative;z-index:1;overflow:hidden}
+#over .sheet::before{content:"";position:absolute;inset:-40%;background:radial-gradient(circle at 30% 30%,var(--wc) 0,transparent 45%);opacity:.35;z-index:-1;animation:oglow 3s ease-in-out infinite alternate}
+#over.vlose .sheet::before{background:radial-gradient(circle at 30% 30%,#5a6a8a 0,transparent 45%);opacity:.3}
+@keyframes oglow{to{transform:translate(8%,6%) scale(1.1)}}
+#over:not([hidden]) #overTitle{font-size:calc(var(--k)*64)!important;letter-spacing:.02em;animation:otitle .7s cubic-bezier(.2,1.6,.4,1) both}
+#over.vwin #overTitle{color:var(--mustard)!important;text-shadow:0 0 24px rgba(255,211,77,.55),4px 4px 0 var(--ink)!important}
+#over.vlose #overTitle{color:#9fb0d0!important;animation:olose .9s ease both}
+#over.vtwo #overTitle{color:var(--wc)!important}
+@keyframes otitle{0%{transform:scale(2.4) rotate(-6deg);opacity:0}100%{transform:none;opacity:1}}
+@keyframes olose{0%{transform:translateY(-30px);opacity:0}60%{transform:translateY(6px) rotate(-2deg);opacity:1}100%{transform:rotate(-2deg)}}
+#over:not([hidden]) .final{animation:ofinal .6s .25s cubic-bezier(.2,1.4,.4,1) both}@keyframes ofinal{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+#over:not([hidden]) #overSub{animation:hhItem .4s .4s both}
+#over:not([hidden]) .row,#over:not([hidden]) .row2,#over:not([hidden]) #xpRow{animation:hhItem .4s .55s both}
+@media (prefers-reduced-motion:reduce){#over .ofx{display:none}#over *{animation:none!important}}
+</style>`);
+const GAME_VERSION = 109;
 const UPDATES = [
+  [109, 'Payback', ['Every green now punishes the other team: zombie hands in the graveyard, lava rain on the volcano, ice blocks on snow and ice, a wave at the beach and under the sea, coconuts in the jungle, quicksand in Egypt, a cannonball on the pirate ship, an anvil on Heavy Planet, sticky goo in Candy Land, arrows in the Colosseum and lightning everywhere else.', 'XP comes in three quarters as fast, so every level means more.', 'Fixed two labels overlapping under the scoreboard on golden ball points.', 'Rules are grouped into Scoring, Speed and gravity, Players and court, Power-ups and Havoc rounds, with clearer descriptions.', 'A much cooler end screen: a giant Victory or Defeat, a team-coloured glow, confetti or rain, and the score counting up.']],
   [108, 'Big intros', ['A new match intro, Brawl Stars style: the screen splits into both team colours, player cards pop in, and VS slams down before the rules and court roll in.', 'The tournament has six rounds now: three opening rounds, a quarterfinal, a semifinal and the final, each one tougher.', 'In 1 v 1, the players talk trash: the scorer says something and the other one fires back.', 'Players sway further left and right, a little faster, like Basket Random.']],
   [107, 'Rules and courts', ['The home screen stripe stays diagonal while the menu slides in.', 'Career and Trophies show their own pages again.', 'Rules (no longer House Rules) have icons, plus five new ones: Quick Game, Mercy Rule, One Court, Plain Points and Golden Every Point.', 'The Court and Rules buttons turn gold when you have something picked, instead of showing a tick.', 'Pick as many courts as you like for the rotation.', 'Online, your team plays under its own team name with your username on both players. Play online with your own team and you earn 50% more XP.', 'The Locker explains Your Look and the Star Player.']],
   [106, 'Goals and trails', ['The practice toolbar only ever shows in practice. It no longer sticks around in other modes, Auto mode or the menus.', 'The setup tag under the scoreboard is colour-coded: Ball in orange, Players in green, Hoop in blue.', 'Trails look smoother: a soft streak follows the ball with evenly spaced hearts, bolts, stars and more.', 'The tutorial dunker never freezes before going up.', 'Pausing shows your goal for the mode: the daily challenge, your dunk contest score so far, the tournament round and more.', 'In one-player games, the arrow keys work as well as W, E and Q. The pause menu and controls guide now say so.']],
