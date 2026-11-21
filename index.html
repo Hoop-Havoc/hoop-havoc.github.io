@@ -2369,7 +2369,9 @@ function celebTick(p, c, dt) {
     case 'FLIPS':
       const onF = p.grounded || (p.y >= GROUND - 4 && p.vy >= -40);   // bouncy floors never quite let you settle
       if (onF && (c.n || 0) < 4 && !(c.fl > 0) && !(c.dip >= 0)) { c.dip = u; p.vy = 0; p.y = GROUND; p.grounded = true; tone(180, 0.08, 'sine', 0.03); }   // a quick dip before every flip
-      if (c.dip >= 0 && !(c.fl > 0)) { const dk = clamp((u - c.dip) / 0.16, 0, 1); p.squash = Math.max(p.squash, 0.5 * Math.sin(dk * Math.PI * 0.5)); p.a += (0 - p.a) * Math.min(1, dt * 20); p.vy = 0; p.vx *= 0.5; p.y = GROUND; p.grounded = true; syncPts(p); if (dk < 1) break; c.dip = -1; }
+      if (c.dip >= 0 && !(c.fl > 0)) { const safeX = clamp(p.x, 150, W - 150);
+        if (Math.abs(p.x - safeX) > 3) { p.x += clamp(safeX - p.x, -520 * dt, 520 * dt); p.facing = Math.sign(safeX - p.x) || p.facing; p.vy = 0; p.y = GROUND; p.grounded = true; p.a += (0 - p.a) * Math.min(1, dt * 20); syncPts(p); c.dip = u; break; }   // jog out to open floor first
+        const dk = clamp((u - c.dip) / 0.16, 0, 1); p.squash = Math.max(p.squash, 0.5 * Math.sin(dk * Math.PI * 0.5)); p.a += (0 - p.a) * Math.min(1, dt * 20); p.vy = 0; p.vx *= 0.5; p.y = GROUND; p.grounded = true; syncPts(p); if (dk < 1) break; c.dip = -1; }
       if ((p.grounded || p.y >= GROUND - 4) && (c.n || 0) < 4 && !(c.fl > 0)) {
         c.n = (c.n || 0) + 1; c.fl = 1; c.t0 = u; c.x0 = p.x; c.offY = 0; const big = c.n === 4, vy0 = (big ? 860 : 640) * Math.sqrt(g / 1400); c.T = big ? 0.95 : 0.66; c.H = 0; c.turns = big ? 2 : 1; if (big) quip(p, ['Double backflip!', 'Watch this!'], true, 1);
         p.vy = -vy0; p.vx = 0; p.grounded = false; p.y = GROUND - 1; tone(330 + c.n * 110, 0.14, 'triangle', 0.05, 1.6);
@@ -3072,7 +3074,7 @@ function stepPlayers(dt) {
     if (p.a > MAXA) { p.a = MAXA; if (p.w > 0) p.w *= -0.25; }
     if (p.a < -MAXA) { p.a = -MAXA; if (p.w < 0) p.w *= -0.25; }
     // walls (feet and head)
-    const runAway = p.celeb && p.celeb.kind === 'SNAKES';   // fleeing snakes: allowed off the edge
+    const runAway = p.celeb && (p.celeb.kind === 'SNAKES' || (p.celeb.kind === 'FLIPS' && p.celeb.fl > 0));   // fleeing snakes / mid-flip: no walls
     if (p.x < 18 && !runAway) { p.x = 18; p.vx = Math.abs(p.vx) * 0.3; }
     if (p.x > W - 18 && !runAway) { p.x = W - 18; p.vx = -Math.abs(p.vx) * 0.3; }
     for (const h of hoops) {
@@ -3112,7 +3114,7 @@ function stepPlayers(dt) {
   for (let i = 0; i < players.length; i++) for (let j = i + 1; j < players.length; j++) {
     const A = players[i], B = players[j];
     if (A.iceShatter || B.iceShatter) continue;
-    if ((A.celeb && A.celeb.kind === 'SNAKES' && A.celeb.away) || (B.celeb && B.celeb.kind === 'SNAKES' && B.celeb.away)) continue;   // the runner squeezes past everyone
+    if ((A.celeb && ((A.celeb.kind === 'SNAKES' && A.celeb.away) || (A.celeb.kind === 'FLIPS' && (A.celeb.fl > 0 || A.celeb.dip >= 0)))) || (B.celeb && ((B.celeb.kind === 'SNAKES' && B.celeb.away) || (B.celeb.kind === 'FLIPS' && (B.celeb.fl > 0 || B.celeb.dip >= 0))))) continue;   // the runner squeezes past everyone
     if (state !== 'play' && ((A.react && A.react.to && !A.react.done) || (B.react && B.react.to && !B.react.done))) continue;   // the high-five run goes past everybody
     const fa = A.hang > 0 || !!A.dunkAnim, fb = B.hang > 0 || !!B.dunkAnim;   // a dunker is an immovable object
     if (fa && fb) continue;
@@ -8359,8 +8361,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhFluid">
 @media (prefers-reduced-motion:reduce){.btn,.pick,.door,.sw,.tog,.ib,.pbtn{transition:none!important}}
 </style>`);
 document.head.insertAdjacentHTML('beforeend', '<style>.lscore{display:grid;grid-template-columns:1fr 1fr;gap:8px}.lscore div{display:flex;flex-direction:column;align-items:center;padding:8px;background:var(--tc);border:3px solid var(--edge,#0b0612);color:#fff;text-shadow:2px 2px 0 rgba(0,0,0,.4)}.lscore span{font-weight:700}.lscore b{font:700 34px/1 var(--pixel,inherit)}</style>');
-const GAME_VERSION = 103;
+const GAME_VERSION = 104;
 const UPDATES = [
+  [104, 'Backflip fix', ['Bouncy Castle backflips no longer get stuck against the wall or knocked sideways. The shooter jogs to open floor, then flips cleanly.']],
   [103, 'Online names', ['If your friend quits an online game, a popup tells you, with the final score and a button to play online again.', 'The tutorial dunker is smarter: it hops into range, gathers for a beat, then attacks the rim, so blocking it feels like the real thing.', 'Set a username in the Locker. Online, both of your players use it, and your team is called your username plus your team name.']],
   [102, 'Cleaner screens', ['The practice toolbar only shows in practice, never on the home screen.', 'The How to play box is gone from the home screen. The tutorial and the pause menu still show the controls.', 'Jungle Temple greens: the shooter runs right off the screen, past the hoop, with the snakes still chasing.', 'Backflips follow a clean scripted arc, so they stay smooth every time.', 'Smoother everything: menus fade out when they close, buttons glide and press, switches spring, and toasts bounce in.', 'The Colosseum lion is much bigger, and you leap higher to clear it.', 'The pause menu is redesigned: a scoreboard with both teams, the game info as chips, big Resume, Restart and Quit buttons, and settings with icons.']],
   [101, 'Gladiator', ['Green in the Colosseum and you become a gladiator: sword and shield out, a lion charges, you vault right over it, then raise the sword to the crowd as gold rains down.']],
