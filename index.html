@@ -363,9 +363,10 @@ function dayKey(d = new Date()) { return d.getFullYear() * 10000 + (d.getMonth()
 function dailyInfo() { const key = dayKey(); let s = key % 233280; const r = () => (s = (s * 9301 + 49297) % 233280) / 233280; r(); r(); r();
   return { key, court: COURTS[Math.floor(r() * COURTS.length)], rule: ['big', 'lowg', 'turbo', null][Math.floor(r() * 4)], goal: DAILY_GOALS[Math.floor(r() * DAILY_GOALS.length)] }; }
 function rules() { return attract || (typeof tutorial === 'function' && tutorial()) ? {} : daily ? (daily.rule ? { [daily.rule]: true, calm: true } : { calm: true }) : contest ? { calm: true, nopow: true } : SV.rules; }
-function lockedCourt() { if (daily && !attract) return daily.court; return !attract && SV.lock && !(mode === 4) ? COURTS.find(c => c.deco === SV.lock) || null : null; }
+function lockedCourt() { if (daily && !attract) return daily.court; if (attract || mode === 4) return null; if (SV.lock) return COURTS.find(c => c.deco === SV.lock) || null;
+  const rot = (SV.rot || []).map(d => COURTS.find(c => c.deco === d)).filter(Boolean); if (!rot.length) return null; return rot.length === 1 ? rot[0] : pick(rot.filter(c => c.deco !== (court && court.deco)).length ? rot.filter(c => c.deco !== (court && court.deco)) : rot); }
 function isMatchPoint(i) { const t = teams[i], o = teams[1 - i]; return !hasWon(i) && !hasWon(1 - i) && t.score + 1 >= WIN && (!rules().by2 || t.score + 1 - o.score >= 2); }
-function hasWon(i) { const t = teams[i]; return t.score >= WIN && (!rules().by2 || t.score - teams[1 - i].score >= 2); }
+function hasWon(i) { const t = teams[i]; if (rules().mercy && !contest && !practice() && t.score - teams[1 - i].score >= 7) return true; return t.score >= WIN && (!rules().by2 || t.score - teams[1 - i].score >= 2); }
 const DISPLAY = '"Changa One", "Arial Black", Impact, sans-serif';   // numbers, buttons, callouts
 const HYPE = '"Shrikhand", "Changa One", Georgia, serif';             // the wordmark and the big hype calls
 const TEXT = '"Changa", "Arial Narrow", system-ui, sans-serif';        // words
@@ -634,10 +635,10 @@ function startRound(fresh = true) {
   round++;
   fresh = fresh || !hoops.length;
   if (fresh) {   // a new court, ball, bodies and rim (practice keeps all of it between makes)
-    court = (mode === 3 && !attract && pracCourt && COURTS.find(c => c.deco === pracCourt)) || lockedCourt() || pick(COURTS, court); ballT = pick(BALLS, ballT); body = rules().big ? BODIES[3] : pick(BODIES, body);
+    court = (mode === 3 && !attract && pracCourt && COURTS.find(c => c.deco === pracCourt)) || (rules().samecourt && round > 1 && court) || lockedCourt() || pick(COURTS, court); ballT = rules().plain ? BALLS[0] : pick(BALLS, ballT); body = rules().big ? BODIES[3] : rules().plain ? BODIES[0] : pick(BODIES, body);
     if (rules().lowg) court = { ...court, g: Math.round(court.g * 0.6) };
   if (rules().highg) court = { ...court, g: Math.round(court.g * 1.35) };
-    hoopT = Math.random() < 0.4 ? HOOP_TYPES[0] : pick(HOOP_TYPES.slice(1), hoopT);
+    hoopT = rules().plain || Math.random() < 0.4 ? HOOP_TYPES[0] : pick(HOOP_TYPES.slice(1), hoopT);
     wind = 0;   // calm air unless a Havoc storm rolls in
   }
   chaos = null;
@@ -660,7 +661,7 @@ function startRound(fresh = true) {
   if (fresh && round === 1 && !attract && !practice() && !tutorial() && !contest && !(net && net.ready && !net.host) && !(autoPlay && autoGames > 1)) pregame = { t: 0, dur: autoPlay ? 5 : 9 };
   if (!attract && !practice() && fresh) setTimeout(() => { for (const p of players) if (Math.random() < 0.7) react(p, pick(['clap', 'stretch', 'bounce', 'clap']), 1.1); }, 30);   // warm-ups during the intro card
   if (!attract && mode !== 4 && !SV.maps.includes(court.deco)) { SV.maps.push(court.deco); persist(); if (SV.maps.length >= 12) unlock('maps'); }
-  goldenRound = !attract && !practice() && goalCount > 0 && Math.random() < 0.12;   // every so often: a golden ball worth double
+  goldenRound = !attract && !practice() && (rules().golden || goalCount > 0 && Math.random() < 0.12);   // every so often: a golden ball worth double
   if (goldenRound) setTimeout(() => { havocCard = { t: 0, name: 'Golden ball', desc: 'Every basket counts double this point.', c: '#ffd34d', tag: 'Bonus' }; tone(988, 0.2, 'triangle', 0.06); setTimeout(() => tone(1319, 0.3, 'triangle', 0.06), 120); }, 120);
   if (tutorial()) { teams[1].cpu = tutCast() === 'block'; }
   if (tutorial()) { court = COURTS[0]; ballT = BALLS[0]; body = BODIES[0]; hoopT = HOOP_TYPES[0]; wind = 0; }
@@ -4073,7 +4074,7 @@ function drawPregame() {
     const modeName = tourney ? (TOURNEY[Math.min(3, tourney.round)].name || 'Tournament') : daily ? 'Daily challenge' : net && net.ready ? 'Online game' : autoPlay ? 'CPU vs CPU' : mode === 2 ? '2 players' : 'Vs the CPU';
     const size = solo() ? '1 on 1' : players.filter(p => p.team === 0).length + ' on ' + players.filter(p => p.team === 1).length;
     ctx.font = `30px ${DISPLAY}`; ctx.fillStyle = CREAM; ctx.fillText(`${modeName}, first to ${WIN}`, W / 2, 342);
-    const tags = [size]; if (rules().by2) tags.push('Win by 2'); if (rules().big) tags.push('Big heads'); if (rules().lowg) tags.push('Low gravity'); if (rules().turbo) tags.push('Turbo'); if (rules().nopow) tags.push('No power-ups'); if (rules().frenzy) tags.push('Power-up frenzy'); if (rules().slow) tags.push('Slow motion'); if (rules().highg) tags.push('Heavy gravity'); if (rules().allhavoc) tags.push('Havoc every point'); if (rules().nohavoc) tags.push('No Havoc rounds');
+    const tags = [size]; if (rules().by2) tags.push('Win by 2'); if (rules().big) tags.push('Big heads'); if (rules().lowg) tags.push('Low gravity'); if (rules().turbo) tags.push('Turbo'); if (rules().nopow) tags.push('No power-ups'); if (rules().frenzy) tags.push('Power-up frenzy'); if (rules().quick) tags.push('Quick game'); if (rules().mercy) tags.push('Mercy rule'); if (rules().samecourt) tags.push('One court'); if (rules().plain) tags.push('Plain points'); if (rules().golden) tags.push('Golden every point'); if (rules().slow) tags.push('Slow motion'); if (rules().highg) tags.push('Heavy gravity'); if (rules().allhavoc) tags.push('Havoc every point'); if (rules().nohavoc) tags.push('No Havoc rounds');
     if (!tourney && !daily && !autoPlay && teams[1].cpu && mode === 1) tags.push('CPU: ' + niceName(diff));
     ctx.font = `700 14px ${TEXT}`; const ws = tags.map(x => ctx.measureText(x).width + 26), tw = ws.reduce((x, y) => x + y + 8, -8); let xx = W / 2 - tw / 2;
     tags.forEach((x, i) => { ctx.fillStyle = i === 0 ? MUSTARD : 'rgba(255,240,207,.14)'; rr(xx, 366, ws[i], 26, 13); ctx.fill(); ctx.fillStyle = i === 0 ? INK : CREAM; ctx.fillText(x, xx + ws[i] / 2, 380); xx += ws[i] + 8; });
@@ -7102,7 +7103,7 @@ function startGame(m, target = 21, tour = false) {
   applyTeam(); htOpen = false; $('panel').hidden = true; pendingStory = null;
   if ((m === 1 || m === 2) && tour !== true) rollTeams();
   setTimeout(introCall, 650);
-  audio(); mode = m; WIN = target; pstats = { shots: 0, greens: 0, makes: 0, dunks: 0 };
+  audio(); mode = m; WIN = target; if (SV.rules && SV.rules.quick && target === 21 && (m === 1 || m === 2) && tour !== true && tour !== 'daily') WIN = 11; pstats = { shots: 0, greens: 0, makes: 0, dunks: 0 };
   tut = m === 4 ? { step: 0, ev: {}, base: {}, okT: 0, t: 0 } : null; $('bSkip').hidden = m !== 4; if (document.activeElement) document.activeElement.blur();
   teams[0].cpu = false; teams[1].cpu = m === 1;   // mode 3 = practice: no opponents
   $('over').hidden = true; $('pause').hidden = true; paused = false;
@@ -7591,7 +7592,7 @@ function openPanel(title, html, buttons) {
 function closePanel(now) { const P = $('panel'); if (P.classList.contains('hhout') && now !== true) return; if (now !== true && !P.hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches) { P.classList.add('hhout'); clearTimeout(P._ot); P._ot = setTimeout(() => closePanel(true), 170); return; } clearTimeout(P._ot); P.classList.remove('hhout'); $('panel').hidden = true; if (!$('menu').hidden) { syncLevel(); syncMenuBtns(); } }
 function syncMenuBtns() {   // keep the icon, change only the words
   const setT = (id, t) => { const b = $(id), n = [...b.childNodes].filter(x => x.nodeType === 3); if (n.length) { n[0].nodeValue = t; n.slice(1).forEach(x => x.remove()); } else b.append(t); };
-  const c = lockedCourt(); setT('bCourt', c ? 'Court ✓' : 'Court'); setT('bRules', Object.values(SV.rules).some(Boolean) ? 'Rules ✓' : 'Rules'); }
+  const cOn = !!(SV.lock || (SV.rot && SV.rot.length)), rOn = Object.values(SV.rules).some(Boolean); setT('bCourt', 'Court'); setT('bRules', 'Rules'); $('bCourt').classList.toggle('set', cOn); $('bRules').classList.toggle('set', rOn); }
 
 // ---- online play: PeerJS (free, browser to browser). The host's game is the real one; the guest just draws what it sends ----
 let netLastArr = 0, netGap = 40, netJit = 10, netDelay = 90;
@@ -7672,7 +7673,7 @@ function netMe() { const c = TEAM_COLORS[myColorIdx()]; return { name: ((SV.team
 function netSetTeam(i, me) {
   if (!me || !teams[i]) return; const t = teams[i], o = teams[1 - i];
   const pn0 = String(me.pn || '').replace(/[^A-Z .'-]/gi, '').toUpperCase().slice(0, 12), tn0 = String(me.name || t.name).replace(/[^A-Z .'-]/gi, '').toUpperCase().slice(0, 14) || t.name;
-  t.name = pn0 ? `${pn0} ${tn0}`.slice(0, 26) : tn0;   // online: "username teamname"
+  t.name = tn0;
   let col = /^#[0-9a-f]{6}$/i.test(me.color) ? me.color : t.color, dk = /^#[0-9a-f]{6}$/i.test(me.dark) ? me.dark : t.dark;
   if (i === 1 && o && !farApart(o.color, col)) { const alt = TEAM_COLORS.find(c => farApart(o.color, c[0])) || TEAM_COLORS[0]; col = alt[0]; dk = alt[1]; }   // a clash: the guest swaps to an away kit
   t.color = col; t.dark = dk;
@@ -7698,11 +7699,16 @@ function netGuestStart() {
   document.body.classList.add('net', 'netG'); setGameUI(true); audio();
   netMsg(''); toast('Online', "You're on the right. Waiting for the host...");
 }
+function hasCustomTeam() { const T = SV.team || {}; return !!(SV.pname && T.name && (T.name !== 'HOT DOGS' || (T.c || 0) !== 0)); }
+function onlineTeamCard() { const c = TEAM_COLORS[myColorIdx()], T = SV.team || {}, ok = hasCustomTeam();
+  return `<div class="oteam" style="--tc:${c[0]}"><div><small>Your team</small><b>${niceName(T.name || 'HOT DOGS')}</b><span>${SV.pname ? 'Players: ' + niceName(SV.pname) : 'No username yet'}</span></div><button class="btn alt" type="button" id="oEdit"><b>Edit team</b></button></div>
+    <p class="onudge${ok ? ' ok' : ''}">${ok ? 'Your own team is set: online wins earn 50% more XP.' : 'Set a username and your own team name or colour in the Locker: online games become your team vs theirs, and you earn 50% more XP.'}</p>`; }
 function openOnline() {
-  openPanel('Play Online', `<p style="margin:0 0 12px">Play a friend on another device. One of you hosts and gets a code. The other joins with it.</p>
+  openPanel('Play Online', `${onlineTeamCard()}<p style="margin:0 0 12px">Play a friend on another device. One of you hosts and gets a code. The other joins with it.</p>
     <div class="nrow"><button class="btn" id="nHost" type="button"><b>Host A Game</b></button></div>
     <div class="nrow"><label class="nlbl" for="nCode">Friend's code</label><input id="nCode" maxlength="4" autocomplete="off" spellcheck="false" placeholder="ABCD"><button class="btn alt" id="nJoin" type="button"><b>Join</b></button></div>
     <p id="nMsg" class="nmsg" aria-live="polite"></p>${SV.onl ? `<p style="text-align:center;margin:6px 0 0;opacity:.85">Your online record: ${SV.onl.w} wins, ${SV.onl.l} losses. Best streak ${SV.onl.best}.</p>` : ''}`, [['Back', () => { netClose(true); openModes(); }]]);
+  { const e = $('oEdit'); if (e) e.onclick = () => openLocker('team'); }
   $('nHost').onclick = netHostGame; $('nJoin').onclick = netJoinGame;
   $('nCode').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') netJoinGame(); });
 }
@@ -7963,16 +7969,21 @@ function openModes() {
 const COURT_BADGE = {"star": "<path d=\"M12 2l2.9 6.2 6.8.8-5 4.6 1.4 6.7L12 17l-6 3.3 1.3-6.7-5-4.6 6.8-.8z\"/>", "crown": "<path d=\"M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z\"/>", "flake": "<path d=\"M11 2h2v20h-2zM2 11h20v2H2zM4.2 5.6l1.4-1.4 14.2 14.2-1.4 1.4zM18.4 4.2l1.4 1.4L5.6 19.8l-1.4-1.4z\"/>", "leaf": "<path d=\"M20 3C9 3 4 9 4 16c0 2 .5 3.5 1 5l1.5-1.2C7 15 11 11 16 9c-4 3-7 6-8.5 10.5C17 20 21 13 20 3z\"/>", "heart": "<path d=\"M12 21l-1.5-1.3C5 15 2 12 2 8.3 2 5.3 4.3 3 7.3 3c1.7 0 3.4.8 4.7 2.1C13.3 3.8 15 3 16.7 3 19.7 3 22 5.3 22 8.3c0 3.7-3 6.7-8.5 11.4z\"/>", "gem": "<path d=\"M6 3h12l4 6-10 12L2 9z\"/>", "note": "<path d=\"M9 3.5 20 1v14.2a3.3 3.3 0 1 1-2.2-3.1V6.1L11.2 7.6v10.6A3.3 3.3 0 1 1 9 15.1z\"/>", "coin": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path fill=\"rgba(0,0,0,.3)\" d=\"M11 6h2v12h-2z\"/>", "bat": "<path d=\"M12 8l1.5-3 1 3c2-1.5 5-2 8-1-1.5 1-2 3-2 5-1.5-1-3-1-4 .5-1-1-2.5-1-4.5 3.5-2-4.5-3.5-4.5-4.5-3.5-1-1.5-2.5-1.5-4-.5 0-2-.5-4-2-5 3-1 6-.5 8 1l1-3z\"/>", "pixel": "<path d=\"M3 3h8v8H3zM13 13h8v8h-8zM13 3h8v8h-8z\" opacity=\".6\"/><path d=\"M3 13h8v8H3z\"/>", "bolt": "<path d=\"M13 2L4 14h7l-1 8 9-12h-7z\"/>"};
 function openCourts() {
   const badge = deco => { const m = MAP_FIN[deco]; if (!m) return '<i class="cbadge" data-keep aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z" fill="none" stroke="currentColor" stroke-width="2.5"/><circle cx="9" cy="9" r="1.8"/><circle cx="15" cy="15" r="1.8"/><circle cx="15" cy="9" r="1.8"/><circle cx="9" cy="15" r="1.8"/></svg></i>'; const lum = h => { const n = parseInt(h.slice(1), 16); return (n >> 16) * 0.3 + (n >> 8 & 255) * 0.59 + (n & 255) * 0.11; }, col = [...m.c].sort((a, b) => lum(b) - lum(a))[m.c.length > 2 ? 1 : 0]; return `<i class="cbadge" data-keep aria-hidden="true" style="color:${lum(col) < 90 ? m.c.reduce((a, b) => lum(b) > lum(a) ? b : a) : col}"><svg viewBox="0 0 24 24">${COURT_BADGE[m.s[0]] || COURT_BADGE.star}</svg></i>`; };
-  const cell = (deco, name, bg) => `<button class="pick court" type="button" data-c="${deco}" aria-pressed="${String((SV.lock || '') === deco)}" style="--cbg:${bg}">${badge(deco)}${name}</button>`;
-  openPanel('Pick A Court', `<p style="margin:0 0 10px">Lock a court for every point, or keep it random.</p><div class="pgrid">${cell('', 'Random<small>New court every point</small>', 'var(--ink2)')}${COURTS.map(c => cell(c.deco, `<span class="nm">${niceName(c.name)}</span>`, `linear-gradient(160deg,${c.wall[0]},${c.wall[1]})`)).join('')}</div>`, [['Done', closePanel, 'red']]);
-  $('panelBody').querySelectorAll('[data-c]').forEach(b => b.onclick = () => { SV.lock = b.dataset.c || null; persist(); $('panelBody').querySelectorAll('[data-c]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); });
+  if (SV.lock && !(SV.rot && SV.rot.length)) SV.rot = [SV.lock]; SV.lock = null; SV.rot = SV.rot || [];
+  const cell = (deco, name, bg) => `<button class="pick court" type="button" data-c="${deco}" aria-pressed="${String(deco ? SV.rot.includes(deco) : !SV.rot.length)}" style="--cbg:${bg}">${badge(deco)}${name}</button>`;
+  openPanel('Courts', `<p style="margin:0 0 10px">Pick the courts you want in the rotation. Pick one to play only there, or none for every court.</p><div class="pgrid">${cell('', 'All courts<small>A new court every point</small>', 'var(--ink2)')}${COURTS.map(c => cell(c.deco, `<span class="nm">${niceName(c.name)}</span>`, `linear-gradient(160deg,${c.wall[0]},${c.wall[1]})`)).join('')}</div>`, [['Done', closePanel, 'red']]);
+  $('panelBody').querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const d = b.dataset.c; SV.lock = null; if (!d) SV.rot = []; else SV.rot = SV.rot.includes(d) ? SV.rot.filter(x => x !== d) : [...SV.rot, d]; persist(); syncMenuBtns();
+    $('panelBody').querySelectorAll('[data-c]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.c ? SV.rot.includes(x.dataset.c) : !SV.rot.length))); });
 }
 const RULES = [['big', 'Big Heads', 'Everyone plays as a bobblehead.'], ['lowg', 'Low Gravity', 'Floaty jumps on every court.'], ['turbo', 'Turbo', 'The whole game runs 20% faster.'],
   ['by2', 'Win By 2', 'You have to win by at least two points.'], ['nopow', 'No Power-Ups', 'Just basketball.'], ['frenzy', 'Power-Up Frenzy', 'Power-ups show up way more often.'],
-  ['slow', 'Slow Motion', 'The whole game runs 20% slower.'], ['highg', 'Heavy Gravity', 'Short, snappy jumps.'], ['allhavoc', 'Havoc Every Point', 'A Havoc round on every point.'], ['nohavoc', 'No Havoc Rounds', 'Never get a Havoc round.']];
-const RULE_OFF = { nopow: 'frenzy', frenzy: 'nopow', turbo: 'slow', slow: 'turbo', lowg: 'highg', highg: 'lowg', allhavoc: 'nohavoc', nohavoc: 'allhavoc' };
+  ['slow', 'Slow Motion', 'The whole game runs 20% slower.'], ['highg', 'Heavy Gravity', 'Short, snappy jumps.'], ['allhavoc', 'Havoc Every Point', 'A Havoc round on every point.'], ['nohavoc', 'No Havoc Rounds', 'Never get a Havoc round.'],
+  ['quick', 'Quick Game', 'Normal games go to 11 instead of 21.'], ['mercy', 'Mercy Rule', 'Go up by 7 and the game is yours.'], ['samecourt', 'One Court', 'The whole game stays on the first court.'],
+  ['plain', 'Plain Points', 'No odd balls, bodies or hoops. Just the court.'], ['golden', 'Golden Every Point', 'Every basket is worth double.']];
+const RULE_ICON = {"big": "<circle cx=\"12\" cy=\"9\" r=\"7\"/><path d=\"M10 16h4v6h-4z\"/>", "lowg": "<path d=\"M12 2a6 6 0 0 1 6 6c0 5-6 9-6 9s-6-4-6-9a6 6 0 0 1 6-6z\" opacity=\".35\"/><circle cx=\"12\" cy=\"8\" r=\"3\"/><path d=\"M11 18h2v4h-2z\"/>", "turbo": "<path d=\"M13 2 4 14h7l-1 8 9-12h-7z\"/>", "by2": "<path d=\"M5 18V6h2v12zm4 0v-2c4-3 6-5 6-7a2 2 0 0 0-4 0H9a4 4 0 0 1 8 0c0 3-2 5-5 7h5v2z\"/>", "nopow": "<circle cx=\"12\" cy=\"12\" r=\"9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.5\"/><path d=\"M5.6 4.2l14.2 14.2-1.4 1.4L4.2 5.6z\"/>", "frenzy": "<path d=\"M12 2l2.4 5.6 6 .6-4.5 4 1.3 6-5.2-3.1-5.2 3.1 1.3-6-4.5-4 6-.6z\"/>", "slow": "<circle cx=\"12\" cy=\"13\" r=\"8\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\"/><path d=\"M11 8h2v6h-2zM9 2h6v2H9z\"/>", "highg": "<path d=\"M11 3h2v12l4-4 1.4 1.4L12 18.8l-6.4-6.4L7 11l4 4z\"/><path d=\"M4 20h16v2H4z\"/>", "allhavoc": "<path d=\"M12 2 2 20h20zm-1 6h2v6h-2zm0 8h2v2h-2z\"/>", "nohavoc": "<path d=\"M12 2 2 20h20z\" opacity=\".35\"/><path d=\"M4.2 3.4l16.4 16.4-1.4 1.4L2.8 4.8z\"/>", "quick": "<circle cx=\"12\" cy=\"13\" r=\"8\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\"/><path d=\"M12 13V8h-2v7h5v-2z\"/><path d=\"M9 2h6v2H9z\"/>", "mercy": "<path d=\"M12 21s-8-5-8-11a5 5 0 0 1 8-4 5 5 0 0 1 8 4c0 6-8 11-8 11z\"/>", "samecourt": "<path d=\"M3 5h18v14H3zm2 2v10h6V7zm8 0v10h6V7z\"/>", "plain": "<circle cx=\"12\" cy=\"12\" r=\"9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\"/><path d=\"M3 12h18\" stroke=\"currentColor\" stroke-width=\"2\"/>", "golden": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 6l1.5 3.6 3.9.3-3 2.5.9 3.8L12 14.2l-3.3 2 .9-3.8-3-2.5 3.9-.3z\" fill=\"rgba(0,0,0,.35)\"/>"};
+const RULE_OFF = { golden: 'nopow', plain: 'big', big: 'plain', nopow: 'frenzy', frenzy: 'nopow', turbo: 'slow', slow: 'turbo', lowg: 'highg', highg: 'lowg', allhavoc: 'nohavoc', nohavoc: 'allhavoc' };
 function openRules() {
-  openPanel('House Rules', `<div class="rlist">${RULES.map(r => `<button class="tog" type="button" role="switch" data-r="${r[0]}" aria-checked="${String(!!SV.rules[r[0]])}"><span>${r[1]}<small>${r[2]}</small></span><i></i></button>`).join('')}</div>`, [['Done', closePanel, 'red']]);
+  openPanel('Rules', `<div class="rlist">${RULES.map(r => `<button class="tog rtog" type="button" role="switch" data-r="${r[0]}" aria-checked="${String(!!SV.rules[r[0]])}"><em class="ric" data-keep aria-hidden="true"><svg viewBox="0 0 24 24">${RULE_ICON[r[0]] || ''}</svg></em><span>${r[1]}<small>${r[2]}</small></span><i></i></button>`).join('')}</div>`, [['Done', closePanel, 'red']]);
   const sync = () => $('panelBody').querySelectorAll('[data-r]').forEach(x => x.setAttribute('aria-checked', String(!!SV.rules[x.dataset.r])));
   $('panelBody').querySelectorAll('[data-r]').forEach(b => b.onclick = () => { const k = b.dataset.r; SV.rules[k] = !SV.rules[k]; if (SV.rules[k] && RULE_OFF[k]) SV.rules[RULE_OFF[k]] = false; persist(); sync(); });
 }
@@ -8009,15 +8020,15 @@ function openLocker0(tab) {
     body = `<div class="cgrid">${st.map(([l, v]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join('')}</div>`;
   } if (lockerTab === 'team') {   // style lives in the same room as your team
     const st = SV.style || {}, lock = L => I.L < L;
-    body += `<div class="h3" style="margin-top:16px">Your Look</div><p style="margin:0 0 8px">Unlock more as you level up.</p><div class="h3">Ball Trail</div><div class="pgrid">${TRAILS.map(([k, n, L]) => `<button class="pick" type="button" data-tr="${k}" aria-pressed="${String((st.trail || 'none') === k)}" ${lock(L) ? 'disabled' : ''}>${n}${lock(L) ? `<small>Level ${L}</small>` : ''}</button>`).join('')}</div>
-      <div class="h3">Star player</div><div class="pgrid">${[[0, 'None', 1, 0], ...STARS].map(([L, n, num]) => `<button class="pick" type="button" data-star="${L ? n : ''}" aria-pressed="${String((st.star || '') === (L ? n : ''))}" ${lock(L || 1) ? 'disabled' : ''}>${L ? n + ` <small>#${num}${lock(L) ? ', level ' + L : ''}</small>` : 'None'}</button>`).join('')}</div>
+    body += `<div class="h3" style="margin-top:16px">Your Look</div><p style="margin:0 0 8px">How your team looks on court, in every game and online. Ball trails follow your shots, headbands go on your players, and new looks unlock as you level up.</p><div class="h3">Ball Trail</div><div class="pgrid">${TRAILS.map(([k, n, L]) => `<button class="pick" type="button" data-tr="${k}" aria-pressed="${String((st.trail || 'none') === k)}" ${lock(L) ? 'disabled' : ''}>${n}${lock(L) ? `<small>Level ${L}</small>` : ''}</button>`).join('')}</div>
+      <div class="h3">Star player</div><p style="margin:0 0 8px">A named player who joins your team in 1-player games, with their own number and a slightly better jump and shot. Unlock legends by levelling up.</p><div class="pgrid">${[[0, 'None', 1, 0], ...STARS].map(([L, n, num]) => `<button class="pick" type="button" data-star="${L ? n : ''}" aria-pressed="${String((st.star || '') === (L ? n : ''))}" ${lock(L || 1) ? 'disabled' : ''}>${L ? n + ` <small>#${num}${lock(L) ? ', level ' + L : ''}</small>` : 'None'}</button>`).join('')}</div>
       <div class="h3" style="margin-top:14px">Headband</div><div class="swrow">${BANDS.map((b, i) => [b, i]).sort((a, b) => (a[0][2] || 0) - (b[0][2] || 0) || a[1] - b[1]).map(([[c, n, L], i]) => `<button class="sw" type="button" data-hb="${i}" style="background:${c || 'repeating-linear-gradient(45deg,#33244a 0 6px,#21162f 6px 12px)'}" aria-label="${n}${lock(L) ? ', unlocks at level ' + L : ''}" aria-pressed="${String((st.band || 0) === i)}" ${lock(L) ? 'disabled' : ''}>${lock(L) ? `<small>Lv ${L}</small>` : ''}</button>`).join('')}</div>`;
-  } else if (lockerTab === 'settings') {
+  } if (lockerTab === 'settings') {
     body = acctHTML() + '<div class="credit"><b>Hoop Havoc</b><span>A Morningfall Corp game</span><small>Beta v' + GAME_VERSION + '</small></div>' + `<div class="rlist" style="margin-bottom:12px"><button class="tog" type="button" role="switch" data-sw="replays" aria-checked="${SV.replays !== false}"><span>Instant replays<small>On: big plays and blocks get a slow-motion replay. Off: no replays during games (highlights still save).</small></span><i></i></button>
       <button class="tog" type="button" role="switch" data-sw="study" aria-checked="${!!SV.study}"><span>Study mix<small>A calmer crowd, softer sound effects and mellow music. Great with Auto Mode.</small></span><i></i></button>
       ${isTouch ? `<button class="tog" type="button" role="switch" data-sw="noVib" aria-checked="${!!SV.noVib}"><span>No vibration<small>Turn off the buzz on blocks and dunks.</small></span><i></i></button>` : ''}</div>
       ${isTouch ? `<div class="h3">Button size</div><div class="seg2">${['Small', 'Medium', 'Large'].map(n => `<button type="button" class="pick" data-bs="${n[0].toLowerCase()}" aria-pressed="${String((SV.btn || 'm') === n[0].toLowerCase())}">${n}</button>`).join('')}</div>` : ''}` + [['music', 'Music'], ['crowd', 'Crowd'], ['sfx', 'Sound Effects'], ['shake', 'Screen Shake']].map(([k, l]) => `<div class="vrow"><label for="v_${k}">${l}</label><input type="range" id="v_${k}" data-v="${k}" min="0" max="100" step="5" value="${Math.round(vol(k) * 100)}"><span>${Math.round(vol(k) * 100)}%</span></div>`).join('');
-  } else {
+  } if (lockerTab === 'trophies') {
     const n = ACH.filter(a => SV.ach[a[0]]).length;
     body = `<p style="margin:0 0 10px">${n} of ${ACH.length} unlocked.</p><div class="agrid">${ACH.map(a => `<div class="ach${SV.ach[a[0]] ? '' : ' off'}"><i>${SV.ach[a[0]] ? '★' : '?'}</i><div><b>${a[1]}</b><span>${a[2]}</span></div></div>`).join('')}</div>`;
   }
@@ -8078,7 +8089,7 @@ function afterGame(w) {
   if (mode === 1 || mode === 2) {
     carAdd('games'); carAdd('points', teams[0].score); carAdd('dunks', S.dunks + S.oops); carAdd('greens', S.greens); carAdd('blocks', S.blocks); carAdd('steals', S.steals);
     if (mode === 1) { carAdd('cpuGames'); if (w === 0) { carAdd('wins'); SV.car.ws = car('ws') + 1; SV.car.bestWs = Math.max(car('bestWs'), SV.car.ws); } else SV.car.ws = 0; }
-    xp = 40 + (w === 0 || mode === 2 ? 50 : 0) + S.baskets * 4 + (S.dunks + S.oops) * 4 + S.greens * 6 + S.blocks * 5 + S.steals * 4 + (WIN >= 100 ? 120 : 0) + (tourney && tourney.round >= 4 && w === 0 ? 250 : 0);
+    const cBonus = net && net.ready && hasCustomTeam(); xp = (cBonus ? 1.5 : 1) * 0 + 40 + (w === 0 || mode === 2 ? 50 : 0) + S.baskets * 4 + (S.dunks + S.oops) * 4 + S.greens * 6 + S.blocks * 5 + S.steals * 4 + (WIN >= 100 ? 120 : 0) + (tourney && tourney.round >= 4 && w === 0 ? 250 : 0);
     if (car('games') >= 10) unlock('games10');
     if (car('greens') >= 10) unlock('greens10');
     if (mode === 1 && w === 0 && WIN >= 100) unlock('cup100');
@@ -8106,6 +8117,7 @@ function afterGame(w) {
   $('xpRow').hidden = !xp;
   if (xp) {
     const parts = []; if (S && !practice()) { parts.push(['Played', 40]); if (w === 0 || mode === 2) parts.push(['Win', 50]); if (S.baskets) parts.push(['Baskets', S.baskets * 4]); if (S.dunks + S.oops) parts.push(['Dunks', (S.dunks + S.oops) * 4]); if (S.greens) parts.push(['Greens', S.greens * 6]); if (S.blocks) parts.push(['Blocks', S.blocks * 5]); if (S.steals) parts.push(['Steals', S.steals * 4]); if (WIN >= 100) parts.push(['Marathon', 120]); if (tourney && tourney.round >= 4 && w === 0) parts.push(['Champion', 250]); }
+    if (net && net.ready && hasCustomTeam()) { const b = Math.round(xp * 0.5); xp += b; parts.push(['Your own team', b]); }
     const sum = parts.reduce((a, p) => a + p[1], 0); if (xp - sum > 0) parts.push(['Bonus', xp - sum]);
     const x0 = SV.xp; gainXP(xp); xpReveal(x0, SV.xp, parts);
   }
@@ -8228,7 +8240,7 @@ function loadCup() { const c = SV.cup; if (!c || !c.opps) return false; TOURNEY.
 @keyframes hhItem{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 @keyframes hhSheen{0%{opacity:0;transform:translateX(-60%) rotate(8deg)}35%{opacity:.5}100%{opacity:0;transform:translateX(160%) rotate(8deg)}}
 @keyframes hhFade{from{opacity:0}to{opacity:1}}
-@keyframes hhSlab{from{transform:translateX(-30%);opacity:0}to{transform:none;opacity:1}}
+@keyframes hhSlab{from{translate:-30% 0;opacity:0}to{translate:0 0;opacity:1}}
 @keyframes hhPop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:none}}
 .ov.hhin{animation:hhFade .25s ease both}
 .ov.hhin>.sheet{animation:hhIn .55s cubic-bezier(.2,.9,.25,1.08) both}
@@ -8397,8 +8409,17 @@ function drawTrailRibbon() {   // a soft tapered streak behind the ball, like a 
   ctx.globalCompositeOperation = gc; ctx.restore();
 }
 { const db0 = drawBall; drawBall = function () { drawTrailRibbon(); return db0.apply(this, arguments); }; }
-const GAME_VERSION = 106;
+document.head.insertAdjacentHTML('beforeend', `<style>
+#bCourt.set,#bRules.set{background:linear-gradient(180deg,#ffd34d,#e8a92a)!important;color:var(--ink,#1a1026)!important;text-shadow:none!important}
+.rtog{display:flex;align-items:center;gap:10px}.rtog .ric{display:grid;flex:0 0 30px;width:30px;height:30px;place-items:center;font-style:normal;background:rgba(255,240,207,.08);border:2px solid rgba(255,240,207,.15)}.rtog .ric svg{width:20px;height:20px;fill:currentColor}
+.rtog[aria-checked="true"] .ric{background:var(--mustard);color:var(--ink,#1a1026);border-color:var(--mustard)}
+.oteam{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;margin:0 0 8px;background:linear-gradient(90deg,var(--tc),rgba(0,0,0,.25));border:3px solid var(--edge,#0b0612);color:#fff;text-shadow:2px 2px 0 rgba(0,0,0,.4)}
+.oteam small{display:block;font-size:11px;opacity:.85}.oteam b{display:block;font:700 20px/1.1 var(--pixel,inherit)}.oteam span{font-size:12px}
+.onudge{margin:0 0 12px;padding:8px 10px;border:2px dashed rgba(255,190,46,.6);color:var(--mustard);font-weight:700;font-size:13px}.onudge.ok{border-style:solid;color:#5fe07a;border-color:rgba(95,224,122,.6)}
+</style>`);
+const GAME_VERSION = 107;
 const UPDATES = [
+  [107, 'Rules and courts', ['The home screen stripe stays diagonal while the menu slides in.', 'Career and Trophies show their own pages again.', 'Rules (no longer House Rules) have icons, plus five new ones: Quick Game, Mercy Rule, One Court, Plain Points and Golden Every Point.', 'The Court and Rules buttons turn gold when you have something picked, instead of showing a tick.', 'Pick as many courts as you like for the rotation.', 'Online, your team plays under its own team name with your username on both players. Play online with your own team and you earn 50% more XP.', 'The Locker explains Your Look and the Star Player.']],
   [106, 'Goals and trails', ['The practice toolbar only ever shows in practice. It no longer sticks around in other modes, Auto mode or the menus.', 'The setup tag under the scoreboard is colour-coded: Ball in orange, Players in green, Hoop in blue.', 'Trails look smoother: a soft streak follows the ball with evenly spaced hearts, bolts, stars and more.', 'The tutorial dunker never freezes before going up.', 'Pausing shows your goal for the mode: the daily challenge, your dunk contest score so far, the tournament round and more.', 'In one-player games, the arrow keys work as well as W, E and Q. The pause menu and controls guide now say so.']],
   [105, 'Phones and polish', ['Fixed menus not closing when you pressed Done, OK or Back.', 'On phones held sideways the court fills the whole height of the screen.', 'The Hype button on phones is smaller and calmer, tucked under the scoreboard.', 'The controls guide is tidier and fades away after the first points.', 'In the jungle, the snakes chase him all the way off screen.']],
   [104, 'Backflip fix', ['Bouncy Castle backflips no longer get stuck against the wall or knocked sideways. The shooter jogs to open floor, then flips cleanly.']],
