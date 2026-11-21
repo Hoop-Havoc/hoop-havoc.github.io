@@ -7796,9 +7796,10 @@ function openChallenges() {
   const C = chState(), row = (c, P, D) => { const v = Math.min(c[3], SV.ch[P][c[0]] || 0), ok = SV.ch[D][c[0]]; return `<div class="chal${ok ? ' ok' : ''}"><div><b>${c[1]}</b><span>${ok ? 'Done!' : v + ' of ' + c[3]}</span></div><i style="--p:${v / c[3] * 100}%"></i><em>+${c[4]} XP</em></div>`; };
   openPanel('Challenges', `<div class="h3">Today</div>${C.day.map(c => row(c, 'dp', 'dd')).join('')}<div class="h3" style="margin-top:12px">This week</div>${C.week.map(c => row(c, 'wp', 'wd')).join('')}<p style="margin:10px 0 0;opacity:.8">New daily challenges every day, new weekly ones every Monday. They count in any game except CPU vs CPU.</p>`, [['Back', openModes]]);
 }
+const MODE_ICON = {"play online": "<circle cx=\"12\" cy=\"12\" r=\"9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><path d=\"M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/>", "tournament": "<path d=\"M7 3h10v3h3v2a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.6V17h3v3H8v-3h3v-2.4A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V6h3zm-1 5a2 2 0 0 0 1 1.7V8zm12 0v1.7A2 2 0 0 0 18 8z\"/>", "daily challenge": "<path d=\"M6 2h2v2h8V2h2v2h3v17H3V4h3zm-1 7v10h14V9zm2 2h4v4H7z\"/>", "challenges": "<circle cx=\"12\" cy=\"12\" r=\"9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"1.8\"/>", "first to 100": "<path d=\"M5 2h2v20H5zm3 1h11l-2.5 4L19 11H8z\"/>", "dunk contest": "<path d=\"M3 4h18v2h-4v3a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6H3z\"/><path d=\"M8 11l1 9h6l1-9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"/><path d=\"M9 14h6M9.5 17h5\" stroke=\"currentColor\" stroke-width=\"1.4\"/>", "3-point shootout": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M3 12h18M12 3v18M5.6 5.6c3 2.2 3 10.6 0 12.8M18.4 5.6c-3 2.2-3 10.6 0 12.8\" fill=\"none\" stroke=\"rgba(0,0,0,.45)\" stroke-width=\"1.6\"/>", "tutorial": "<path d=\"M12 3 1 9l11 6 9-4.9V17h2V9z\"/><path d=\"M5 13v4c2 2 4.5 3 7 3s5-1 7-3v-4l-7 3.8z\"/>", "practice": "<path d=\"M12 2l4 14H8z\"/><path d=\"M4 17h16v3H4z\"/><path d=\"M9.3 11h5.4l.6 2H8.7z\" fill=\"rgba(0,0,0,.35)\"/>", "auto mode": "<path d=\"M4 13a8 8 0 0 1 16 0v6a2 2 0 0 1-2 2h-2v-7h2.3A6.3 6.3 0 0 0 5.7 14H8v7H6a2 2 0 0 1-2-2z\"/>"};
 function openModes() {
   const G = [['Play with friends', ['Play Online']], ['Compete', ['Tournament', 'Daily Challenge', 'Challenges', 'First To 100', 'Dunk Contest', '3-Point Shootout']], ['Practice', ['Tutorial', 'Practice']], ['Chill', ['Auto Mode']]];
-  const cell = i => { const m = MODES[i]; return `<button class="pick" type="button" data-m="${i}">${m[0]}<small>${typeof m[1] === 'function' ? m[1]() : m[1]}</small></button>`; };
+  const cell = i => { const m = MODES[i], ic = MODE_ICON[m[0].toLowerCase()] || MODE_ICON['3-point shootout']; return `<button class="pick mpick" type="button" data-m="${i}"><i class="micon" data-keep aria-hidden="true"><svg viewBox="0 0 24 24">${ic}</svg></i>${m[0]}<small>${typeof m[1] === 'function' ? m[1]() : m[1]}</small></button>`; };
   const seen = new Set(), low = x => x.toLowerCase();
   let html = G.map(([h, names]) => { const idx = MODES.map((m, i) => i).filter(i => names.some(n => low(n) === low(MODES[i][0]))); idx.forEach(i => seen.add(i)); return idx.length ? `<div class="h3">${h}</div><div class="mgrid">${idx.map(cell).join('')}</div>` : ''; }).join('');
   const rest = MODES.map((m, i) => i).filter(i => !seen.has(i)); if (rest.length) html += `<div class="h3">More</div><div class="mgrid">${rest.map(cell).join('')}</div>`;
@@ -7822,9 +7823,20 @@ function openRules() {
   $('panelBody').querySelectorAll('[data-r]').forEach(b => b.onclick = () => { const k = b.dataset.r; SV.rules[k] = !SV.rules[k]; if (SV.rules[k] && RULE_OFF[k]) SV.rules[RULE_OFF[k]] = false; persist(); sync(); });
 }
 let lockerTab = 'team';
+const LOCKER_ROOMS = [['team', 'Your Team'], ['style', 'Style'], ['career', 'Career'], ['trophies', 'Trophies'], ['settings', 'Settings']], LOCKER_ICON = {"team": "<path d=\"M8 3 3 6l2 5 2-1v11h10V10l2 1 2-5-5-3c-.5 1.5-2 2.5-4 2.5S8.5 4.5 8 3z\"/>", "style": "<path d=\"M10 2c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7zm8.5 10c.3 2.3 1.2 3.2 3.5 3.5-2.3.3-3.2 1.2-3.5 3.5-.3-2.3-1.2-3.2-3.5-3.5 2.3-.3 3.2-1.2 3.5-3.5z\"/>", "career": "<path d=\"M4 20V10h3v10zm6.5 0V4h3v16zM17 20v-7h3v7z\"/>", "trophies": "<path d=\"M7 3h10v3h3v2a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.6V17h3v3H8v-3h3v-2.4A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V6h3zm-1 5a2 2 0 0 0 1 1.7V8zm12 0v1.7A2 2 0 0 0 18 8z\"/>", "settings": "<path d=\"M10.3 2h3.4l.5 2.6 1.8.8 2.2-1.5 2.4 2.4-1.5 2.2.8 1.8 2.6.5v3.4l-2.6.5-.8 1.8 1.5 2.2-2.4 2.4-2.2-1.5-1.8.8-.5 2.6h-3.4l-.5-2.6-1.8-.8-2.2 1.5-2.4-2.4 1.5-2.2-.8-1.8L2 13.7v-3.4l2.6-.5.8-1.8-1.5-2.2 2.4-2.4 2.2 1.5 1.8-.8zM12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z\"/>"};
+let lockerShown = null;
 function openLocker(tab) {
+  const fresh = $('panel').hidden || !$('panelBody').querySelector('.doors'), prev = fresh ? null : lockerShown, next = tab || lockerTab;
+  if (!fresh) $('panelBody').dataset.quiet = '1';   // re-drawing the same room: no row-by-row entrance
+  openLocker0(tab); lockerShown = next;
+  const pb = $('panelBody'), doors = pb.querySelector('.doors'); if (!doors) return;
+  const room = document.createElement('div'); room.className = 'room'; while (doors.nextSibling) room.appendChild(doors.nextSibling); pb.appendChild(room);
+  if (prev && prev !== next) { const ix = k => LOCKER_ROOMS.findIndex(r => r[0] === k); room.classList.add(ix(next) > ix(prev) ? 'from-r' : 'from-l'); }
+  const ttl = $('panelTitle'); if (ttl) ttl.textContent = 'Locker room: ' + (LOCKER_ROOMS.find(r => r[0] === next) || ['', ''])[1];
+}
+function openLocker0(tab) {
   lockerTab = tab || lockerTab; const I = lvlInfo();
-  const tabs = `<div class="tabs"><div class="seg" role="group" aria-label="Locker">${[['team', 'Your Team'], ['style', 'Style'], ['career', 'Career'], ['trophies', 'Trophies'], ['settings', 'Settings']].map(([k, l]) => `<button type="button" data-t="${k}" aria-pressed="${String(k === lockerTab)}">${l}</button>`).join('')}</div></div>`;
+  const tabs = `<div class="doors" role="group" aria-label="Locker rooms">${LOCKER_ROOMS.map(([k, l], i) => `<button type="button" class="door" data-t="${k}" aria-pressed="${String(k === lockerTab)}"><span class="vents" aria-hidden="true"></span><span class="plate">${i + 1}</span><i data-keep aria-hidden="true"><svg viewBox="0 0 24 24">${LOCKER_ICON[k]}</svg></i><b>${l}</b><span class="handle" aria-hidden="true"></span></button>`).join('')}</div>`;
   const lvl = `<div class="lvl" style="margin-bottom:12px"><b>Level ${I.L}</b><span class="xpbar"><i style="width:${I.cur / I.need * 100}%"></i></span><small>${I.cur} / ${I.need} XP</small></div>`;
   let body = '';
   if (lockerTab === 'team') {
@@ -8078,7 +8090,7 @@ function loadCup() { const c = SV.cup; if (!c || !c.opps) return false; TOURNEY.
   ['menu', 'panel', 'pause', 'over'].forEach(id => { const ov = $(id); if (!ov) return; let was = ov.hidden;
     new MutationObserver(() => { if (was && !ov.hidden) play(ov); was = ov.hidden; }).observe(ov, { attributes: true, attributeFilter: ['hidden'] }); });
   const pb = $('panelBody'); let q = 0;   // switching panels while one is open: the new rows slide in
-  if (pb) new MutationObserver(() => { if (q || $('panel').hidden) return; q = requestAnimationFrame(() => { q = 0; stagger(pb); }); }).observe(pb, { childList: true });
+  if (pb) new MutationObserver(() => { if (pb.dataset.quiet) { delete pb.dataset.quiet; return; } if (q || $('panel').hidden) return; q = requestAnimationFrame(() => { q = 0; stagger(pb); }); }).observe(pb, { childList: true });
   if (!$('menu').hidden) requestAnimationFrame(() => play($('menu')));
 })();
 document.head.insertAdjacentHTML('beforeend', `<style id="hhIcons">
@@ -8117,8 +8129,35 @@ function decorateButtons(root) {
   });
 }
 decorateButtons(); { let q = 0; new MutationObserver(() => { if (q) return; q = requestAnimationFrame(() => { q = 0; decorateButtons(); }); }).observe(document.body, { childList: true, subtree: true }); }
-const GAME_VERSION = 94;
+document.head.insertAdjacentHTML('beforeend', `<style id="hhLocker">
+.doors{display:grid;grid-template-columns:repeat(5,1fr);gap:calc(var(--k)*8);margin:0 0 calc(var(--k)*12);perspective:600px}
+.door{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;min-height:calc(var(--k)*96);padding:calc(var(--k)*8) 4px calc(var(--k)*8);cursor:pointer;color:var(--cream);font:inherit;
+  background:linear-gradient(90deg,rgba(0,0,0,.28),transparent 12%,transparent 88%,rgba(0,0,0,.28)),linear-gradient(180deg,rgba(255,255,255,.12),rgba(0,0,0,.25)),var(--dc,#3a2a52);border:3px solid var(--edge);box-shadow:inset 0 3px 0 rgba(255,255,255,.12),inset 0 -4px 0 rgba(0,0,0,.4),0 4px 0 var(--edge);
+  transform-origin:left center;transition:transform .25s cubic-bezier(.2,.9,.25,1.1),filter .12s}
+.door .vents{position:absolute;top:8px;left:18%;right:18%;height:22px;background:repeating-linear-gradient(180deg,rgba(0,0,0,.55) 0 3px,transparent 3px 6px)}
+.door .plate{position:absolute;top:36px;left:50%;transform:translateX(-50%);font:700 11px/1 var(--pixel);color:var(--ink,#1a1026);background:var(--cream);padding:2px 6px;box-shadow:0 2px 0 var(--edge)}
+.door .handle{position:absolute;right:9px;top:50%;width:5px;height:20px;background:#b9a98c;box-shadow:inset -2px 0 0 rgba(0,0,0,.35)}
+.door i{display:grid;width:26px;height:26px;margin-top:40px}.door i svg{width:100%;height:100%;fill:currentColor}
+.door b{font:600 max(11px,calc(var(--k)*13))/1.1 var(--pixel);text-align:center}
+.door:hover{filter:brightness(1.15)}
+.door[data-t=team]{--dc:#b3243b}.door[data-t=style]{--dc:#7a3fb0}.door[data-t=career]{--dc:#2a62c4}.door[data-t=trophies]{--dc:#b8860b}.door[data-t=settings]{--dc:#1f8a7a}
+.door[aria-pressed="true"]{color:var(--cream)!important;border-color:var(--cream)!important}.door[aria-pressed="true"] .plate{background:var(--cream)!important}
+.door[aria-pressed="true"]{color:var(--mustard);border-color:var(--mustard);transform:rotateY(-14deg);background:linear-gradient(90deg,rgba(255,240,207,.22),transparent 40%),linear-gradient(180deg,rgba(255,255,255,.16),rgba(0,0,0,.2)),var(--dc,#3a2a52);box-shadow:inset 0 0 18px rgba(255,190,46,.25),0 4px 0 var(--edge),-8px 0 18px rgba(255,190,46,.25)}
+.door[aria-pressed="true"] .plate{background:var(--mustard)}
+.room{animation:none}
+.room.from-r{animation:roomR .38s cubic-bezier(.2,.9,.25,1) both}.room.from-l{animation:roomL .38s cubic-bezier(.2,.9,.25,1) both}
+@keyframes roomR{from{opacity:0;transform:translateX(70px)}to{opacity:1;transform:none}}
+@keyframes roomL{from{opacity:0;transform:translateX(-70px)}to{opacity:1;transform:none}}
+.mpick{position:relative;padding-left:calc(var(--k)*58)!important;text-align:left}
+.mpick .micon{position:absolute;left:calc(var(--k)*12);top:50%;transform:translateY(-50%);width:calc(var(--k)*32);height:calc(var(--k)*32);display:grid;color:var(--mustard);filter:drop-shadow(2px 2px 0 rgba(0,0,0,.45))}
+.mpick .micon svg{width:100%;height:100%;fill:currentColor}
+@media (max-height:500px){.door{min-height:58px;padding-bottom:6px}.door .vents{display:none}.door .plate{top:5px}.door i{margin-top:14px;width:20px;height:20px}.doors{margin-bottom:6px}}
+@media (max-width:560px){.doors{gap:4px}.door b{font-size:10px}.door .vents{display:none}.door .plate{top:6px}.door i{margin-top:18px}.door{min-height:74px}}
+@media (prefers-reduced-motion:reduce){.room.from-r,.room.from-l{animation:none}.door{transition:none}}
+</style>`);
+const GAME_VERSION = 95;
 const UPDATES = [
+  [95, 'Locker rooms', ['The Locker is now a row of colourful locker doors. Open one to walk into that room, and the room slides in from the side you came from.', 'Every mode has its own icon.']],
   [94, 'Even better courts', ['Point setups (like Ball: Beach ball) show in the small tag under the scoreboard for a few seconds, then fade.', 'More courts got props: umbrellas, puddles and lightning in Rainy Park, a windmill and tumbleweed on the ranch, coral, treasure and a jellyfish under the sea, embers on Volcano Island, a ghost in the graveyard, a sphinx and camel in the desert, cannons and a parrot on the pirate ship, a hot-air balloon in the clouds, pennants at the ice rink, a dragon over the castle and a lit-up disco floor.']],
   [93, 'Better courts', ['Beach Court has palm trees, a beach umbrella, a lifeguard chair, gulls and a sailboat.', 'Bounce House has inflatable castle towers and balloons.', 'Moon Base has craters, a lunar lander and a flag. Heavy Planet has red rocks, alien crystals and meteors.', 'Rooftop has a water tower, string lights and an antenna. Snow Day has a log cabin, snowmen and falling snow.', 'Crystal Cave has stalactites, glowing mushrooms and fireflies.']],
   [92, 'Icons and new rules', ['Buttons across the game have icons, and the home buttons show theirs again.', 'Headings and buttons are back in the classic Hoop Havoc font.', 'Court tiles show their colours again, each with its own badge.', 'Four new house rules: Slow Motion, Heavy Gravity, Havoc Every Point and No Havoc Rounds.', 'Three new power-ups: Heavy (the other team jumps lower), Speed (longer hops) and Boom (knocks the other team flying).', 'Hype time is harder to earn but lasts 30 seconds.', 'Wind only blows during a Havoc wind storm.', 'Each point lists its ball, players and hoop in the small tag under the scoreboard for a few seconds, then it fades away.', 'Save codes are gone. Sign in to keep your progress across devices.']],
