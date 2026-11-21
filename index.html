@@ -8654,7 +8654,7 @@ function syncPrac(force) { const b = $('pracBar'); if (!b) return; const on = mo
   const ic = { pMusic: '<path d="M9 3.5 20 1v14.2a3.3 3.3 0 1 1-2.2-3.1V6.1L11.2 7.6v10.6A3.3 3.3 0 1 1 9 15.1z"/>', pSfx: '<path d="M3 9h4l5-4v14l-5-4H3z"/><path d="M15 8.5a4.5 4.5 0 0 1 0 7M17.5 6a8 8 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2"/>', pFx: '<path d="M10 2c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7z"/>', pVoice: '<path d="M3 5h18v11H9l-5 4v-4H3z"/>', pReplays: '<path d="M4 5h16v14H4zm2 2v10h12V7zm3 2 6 3-6 3z"/>' };
   Object.entries(ic).forEach(([id, svg]) => { const b = $(id); if (b) b.insertAdjacentHTML('afterbegin', `<em class="tic" aria-hidden="true"><svg viewBox="0 0 24 24">${svg}</svg></em>`); });
   document.head.insertAdjacentHTML('beforeend', `<style>
-body:not(.ingame) #pracBar{display:none!important}
+body:not(.ingame) #pracBar,#pracBar[hidden]{display:none!important}
 #menu .howto{display:none!important}
 #pause .sheet{width:min(94%,calc(var(--k)*820))!important}
 #pause .pgrid2{display:grid;grid-template-columns:1.15fr 1fr;gap:calc(var(--k)*18);align-items:start;text-align:left;width:100%}
@@ -8758,8 +8758,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 112;
+const GAME_VERSION = 113;
 const UPDATES = [
+  [113, 'Tidy', ['The practice toolbar only shows up in Practice now, nowhere else.']],
   [112, 'Your turn', ['New in the locker: choose court outfits, your custom jersey, or a plain jersey for every game.', 'Every jersey pattern is redrawn as a full design, plus five new ones: Finish Line, Camo, Retro Sunset, Graffiti and Neon Circuit.', 'Havoc round and golden ball cards now wait until the match intro is over.', 'Online, both players now see the match intro and the Havoc cards.']],
   [111, 'Eruption', ['When a green punishes the other team, they stay frozen, buried, stuck or knocked down until the next point starts.', 'Practice has a dummy: pick Dunk on me to posterize him, or Defender to have him guard you and block your shots. He always hands the ball back.', 'Volcano Island greens are terrifying now: the ground rumbles, lava bombs rain down with smoke trails and a red flash, and the floor under the losers turns into bubbling lava with geysers.']],
   [110, 'The look', ['Cosmetics, rebuilt: every item has a rarity (Common, Rare, Epic or Legendary) with its own colour.', 'New jersey patterns: twin stripes, pinstripes, two-tone, sash, chevron, stars, lightning bolt, flames, galaxy, gold trim and royal.', 'New sneakers, from Fire Red and Neon to Galaxy, Lava and Diamond (the best ones sparkle).', 'New score effects that go off at the rim when your team scores: confetti, hearts, thunder, a jackpot, ink, fireworks, pixels, shockwaves, a supernova, crowns and GOAT Mode.', 'A live preview in the Locker shows your look as you pick it.']],
