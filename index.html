@@ -378,9 +378,9 @@ const KEEPWORDS = new Set(['I', 'CPU', 'CPUs', 'Lv', 'XP', 'XP', 'MJ', 'FX', 'HH
 let keepPhrases = [], noCase = false;   // team, court and player names keep their capitals
 function sentenceCase(s, cont) {
   s = String(s); const hold = [];
-  for (const ph of keepPhrases) if (ph && s.toLowerCase().includes(ph.toLowerCase())) s = s.replace(new RegExp(ph.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), m => { hold.push(ph); return '\u0001' + (hold.length - 1) + '\u0002'; });
+  for (const ph of keepPhrases) if (ph && s.toLowerCase().includes(ph.toLowerCase())) s = s.replace(new RegExp('(?<![A-Za-z])' + ph.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![A-Za-z])', 'gi'), m => { hold.push(ph); return '\u0001' + (hold.length - 1) + '\u0002'; });
   let first = !cont;
-  s = s.replace(/\u0001\d+\u0002|[A-Za-z0-9][A-Za-z0-9']*|[.!?:]\s|\n/g, w => {
+  s = s.replace(/\u0001\d+\u0002|[A-Za-z0-9][A-Za-z0-9'’]*|[.!?:]\s|\n/g, w => {
     if (w[0] === '\u0001') { first = false; return w; }
     if (/^[.!?:]\s$|^\n$/.test(w)) { first = true; return w; }
     const up = w.toUpperCase() === w && /[A-Z]/.test(w);
@@ -1470,8 +1470,9 @@ function doFake(h) {
   if (kind === 'dunk') h.noDunk = true;            // pull it down instead of slamming this flight
   let bit = 0;
   for (const q of players) if (q.team !== h.team && !(q.down > 0) && Math.abs(q.x - h.x) < (kind === 'dunk' ? 220 : 170)) {
-    q.bitT = 1.3; q.bitAir = false; bit++;
-    if (q.grounded && Math.cos(q.a) > 0.25) { jumpPlayer(q); q.vx = q.vx * 0.4 + Math.sign(h.x - q.x) * 120; }   // they leave their feet
+    const cpuBites = teams[q.team].cpu && q.grounded && Math.cos(q.a) > 0.25 && Math.random() < 0.7 - 0.55 * (cpuD(q.team).smart || 0);
+    if (!q.grounded || cpuBites) { q.bitT = 1.3; q.bitAir = false; bit++; }
+    if (cpuBites) { jumpPlayer(q); q.vx = q.vx * 0.4 + Math.sign(h.x - q.x) * 120; }   // the CPU fell for it
   }
   pop(kind === 'dunk' ? 'DUNK FAKE!' : 'PUMP FAKE!', h.Hd.x, h.Hd.y - 58, '#7fe3ff');
   if (bit) h.fakeBoost = 1.4;   // open look: a wider green window for a moment
@@ -3249,7 +3250,7 @@ function finishDunk(p) {
   p.dunkAnim = null; p.a = Math.atan2(Math.sin(p.a), Math.cos(p.a));
   p.phi = PHI_END + Math.atan2(Math.sin(p.phi - PHI_END), Math.cos(p.phi - PHI_END));   // fold the arm back into range: no unwinding spin
   ball.holder = null; ball.thrower = p; ball.immune = 0.3; p.cool = 0.5;
-  ball.x = hp.cx; ball.y = hp.rimY - ball.r - 2; ball.prevY = ball.y - 1;
+  ball.x = hp.cx; ball.y = hp.rimY - ball.r - 2; ball.prevY = ball.y - 1; ball.upThru = -9; ball.dunkGuard = { hp, t: time }; ball.slamUntil = Math.max(ball.slamUntil || 0, time + 0.35);   // nobody can snatch it out of the net
   ball.vx = 0; ball.vy = oop ? 820 : 640; ball.spin = 0; ball.dunk = true; ball.shotTeam = p.team; ball.shotX = hp.cx;
   ball.oop = oop; ball.oopSelf = da.self; ball.bonus = da.bonus; ball.dunkName = da.name; ball.poster = !!da.poster; ball.putback = !!da.putback;
   // sometimes the glass can't take it
@@ -3609,6 +3610,7 @@ function interactions() {
     }
   }
   if (state === 'play' && ball.goaltend) { const hp = ball.goaltend; ball.goaltend = null; ball.gt = true; scored(hoops.indexOf(hp), hp); }   // goaltending: the basket counts
+  else if (state === 'play' && !ball.holder && ball.dunkGuard && time - ball.dunkGuard.t < 0.7 && ball.y > ball.dunkGuard.hp.rimY + 6 && Math.abs(ball.x - ball.dunkGuard.hp.cx) < 40) { const hp = ball.dunkGuard.hp; ball.dunkGuard = null; scored(hoops.indexOf(hp), hp); }
   else if (state === 'play' && !ball.holder) {
     for (let i = 0; i < 2; i++) {
       const hp = hoops[i], lo = Math.min(hp.front, hp.back) + 2, hi = Math.max(hp.front, hp.back) - 2;
@@ -3622,6 +3624,7 @@ function interactions() {
   }
 }
 function scored(ti, hp) {
+  ball.dunkGuard = null;
   let pts = 1, txt = pick(['BUCKET!', 'COUNT IT!', 'CASH!', 'MONEY!']), sub = '', deep = false;
   const tags = [], sh = ball.shotTeam, add = x => { sub = sub ? `${sub} · ${x}` : x; tags.push(x); };
   if (hp.swish > 0.3 && !ball.dunk && !ball.oop) txt = 'NOTHING BUT NET!';
@@ -6236,7 +6239,14 @@ function drawGemFlat(x, y, s, rot, glow) {
     if (t > 0.65 && t < 0.75 && !g.gemDing) { g.gemDing = true; [2093, 2637, 3136].forEach((fq, i) => setTimeout(() => tone(fq, 0.25, 'sine', 0.035), i * 60)); }
   }; }
 function hexRgb(h) { const n = parseInt(h.slice(1), 16); return `${n >> 16 & 255},${n >> 8 & 255},${n & 255}`; }
+const MAP_FIN = {"arena": {"s": ["star", "crown"], "c": ["#ffd34d", "#ffffff", "#ff4f6d"], "f": "top"}, "ice": {"s": ["flake"], "c": ["#ffffff", "#bfe6ff"], "f": "top"}, "moon": {"s": ["star"], "c": ["#ffffff", "#ffd34d", "#c9c9ff"], "f": "top"}, "beach": {"s": ["leaf", "star"], "c": ["#3fd0c9", "#ffd34d", "#ffffff"], "f": "floor"}, "roof": {"s": ["star"], "c": ["#ff8f5e", "#ffd34d", "#ffffff"], "f": "top"}, "bounce": {"s": ["heart", "star"], "c": ["#ff8fcf", "#ffd34d", "#7fe3ff"], "f": "floor"}, "snow": {"s": ["flake"], "c": ["#ffffff", "#e8f6ff"], "f": "top"}, "heavy": {"s": ["gem"], "c": ["#b38a6b", "#8a6a52", "#ffd34d"], "f": "top"}, "street": {"s": ["note", "star"], "c": ["#ff4fa3", "#4fe3ff", "#ffd34d"], "f": "floor"}, "rain": {"s": ["leaf"], "c": ["#ff4f6d", "#ffd34d", "#5dff7a", "#2f7de1", "#9b7bff"], "f": "top"}, "ranch": {"s": ["coin", "star"], "c": ["#ffd34d", "#e8b82a"], "f": "floor"}, "water": {"s": ["gem"], "c": ["#cfefff", "#7fe3ff", "#ffffff"], "f": "floor"}, "lava": {"s": ["star"], "c": ["#ff3d1f", "#ff8a3d", "#ffd34d"], "f": "floor"}, "jungle": {"s": ["leaf"], "c": ["#3fae4a", "#7ac74f", "#ffd34d"], "f": "top"}, "haunted": {"s": ["bat"], "c": ["#2a1c3a", "#5a3a7a", "#ff8a3d"], "f": "floor"}, "egypt": {"s": ["coin", "gem"], "c": ["#ffd34d", "#2f7de1", "#e8b82a"], "f": "top"}, "candy": {"s": ["heart", "star", "gem"], "c": ["#ff6fd8", "#7fe8ff", "#fff07a", "#8cff9a"], "f": "top"}, "pirate": {"s": ["coin"], "c": ["#ffd34d", "#e8b82a"], "f": "top"}, "neon": {"s": ["pixel"], "c": ["#ff00aa", "#00f0ff", "#ffe14d", "#5dff7a"], "f": "floor"}, "rome": {"s": ["leaf", "coin"], "c": ["#dc283c", "#ffd34d"], "f": "top"}, "sky": {"s": ["heart", "star"], "c": ["#ffffff", "#ff8ad8", "#7fe3ff"], "f": "floor"}, "castle": {"s": ["crown", "star"], "c": ["#ffd34d", "#ff8a3d", "#5fd068"], "f": "top"}, "disco": {"s": ["note", "star"], "c": ["#ff4fd8", "#00f0ff", "#ffd34d"], "f": "top"}, "cave": {"s": ["gem"], "c": ["#5ee6ff", "#c79bff", "#ff6fd8"], "f": "floor"}};
+function mapFinale() {
+  const m = MAP_FIN[court.deco] || MAP_FIN.arena;
+  for (let w = 0; w < 4; w++) setTimeout(() => { for (let i = 0; i < 28; i++) { const top = m.f === 'top';
+    particles.push({ x: rand(20, W - 20), y: top ? rand(-60, -5) : GROUND - 4, vx: rand(-60, 60), vy: top ? rand(60, 200) : rand(-720, -380), c: pick(m.c), life: rand(2, 3), max: 3, g: top ? 120 : 520, s: rand(5, 9), shape: pick(m.s) }); } }, w * 320);
+}
 function winnerFinish(kind, hp, who) {
+  mapFinale();
   const pal = MAP_PAL[court.deco] || MAP_PAL.arena, s = Math.sign(hp.boardX - W / 2);
   slowT = Math.max(slowT, kind === 'tip' ? 1.1 : 0.8); flashA = 1; shake = Math.max(shake, kind === 'dunk' ? 26 : 14); roar(2.2, 0.16); music.crash = true; crowdJump = 2;
   [392, 523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.55, 'triangle', 0.05), i * 110));
@@ -6252,6 +6262,7 @@ function winnerFinish(kind, hp, who) {
   if (who) setTimeout(() => react(who, pick(['flex', 'point']), 2.4), 200);
 }
 function winnerGreen(hp) {
+  mapFinale();
   const g = greenBurst; g.big = true; g.dur = (g.dur || 1.4) * 2.4;
   const pal = MAP_PAL[g.kind] || MAP_PAL.arena;
   slowT = Math.max(slowT, 0.9); flashA = 1; shake = Math.max(shake, 14); roar(2, 0.14); music.crash = true;
@@ -6262,6 +6273,26 @@ function winnerGreen(hp) {
   }, 250 + b * 260);
   for (let i = 0; i < 70; i++) particles.push({ x: rand(0, W), y: rand(-40, 0), vx: rand(-50, 50), vy: rand(60, 170), c: pick(pal), life: rand(2, 3), max: 3, g: 200, s: rand(3, 6) });
 }
+{ const C = GFX.cave, d0 = C.draw; C.dur = 2.3;
+  C.draw = function (g, t, P, h) {   // a glowing geode halo of prisms behind the rim, and light rays through them
+    const k = Math.min(1, t / 0.4) * Math.max(0, 1 - (t - 1.8) / 0.5), gc = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2 + t * 0.8, r = P.R * 2.2, x = P.cx + Math.cos(a) * r, y = P.cy - 30 + Math.sin(a) * r * 0.75, c = ['94,230,255', '199,155,255', '255,111,216'][i % 3];
+      ctx.fillStyle = `rgba(${c},${0.18 * k})`; ctx.beginPath(); ctx.moveTo(P.cx, P.cy - 30); ctx.lineTo(x - 6, y); ctx.lineTo(x + 6, y); ctx.fill();
+      ctx.fillStyle = `rgba(${c},${0.8 * k})`; ctx.save(); ctx.translate(x, y); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(5, 0); ctx.lineTo(0, 9); ctx.lineTo(-5, 0); ctx.fill(); ctx.restore(); }
+    ctx.globalCompositeOperation = gc; d0.call(this, g, t, P, h);
+  }; }
+{ const R = GFX.rome, d0 = R.draw; R.dur = 2.3;
+  R.draw = function (g, t, P, h) {   // a golden eagle standard rises over the rim, and gold coins rain down
+    d0.call(this, g, t, P, h);
+    const e = ease(clamp((t - 0.3) / 0.5, 0, 1)), k = Math.max(0, 1 - (t - 1.9) / 0.4); if (e <= 0 || k <= 0) return;
+    ctx.save(); ctx.globalAlpha = k; ctx.translate(P.cx, P.cy - 40 - e * 70);
+    ctx.fillStyle = '#7a5a2a'; ctx.fillRect(-2, 0, 4, 60); ctx.fillStyle = '#b3243b'; ctx.fillRect(-16, 14, 32, 26); ctx.fillStyle = '#ffd34d'; ctx.fillRect(-16, 14, 32, 4); ctx.font = `10px ${DISPLAY}`; ctx.textAlign = 'center'; ctx.fillText('SPQR', 0, 32);
+    ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.moveTo(0, -14); ctx.lineTo(-22, -4 - Math.sin(t * 6) * 4); ctx.lineTo(-8, 0); ctx.lineTo(0, 6); ctx.lineTo(8, 0); ctx.lineTo(22, -4 - Math.sin(t * 6) * 4); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.arc(0, -14, 5, 0, 7); ctx.fill();
+    ctx.restore();
+    for (let i = 0; i < 16; i++) { const u = t - 0.4 - hash(g.seed + i) * 0.8; if (u < 0) continue; const x = P.cx + (hash(g.seed + i + 3) - 0.5) * 240, y = P.cy - 160 + u * 160 + 200 * u * u; if (y > P.cy + 140) continue;
+      ctx.globalAlpha = k; ctx.fillStyle = '#ffd34d'; drawShape('coin', x, y, 5, u * 8 + i); }
+    ctx.globalAlpha = 1;
+  }; }
 function startGreenBurst(hp) {
   const kind = GFX[court.deco] ? court.deco : 'arena', fx = GFX[kind];
   greenBurst = { x: hp.cx, y: hp.rimY + 8, t: 0, h: hp, kind, dur: fx.dur, seed: Math.floor(Math.random() * 1000) };
@@ -6903,7 +6934,7 @@ document.querySelectorAll('button').forEach(b => b.addEventListener('keydown', e
 window.__hh = { oopStats, get goals() { return goalCount; }, get players() { return players; }, get ball() { return ball; }, get state() { return state; } };
 function refreshKeep() {
   const set = new Set(); try { TEAM_POOL.forEach(t => set.add(niceName(t.name || t[0] || ''))); } catch (e) {}
-  teams.forEach(t => t && t.name && set.add(niceName(t.name))); COURTS.forEach(c => set.add(niceName(c.name))); NAMES.forEach(n => set.add(niceName(n)));
+  teams.forEach(t => t && t.name && set.add(niceName(t.name))); COURTS.forEach(c => set.add(niceName(c.name))); players.forEach(q => q && q.pname && set.add(niceName(q.pname))); teams.forEach(t => (t.roster || []).forEach(r => r && r.pname && set.add(niceName(r.pname))));
   try { TOURNEY.forEach(r => r.name && set.add(niceName(r.name))); } catch (e) {}
   ['Hoop Havoc', 'Morningfall Corp', 'Basket Random', 'First To 100', 'Play Online', 'Auto Mode', 'the Jump button', 'the Lob button', 'the Pass button'].forEach(x => set.add(x));
   keepPhrases = [...set].filter(x => x && x.length > 1).sort((a, b) => b.length - a.length);
@@ -7727,8 +7758,9 @@ function newCup() {
 function saveCup() { SV.cup = tourney ? { round: tourney.round, me: tourney.me, opps: TOURNEY.map(o => [o.name, o.color, o.dark]) } : null; persist(); }
 function loadCup() { const c = SV.cup; if (!c || !c.opps) return false; TOURNEY.forEach((o, i) => { if (c.opps[i]) { o.name = c.opps[i][0]; o.color = c.opps[i][1]; o.dark = c.opps[i][2]; } }); tourney = { round: c.round, me: c.me }; return true; }
 // ---- update log ----
-const GAME_VERSION = 84;
+const GAME_VERSION = 85;
 const UPDATES = [
+  [85, 'Finishing touches', ['Fixed bugs where a finished dunk sometimes didn\'t count.', 'Fixed odd capitals in words like freeze and let\'s.', 'Every court has its own game-winner shower: snowflakes on Snow Day, bats in the graveyard, coins on the pirate ship, pixels in the arcade and more.', 'Crystal Cave greens light up a glowing halo of crystals; Colosseum greens raise a golden eagle and rain gold coins.']],
   [84, 'Bigger celebrations', ['Crystal Cave: the diamond bursts into gems and crystals grow out of the floor.', 'Dusty Ranch: a tumbleweed rolls by, then a big yeehaw.', 'Bouncy Castle: every flip bounces the floor, and the last one sticks the landing.', 'Moon Base: a rocket blasts off behind you.', 'Colosseum: trumpets, a golden laurel crown, and the emperor gives a thumbs up.', 'Heavy Planet: the ground pound cracks the floor and throws rocks.', 'Under the Sea: a whale swims by and spouts.', 'Volcano Island: the volcano erupts and a ring of fire circles you.', 'Jungle Temple: a giant python drops down from the trees.', 'Egyptian Sands: golden light beams and a sandstorm around the throne.', 'Pirate Ship: a cannon salute, and a parrot lands on your shoulder.', 'Neon Arcade: the other player gets a glitchy GAME OVER, and there are arcade cabinets on the court.', 'Disco Rink: colored spotlights sweep the floor.', 'Street Court has a city skyline, and the Colosseum has an emperor box.']],
   [83, 'Smoother', ['Dunks ease out of the slam instead of the arm snapping down.', 'Highlights: every big play is saved (even with replays off), and the best five play as a countdown to the play of the game.', 'Online: less delay for the friend who joins on a good connection.']],
   [82, 'Level up', ['3 v 3 is here. Pick it next to 1 v 1 and 2 v 2.', 'Levels go all the way to 100, with a reward at every step: ball trails, headbands, jerseys and star players.', 'Ball trails have real shapes now: hearts, lightning bolts, stars, music notes, snowflakes and more.', 'Tournaments save your spot if you leave.', 'Dunk contest judges reward new dunks, oops, spins and broken glass, and say why.', 'Daily and weekly challenges for bonus XP (Modes, then Challenges).', 'Save codes: move your progress to another device (Locker, Settings).', 'Sound mixer with a crowd slider, plus a Study mix. Phones get button sizes and a vibration switch.', 'Modes are grouped, and online games keep your record.']],
