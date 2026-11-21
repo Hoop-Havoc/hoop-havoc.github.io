@@ -150,6 +150,7 @@ kbd.b{box-shadow:inset 0 calc(var(--k)*-3.5) 0 var(--blue),0 calc(var(--k)*2) 0 
 .small .box .v{font-size:calc(var(--k)*15)}
 
 /* ---------- In-game corner buttons: small ink squares with icons ---------- */
+#hudBtns.away{opacity:0;pointer-events:none;visibility:hidden}
 #hudBtns{position:absolute;top:calc(var(--u)*10);right:calc(var(--u)*10);display:flex;gap:calc(var(--u)*6);transition:opacity .25s}
 #hudBtns.dim{opacity:0;pointer-events:none}
 .ib{display:grid;place-items:center;width:max(30px,calc(var(--u)*32));height:max(30px,calc(var(--u)*32));padding:0;border:max(2px,calc(var(--u)*2.5)) solid var(--cream);border-radius:calc(var(--u)*9);background:var(--ink);color:var(--cream);box-shadow:0 max(2px,calc(var(--u)*3)) 0 var(--deep);position:relative}
@@ -160,7 +161,7 @@ kbd.b{box-shadow:inset 0 calc(var(--k)*-3.5) 0 var(--blue),0 calc(var(--k)*2) 0 
 .ib[aria-pressed="false"]::after{content:"";position:absolute;left:18%;right:18%;top:50%;height:max(2px,calc(var(--u)*2.5));background:var(--red);transform:rotate(-45deg);border-radius:9px}
 .ib.wide{width:auto;padding:0 calc(var(--u)*12);font-size:max(13px,calc(var(--u)*14))}
 #bFx.lite{color:#8f7fa3;border-color:#8f7fa3}
-.touch #hudBtns .ib:not(#bPause):not(#bSkip){display:none}
+.touch #hudBtns .ib:not(#bPause):not(#bSkip):not(#bBack){display:none}
 .touch #hudBtns .ib{width:44px;height:44px}
 .touch #hudBtns .ib.wide{width:auto}
 
@@ -189,7 +190,8 @@ kbd.b{box-shadow:inset 0 calc(var(--k)*-3.5) 0 var(--blue),0 calc(var(--k)*2) 0 
   <canvas id="cv" aria-label="Hoop Havoc game court"></canvas>
 
   <div id="hudBtns">
-    <button id="bSkip" class="ib wide" type="button" hidden>Skip step</button>
+    <button id="bBack" class="ib wide" type="button" hidden>Back</button>
+    <button id="bSkip" class="ib wide" type="button" hidden>Next</button>
     <button id="bMusic" class="ib" type="button" aria-pressed="true" aria-label="Music" title="Music (N)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3.5 20 1v14.2a3.3 3.3 0 1 1-2.2-3.1V6.1L11.2 7.6v10.6A3.3 3.3 0 1 1 9 15.1z"/></svg></button>
     <button id="bMute" class="ib" type="button" aria-pressed="true" aria-label="Sound effects" title="Sound (M)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8.5h4.2L13 3.6v16.8l-5.8-4.9H3zM15.8 8.2a5.3 5.3 0 0 1 0 7.6l-1.5-1.4a3.3 3.3 0 0 0 0-4.8zm2.9-2.9a9.4 9.4 0 0 1 0 13.4l-1.5-1.4a7.4 7.4 0 0 0 0-10.6z"/></svg></button>
     <button id="bFx" class="ib" type="button" aria-label="Effects quality" title="Effects: high. Lite turns off grain, flares and reflections for slower computers"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7zm8.5 10c.3 2.3 1.2 3.2 3.5 3.5-2.3.3-3.2 1.2-3.5 3.5-.3-2.3-1.2-3.2-3.5-3.5 2.3-.3 3.2-1.2 3.5-3.5z"/></svg></button>
@@ -235,7 +237,6 @@ kbd.b{box-shadow:inset 0 calc(var(--k)*-3.5) 0 var(--blue),0 calc(var(--k)*2) 0 
         <div class="seg" role="group" aria-label="Team size"><span>Teams</span>
           <button type="button" data-size="2" aria-pressed="true">2 v 2</button>
           <button type="button" data-size="1" aria-pressed="false">1 v 1</button>
-          <button type="button" data-size="3" aria-pressed="false">3 v 3</button>
         </div>
         <div class="seg" role="group" aria-label="CPU difficulty"><span>CPU</span>
           <button type="button" data-d="rookie" aria-pressed="false">Rookie</button>
@@ -1007,7 +1008,8 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyM') toggleMute();
   if (e.code === 'KeyN') toggleMusic();
   if (e.code === 'KeyR' && mode === 3 && !attract && !paused && !contest) startRound();
-  if (tutorial() && !paused && e.code === 'KeyS') tutSkip();
+  if (tutorial() && !paused && (e.code === 'KeyS' || e.code === 'BracketRight')) tutSkip();
+  if (tutorial() && !paused && (e.code === 'KeyB' || e.code === 'BracketLeft')) tutBack();
   if (tutorial() && !paused && e.code === 'KeyL') { keys[e.code] = false; openLessons(true); return; }
   if (tutorial() && !paused && e.code === 'KeyR') { tut.repeat = !tut.repeat; tut.reps = 0; pop(tut.repeat ? 'REPEAT ON: PRACTICE THIS LESSON' : 'REPEAT OFF', W / 2, 160, MUSTARD); }
   if (tutorial() && !paused && e.code === 'KeyH') { SV.tutMini = !SV.tutMini; persist(); }
@@ -1250,7 +1252,7 @@ function drawTutorial() {
   lines.forEach((l, i) => ctx.fillText(l, px + 14, py + 61 + i * 16));
   if (!st.final && !isTouch && !mini) {
     ctx.font = `600 11px ${TEXT}`; ctx.fillStyle = MUTED;
-    ctx.fillText('S Skip   L Lessons   R Repeat ' + (tut.repeat ? 'Off' : 'On') + '   H Hide   Esc Pause', px + 14, py + ph - 11);
+    ctx.fillText('B Back   S Next   L Lessons   R Repeat ' + (tut.repeat ? 'Off' : 'On') + '   H Hide   Esc Pause', px + 14, py + ph - 11);
   }
   if (mini && !isTouch) { ctx.font = `600 11px ${TEXT}`; ctx.fillStyle = MUTED; ctx.textAlign = 'right'; ctx.fillText('H Show', px + pw - 12, py + 29); }
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
@@ -6716,7 +6718,8 @@ document.head.insertAdjacentHTML('beforeend', '<style>body.ingame #cv{cursor:non
 let lastTitle = '';
 function frame(now) {
   { const tt = attract ? 'Hoop Havoc' : practice() ? 'Practice | Hoop Havoc' : `${niceName(teams[0].name)} ${teams[0].score}-${teams[1].score} ${niceName(teams[1].name)} | Hoop Havoc`; if (tt !== lastTitle) { lastTitle = tt; document.title = tt; } }
-  { const sk = !(tutorial() && !attract); if ($('bSkip').hidden !== sk) $('bSkip').hidden = sk; if (tutorial() && isTouch) { const ph = tutCast() !== 'team'; if ($('pL').hidden !== ph) $('pL').hidden = ph; } }
+  { const away = !$('menu').hidden; if ($('hudBtns').classList.contains('away') !== away) $('hudBtns').classList.toggle('away', away); }
+  { const sk = !(tutorial() && !attract && !paused && $('panel').hidden && state !== 'replay' && tut && !TUT[tut.step].final), bk = sk || !tut || tut.step === 0; if ($('bSkip').hidden !== sk) $('bSkip').hidden = sk; if ($('bBack').hidden !== bk) $('bBack').hidden = bk; if (tutorial() && isTouch) { const ph = tutCast() !== 'team'; if ($('pL').hidden !== ph) $('pL').hidden = ph; } }
   pollPads();
   if (netGuest()) { last = now; netGuestFrame(now); draw(); syncHypeBtn(); drawHypeScreen(0.016); netPingTick(now); drawPing(); requestAnimationFrame(frame); return; }
   el = Math.min(0.05, (now - last) / 1000) * (rules().turbo && state !== 'replay' ? 1.2 : 1); last = now;
@@ -6841,7 +6844,7 @@ function toMenu() {
   if (net) netClose();
   autoPlay = false; autoGames = 0; document.body.classList.remove('auto');
   WIN = 21; tourney = null; daily = null; contest = null; contestOpen = false; reel = null; setTimeout(applyTeam, 0); Object.assign(teams[1], DEF1); htOpen = false; $('panel').hidden = true;
-  paused = false; $('pause').hidden = true; $('over').hidden = true; tut = null; $('bSkip').hidden = true;
+  paused = false; $('pause').hidden = true; $('over').hidden = true; tut = null; $('bSkip').hidden = true; $('bBack').hidden = true;
   teams.forEach(t => { t.cpu = true; }); setGameUI(false); newMatch(true);
 }
 function togglePause() {
@@ -6898,6 +6901,8 @@ $('bPr').addEventListener('click', () => startGame(3));
 $('bTut').addEventListener('click', () => startGame(4));
 $('bInf').addEventListener('click', () => startGame(1, 100));
 $('bSkip').addEventListener('click', () => tutSkip());
+$('bBack').addEventListener('click', () => tutBack());
+function tutBack() { if (tut && tut.step > 0) { tut.okT = 0; tutGoto(tut.step - 1); tone(392, 0.08, 'square', 0.03); } }
 $('bPause').addEventListener('click', togglePause);
 $('bMute').addEventListener('click', toggleMute);
 $('bResume').addEventListener('click', togglePause);
@@ -7040,9 +7045,9 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 .linkb{background:none;border:0;color:inherit;opacity:.8;text-decoration:underline;font:inherit;font-size:.88em;cursor:pointer;justify-self:center}
 </style>`);
 acctBoot();
-KEEPWORDS.add('Google');
+KEEPWORDS.add('Google'); ['Hoop', 'Havoc', 'Basket', 'Random', 'Corp'].forEach(w => KEEPWORDS.delete(w));
 
-function setTeamSize(n) { teamSize = n === 1 ? 1 : n === 3 ? 3 : 2; document.querySelectorAll('.seg button[data-size]').forEach(x => x.setAttribute('aria-pressed', String(+x.dataset.size === teamSize))); }
+function setTeamSize(n) { teamSize = n === 1 ? 1 : 2; document.querySelectorAll('.seg button[data-size]').forEach(x => x.setAttribute('aria-pressed', String(+x.dataset.size === teamSize))); }
 document.querySelectorAll('.seg button[data-size]').forEach(b => b.addEventListener('click', () => { setTeamSize(+b.dataset.size); saveSettings(); }));
 $('bFx').addEventListener('click', toggleFx);
 $('pMusic').addEventListener('click', () => { audio(); toggleMusic(); });
@@ -7055,7 +7060,7 @@ try {   // restore difficulty, sound and FX from last time
   const st = JSON.parse(localStorage.getItem('hh-settings') || 'null');
   if (st) {
     if (DIFF[st.diff]) { diff = st.diff; document.querySelectorAll('.seg button[data-d]').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.d === diff))); }
-    if (st.size === 1 || st.size === 3) setTeamSize(st.size);
+    if (st.size === 1) setTeamSize(1);
     if (st.muted) muted = true;
     if (st.music === false) music.on = false;
     if (st.lite) lite = true;
@@ -7619,7 +7624,7 @@ function openTour() {
     [ICON.one, '1 player', 'You against the CPU.'], [ICON.two, '2 players', 'Play a friend on the same keyboard or screen.'],
     [ICON.modes, 'Modes', 'Online, tournaments, dunk contests, practice and more.'], [ICON.court, 'Court', 'Pick a court, or get a new one every point.'],
     [ICON.rules, 'Rules', 'Fun house rules like big heads or win by 2.'], [ICON.locker, 'Locker', 'Your team, your style, trophies and settings.'],
-    [ICON.cpu, 'Teams and CPU', 'Pick 1v1, 2v2 or 3v3, and how good the CPU is.']].map(r => row(...r)).join('')}</div>
+    [ICON.cpu, 'Teams and CPU', 'Pick 1v1 or 2v2, and how good the CPU is.']].map(r => row(...r)).join('')}</div>
     <p style="margin:12px 0 0">You can replay the tutorial any time from Modes. Sign in from Locker, Settings to save your progress to an account.</p>`, [['Let\'s play', closePanel]]);
 }
 const CH_DAY = [["d_win", "Win a game", "win", 1, 60], ["d_green", "Hit 3 greens", "greens", 3, 50], ["d_dunk", "Make 4 dunks", "dunks", 4, 50], ["d_block", "Get 2 blocks", "blocks", 2, 50], ["d_steal", "Get 2 steals", "steals", 2, 50], ["d_deep", "Make 2 deep shots", "deep", 2, 50], ["d_oop", "Finish 2 alley-oops", "oops", 2, 60], ["d_games", "Play 3 games", "games", 3, 40]], CH_WEEK = [["w_win", "Win 7 games", "win", 7, 300], ["w_green", "Hit 20 greens", "greens", 20, 300], ["w_dunk", "Make 30 dunks", "dunks", 30, 300], ["w_courts", "Win on 5 different courts", "courts", 5, 350], ["w_block", "Get 12 blocks", "blocks", 12, 250], ["w_cpu", "Beat a Legend CPU", "legend", 1, 400]];
@@ -7902,8 +7907,10 @@ function newCup() {
 function saveCup() { SV.cup = tourney ? { round: tourney.round, me: tourney.me, opps: TOURNEY.map(o => [o.name, o.color, o.dark]) } : null; persist(); }
 function loadCup() { const c = SV.cup; if (!c || !c.opps) return false; TOURNEY.forEach((o, i) => { if (c.opps[i]) { o.name = c.opps[i][0]; o.color = c.opps[i][1]; o.dark = c.opps[i][2]; } }); tourney = { round: c.round, me: c.me }; return true; }
 // ---- update log ----
-const GAME_VERSION = 88;
+const GAME_VERSION = 90;
 const UPDATES = [
+  [90, 'Cleaner home screen', ['The music, sound, effects and pause buttons no longer sit in the corner of the home screen. They come back once a game starts.']],
+  [89, 'Tutorial controls', ['Move back and forth through the tutorial with the Back and Next buttons (or B and S).', 'The tutorial buttons only show during a lesson, never on other screens.', '3v3 has been removed. Games are 1v1 or 2v2.']],
   [88, 'Accounts', ['Sign in with Google or email (Locker, Settings) and your level, XP, trophies and stats save to your account.', 'Play on another device and your progress comes with you. If both have progress, the one that is further along wins.', 'Forgot your password? There is a reset link.']],
   [87, 'Replay switch', ['The Instant replays switch now turns off every replay during games, block replays included. It is on by default.', 'You can flip it from the pause menu too.', 'Long dunks ease into their arm swing instead of snapping.', 'No more Over the top text when you bounce off someone\'s head.', 'Hype time is now yours to fire: when your meter is full, press R (or → for the right player, or the glowing Hype button on phones). The screen glows in your color while it runs, and the tutorial has a new Hype time lesson.', 'After a game, a big XP bar fills up with level badges, a count-up, where your XP came from, and a flash when you level up.']],
   [86, 'New look', ['A blocky new look for every menu, with chunky bevelled buttons, square panels and pixel headings, in the Hoop Havoc colors.', 'On phones, the Pass button now shows up in the tutorial\'s teammate lessons.']],
