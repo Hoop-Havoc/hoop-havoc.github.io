@@ -2424,9 +2424,15 @@ function lookPreview() {   // a little mannequin wearing your current look
 function drawHeadband(p, R) {
   const b = BANDS[SV.outfit === 'plain' ? 0 : (SV.style || {}).band || 0]; if (!b || !b[0] || attract || !myTeam(p.team)) return;
   ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.clip();
-  ctx.fillStyle = b[0]; ctx.fillRect(-R * 1.1, -R * 0.62, R * 2.2, R * 0.3);
-  ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(-R * 1.1, -R * 0.36, R * 2.2, R * 0.05);
+  ctx.fillStyle = b[0]; ctx.fillRect(-R * 1.1, -R * 0.66, R * 2.2, R * 0.36);
+  ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(-R * 1.1, -R * 0.52, R * 2.2, R * 0.07);
+  ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(-R * 1.1, -R * 0.66, R * 2.2, R * 0.05);
+  ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(-R * 1.1, -R * 0.34, R * 2.2, R * 0.05);
   ctx.restore();
+  const bk = -(p.facing || 1), wv = Math.sin(time * 14 + p.x * 0.05), sp = clamp(Math.abs(p.vx || 0) / 300, 0.3, 1);   // knot tails flutter behind
+  ctx.save(); ctx.fillStyle = b[0]; ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 1;
+  for (const [o, l] of [[0, 1], [0.18, 0.8]]) { const x0 = bk * R * 0.92, y0 = -R * 0.48 + o * R; ctx.beginPath(); ctx.moveTo(x0, y0 - R * 0.1); ctx.quadraticCurveTo(x0 + bk * R * 0.7 * l, y0 + wv * R * 0.25 * sp, x0 + bk * R * 1.15 * l, y0 + R * (0.35 - 0.3 * sp) + wv * R * 0.2); ctx.lineTo(x0 + bk * R * 1.05 * l, y0 + R * (0.5 - 0.3 * sp) + wv * R * 0.2); ctx.quadraticCurveTo(x0 + bk * R * 0.5 * l, y0 + R * 0.2 + wv * R * 0.2 * sp, x0, y0 + R * 0.12); ctx.closePath(); ctx.fill(); ctx.stroke(); }
+  ctx.beginPath(); ctx.arc(bk * R * 0.95, -R * 0.48, R * 0.13, 0, 7); ctx.fill(); ctx.stroke(); ctx.restore();
 }
 function autoDiff(ti) {
   // Auto: the CPU eases off when it's ahead and sharpens up when it's behind, so games stay close
@@ -5066,7 +5072,14 @@ function drawLeg(hip, foot, legL, fwx, fwy, p, t, back) {
     ell(fx2, fy2 - 0.4 * sc, 7.4, 3.6, t.dark);
   }
   else {   // court sneakers
-    const SC2 = shoeCols(p); ell(fx2, fy2 + 1.2 * sc, 8, 3, SC2 ? SC2[3] : '#f6f0e4'); ell(fx2, fy2 - 0.6 * sc, 7.5, 3.4, SC2 ? SC2[2] : '#16171f'); ell(fx2 - fwx * 1.5 * sc, fy2 - 1 * sc, 3.2, 1.4, SC2 ? SC2[3] : t.color);
+    const SC2 = shoeCols(p), up = SC2 ? SC2[2] : '#16171f', so = SC2 ? SC2[3] : '#f6f0e4', ac = SC2 ? SC2[3] : t.color, sk = SC2 ? SC2[0] : 'classic';
+    { const [bx, by] = at(0.86); seg(bx, by, ax, ay, 6.4 * sc, up); seg(bx, by, lerp(bx, ax, 0.22), lerp(by, ay, 0.22), 6.9 * sc, ac); }
+    if (sk === 'neon' || sk === 'lava' || sk === 'galaxy' || sk === 'diamond') { const gc = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter'; ell(fx2, fy2 + 2 * sc, 11, 4, sk === 'lava' ? 'rgba(255,90,20,.35)' : sk === 'neon' ? 'rgba(93,255,122,.35)' : sk === 'galaxy' ? 'rgba(199,155,255,.35)' : 'rgba(191,239,255,.4)'); ctx.globalCompositeOperation = gc; }
+    ell(fx2 + fwx * 0.6 * sc, fy2 + 1.4 * sc, 8.8, 3.1, so); ell(fx2, fy2 - 0.6 * sc, 7.8, 3.7, up);
+    ell(fx2 + fwx * 4.4 * sc, fy2 + fwy * 4.4 * sc - 0.2 * sc, 3, 2.3, sk === 'classic' ? '#f6f0e4' : so);
+    ctx.strokeStyle = ac; ctx.lineWidth = 1.5 * sc; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(fx2 - fwx * 5.5 * sc, fy2 - fwy * 5.5 * sc - 0.6 * sc); ctx.quadraticCurveTo(fx2 - fwx * 0.5 * sc, fy2 + 1.2 * sc, fx2 + fwx * 3 * sc, fy2 + fwy * 3 * sc - 2.6 * sc); ctx.stroke();
+    for (let i = 0; i < 2; i++) ell(fx2 + fwx * (0.4 + i * 2.2) * sc, fy2 + fwy * (0.4 + i * 2.2) * sc - 3.2 * sc, 0.9, 0.6, '#ffffff');
+    if (sk === 'gold' || sk === 'diamond') { const gl = (time * 0.8 + p.x * 0.01) % 1.6; if (gl < 0.3) ell(fx2 + fwx * (gl / 0.3 * 10 - 5) * sc, fy2 - 1.5 * sc, 1.3, 1.3, '#ffffff'); }
     if (SC2 && (SC2[0] === 'diamond' || SC2[0] === 'galaxy' || SC2[0] === 'lava') && Math.random() < 0.04) spark(fx2, fy2 - 3, SC2[3], rand(-20, 20), rand(-40, -10), true);
   }
   if (back) { seg(hip.x, hip.y, kx, ky, 6.5 * sc, SHADE); seg(kx, ky, ax, ay, 5.5 * sc, SHADE); }
@@ -5970,7 +5983,7 @@ function drawHUD() {
   }
   ctx.restore();
   // controls reminder for the first couple of points
-  if (!attract && !autoPlay && !net && round <= 2 && state !== 'scored' && !isTouch) {
+  if (!attract && !autoPlay && !net && round <= 2 && state !== 'scored' && state !== 'over' && !isTouch) {
     const one = mode !== 2, ga = ctx.globalAlpha; ctx.globalAlpha = ga * clamp((time - roundStart) / 0.4, 0, 1) * (round === 2 ? clamp((roundStart + 8 - time) / 1, 0, 1) : 1);
     keyHint(14, H - 50, one ? [['W/↑', 'Hop, Hold To Shoot'], ['E/↓', 'Lob'], ['Q/←', 'Pass']] : [['W', 'Hop, Shoot'], ['E', 'Lob'], ['Q', 'Pass']], teams[0].color, false);
     if (!one) keyHint(W - 14, H - 50, [['↑', 'Hop, Shoot'], ['↓', 'Lob'], ['←', 'Pass']], teams[1].color, true);
@@ -6788,7 +6801,7 @@ function stepDoom(el) {
 }
 function drawDoom() {
   const d = doom; if (!d || attract) return; const k = d.kind, t = d.t, hitAt = d.hit ? 1 : 0;
-  if (DOOM2[k]) { ctx.save(); try { DOOM2[k].draw(d); } catch (e) {} ctx.restore(); return; }
+  if (DOOM2[k]) { ctx.save(); try { DOOM2[k].draw(d); } catch (e) {} ctx.restore(); ctx.save(); try { drawDoomWord(d); } catch (e) {} ctx.restore(); return; }
   ctx.save();
   if (k === 'lava' && t < 0.85) { ctx.fillStyle = `rgba(255,60,10,${0.12 + Math.sin(time * 20) * 0.05})`; ctx.fillRect(-60, -60, W + 120, H + 120); if (Math.random() < 0.5) shake = Math.max(shake, 3); }   // the rumble before it blows
   if (d.flash > 0) { ctx.fillStyle = `rgba(255,120,40,${0.45 * d.flash})`; ctx.fillRect(-60, -60, W + 120, H + 120); d.flash = Math.max(0, d.flash - 0.04); }
@@ -6909,7 +6922,17 @@ function drawShark(x, y, dir, open, legs, t, tm) {
   ctx.restore();
 }
 function drawWeight(x, by) { ctx.fillStyle = '#2e3038'; ctx.beginPath(); ctx.moveTo(x - 46, by); ctx.lineTo(x + 46, by); ctx.lineTo(x + 32, by - 62); ctx.lineTo(x - 32, by - 62); ctx.closePath(); ctx.fill(); ctx.strokeStyle = '#2e3038'; ctx.lineWidth = 7; ctx.beginPath(); ctx.arc(x, by - 70, 12, Math.PI * 0.95, Math.PI * 2.05); ctx.stroke(); ctx.fillStyle = '#4a4d58'; ctx.fillRect(x - 30, by - 54, 8, 48); ctx.font = `26px ${HYPE}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = '#ffffff'; ctx.fillText('16T', x + 6, by - 30); }
-function drawThumb(x, by, sk) { ctx.save(); ctx.fillStyle = sk; rr(x - 13, by - 60, 26, 60, 12); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.25)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x - 8, by - 14); ctx.lineTo(x + 8, by - 14); ctx.stroke(); ctx.fillStyle = sk; rr(x - 40, by - 120, 80, 66, 22); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.22)'; for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(x - 30 + i * 22, by - 64); ctx.lineTo(x - 30 + i * 22, by - 86); ctx.stroke(); } ctx.fillStyle = '#ffd34d'; ctx.fillRect(x - 32, by - 150, 64, 30); ctx.fillStyle = '#c9952a'; ctx.fillRect(x - 32, by - 128, 64, 5); ctx.fillStyle = sk; ctx.fillRect(x - 28, by - 420, 56, 272); ctx.restore(); }
+function drawThumb(x, by, sk) {   // the emperor's verdict: a big fist, thumb down, red sleeve with a gold cuff
+  ctx.save(); const ink = '#5a3424'; ctx.lineJoin = 'round'; ctx.lineWidth = 3.5; ctx.strokeStyle = ink;
+  ctx.fillStyle = '#b8222e'; ctx.fillRect(x - 30, by - 420, 60, 300); ctx.strokeRect(x - 30, by - 420, 60, 300); ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(x + 12, by - 420, 18, 300);
+  ctx.fillStyle = '#ffd34d'; rr(x - 36, by - 136, 72, 22, 6); ctx.fill(); ctx.stroke(); ctx.fillStyle = '#c9952a'; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.arc(x - 24 + i * 16, by - 125, 3, 0, 7); ctx.fill(); }
+  ctx.fillStyle = sk; rr(x - 44, by - 116, 88, 70, 26); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = 'rgba(255,255,255,.18)'; rr(x - 36, by - 110, 40, 18, 9); ctx.fill();
+  for (let i = 0; i < 4; i++) { ctx.fillStyle = sk; ctx.beginPath(); ctx.ellipse(x + 30, by - 104 + i * 15, 14, 9, 0, 0, 7); ctx.fill(); ctx.stroke(); }
+  ctx.fillStyle = sk; rr(x - 16, by - 58, 30, 58, 14); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#f4d4c0'; rr(x - 10, by - 16, 18, 12, 5); ctx.fill(); ctx.strokeStyle = 'rgba(90,52,36,.6)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.restore();
+}
 function drawDiscoBall(x, y, r, tm) { ctx.fillStyle = '#b8c0d0'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.clip(); const s = r / 4.5; for (let i = -5; i <= 5; i++) for (let j = -5; j <= 5; j++) { ctx.fillStyle = `hsl(${(i * 40 + j * 25 + tm * 200) % 360},70%,${55 + ((i + j + Math.floor(tm * 6)) % 3) * 12}%)`; ctx.fillRect(x + i * s - s / 2 + 1, y + j * s - s / 2 + 1, s - 2, s - 2); } ctx.restore(); ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.beginPath(); ctx.arc(x - r * 0.35, y - r * 0.4, r * 0.18, 0, 7); ctx.fill(); }
 function drawPigeon(x, y, dir, fl) { ctx.fillStyle = '#8a8f9a'; ctx.beginPath(); ctx.ellipse(x, y, 10, 7, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#6a6f7a'; ctx.beginPath(); ctx.moveTo(x - 2, y - 2); ctx.lineTo(x - 14 * dir, y - 12 - fl); ctx.lineTo(x + 6 * dir, y - 2); ctx.fill(); ctx.fillStyle = '#7a8aa0'; ctx.beginPath(); ctx.arc(x + 9 * dir, y - 5, 5, 0, 7); ctx.fill(); ctx.fillStyle = '#ffb02e'; ctx.fillRect(x + 13 * dir - (dir < 0 ? 4 : 0), y - 5, 4, 2); ctx.fillStyle = '#111'; ctx.fillRect(x + 10 * dir, y - 7, 1.6, 1.6); }
 function drawRock(x, y, r, c, seed) { ctx.fillStyle = c; ctx.beginPath(); for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2, rr2 = r * (0.75 + hash(seed + i) * 0.35); const px = x + Math.cos(a) * rr2, py = y + Math.sin(a) * rr2 * 0.85; if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py); } ctx.closePath(); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.beginPath(); ctx.arc(x - r * 0.3, y - r * 0.3, r * 0.3, 0, 7); ctx.fill(); }
@@ -6917,7 +6940,7 @@ function drawBoulder(x, y, r, rot) { ctx.save(); ctx.translate(x, y); ctx.rotate
 function drawStars(x, y, t) { for (let s = 0; s < 3; s++) { const a = t * 6 + s * 2.1; ctx.fillStyle = '#ffd34d'; drawShape('star', x + Math.cos(a) * 18, y + Math.sin(a) * 6, 5, a); } }
 
 const DOOM2 = {
-  cry: { at: 0.25, hit(d) { d.losers.forEach(p => pop('WAAAH!', p.x, bodyTop(p) - 30, '#8fd8ff')); },
+  cry: { at: 0.25, hit(d) { tone(520, 0.5, 'triangle', 0.04, 0.6); },
     step(d, p, el) { if (d.t < 0.25) return; const dir = p.cryDir || (p.cryDir = Math.sign(p.x - W / 2) || 1); p.doomRun = 1; p.mood = 'sad'; p.moodT = 2;
       if (!p.cried) { p.cried = 1; quip(p, ['Waaah!', 'Mommyyy!', 'Not fair!', 'I wanna go home!', 'Nooo!'], false, 1.6); }
       if (p.x > -150 && p.x < W + 150) { if (p.grounded) { p.vx = dir * 300; p.facing = dir; if (Math.random() < el * 2.2) { p.vy = -170; p.grounded = false; } }
@@ -6987,7 +7010,7 @@ const DOOM2 = {
     step(d, p, el) { stillP(p); if (d.t < 0.7) return; const f = dfx(p), u = clamp((d.t - 0.7) / 1.6, 0, 1); f.oy = -(u * u) * (GROUND + 120); f.ox = -d.side * u * u * 200; f.rot = Math.sin(d.t * 5) * 0.2; if (u >= 1) f.gone = true; },
     post(d, p) { if (d.t < 0.6) return; for (let q = 0; q < 5; q++) { const fl = Math.sin(time * 34 + q) * 7, a = q / 5; drawPigeon(p.Hd.x - 30 + q * 15, p.Hd.y - p.headR - 10 - Math.sin(a * Math.PI) * 14, q % 2 ? 1 : -1, fl); ctx.strokeStyle = '#ffb02e'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(p.Hd.x - 30 + q * 15, p.Hd.y - p.headR - 4 - Math.sin(a * Math.PI) * 14); ctx.lineTo(p.Hd.x - 10 + q * 5, p.Hd.y - p.headR + 2); ctx.stroke(); } },
     draw(d) { if (d.t >= 0.6) return; d.losers.forEach(p => { for (let q = 0; q < 5; q++) { const u = ease(clamp(d.t / 0.6, 0, 1)); drawPigeon(lerp(p.x - d.side * 520 + q * 30, p.Hd.x - 30 + q * 15, u), lerp(80 + q * 20, p.Hd.y - p.headR - 10, u), d.side, Math.sin(time * 34 + q) * 7); } }); } },
-  skyrocket: { at: 0.35, hit(d) { tone(220, 0.5, 'sine', 0.06, 4); d.losers.forEach(p => pop('BOING!', p.x, GROUND - 40, '#ff6fd8')); },
+  skyrocket: { at: 0.35, hit(d) { tone(220, 0.5, 'sine', 0.06, 4); },
     step(d, p, el) { stillP(p); if (d.t < 0.35) return; const f = dfx(p), u = d.t - 0.35; f.oy = -u * u * 2200 - u * 600; f.rot += 9 * el * (p.team ? -1 : 1); if (p.Hd.y + f.oy < -200) f.gone = true; },
     draw(d) { d.losers.forEach(p => { const tw = clamp((d.t - 0.75) / 0.6, 0, 1); if (tw > 0 && tw < 1) { ctx.save(); ctx.globalAlpha = Math.sin(tw * Math.PI); ctx.fillStyle = '#fff6a8'; drawShape('star', p.x, 30, 10 + 8 * Math.sin(tw * Math.PI), tw * 4); ctx.restore(); if (tw > 0.05 && !p.dinged) { p.dinged = 1; tone(1760, 0.3, 'triangle', 0.04); } } }); } },
   fried: { at: 0.45, hit(d) { tone(60, 0.35, 'sawtooth', 0.07); shake = Math.max(shake, 8); d.flashW = 1; },
@@ -6997,7 +7020,7 @@ const DOOM2 = {
       if (d.flashW > 0) { ctx.fillStyle = `rgba(255,255,255,${0.5 * d.flashW})`; ctx.fillRect(-60, -60, W + 120, H + 120); d.flashW = Math.max(0, d.flashW - 0.08); } } },
   derez: { at: 0.4, hit() { tone(880, 0.12, 'square', 0.04); setTimeout(() => tone(660, 0.12, 'square', 0.04), 140); setTimeout(() => tone(440, 0.12, 'square', 0.04), 280); setTimeout(() => tone(220, 0.35, 'square', 0.04), 420); },
     step(d, p, el) { stillP(p); if (d.t < 0.4) return; const f = dfx(p), u = clamp((d.t - 0.4) / 1.0, 0, 1); f.alpha = 1 - u; f.ox = (Math.random() - 0.5) * 8 * (1 - u); if (u >= 1) f.gone = true; if (u < 1 && Math.random() < el * 40) { const s = Math.random(); particles.push({ x: lerp(p.F.x, p.Hd.x, s) + rand(-10, 10), y: lerp(p.F.y, p.Hd.y, s), vx: rand(-40, 40), vy: rand(-140, -30), c: pick([teams[p.team].color, '#00f0ff', '#ff2d95']), life: 1, max: 1, g: 0, s: 5, shape: 'pixel' }); } },
-    draw(d) { if (d.t < 0.5) return; d.losers.forEach(p => { if (Math.floor(d.t * 4) % 2 && d.t < 1.6) return; ctx.save(); ctx.font = `20px ${HYPE}`; ctx.textAlign = 'center'; ctx.fillStyle = '#ff2d55'; ctx.shadowColor = '#ff2d55'; ctx.shadowBlur = 12; ctx.fillText('GAME OVER', p.x, GROUND - 130); ctx.font = `12px ${TEXT}`; ctx.fillStyle = '#00f0ff'; ctx.fillText('Insert coin', p.x, GROUND - 110); ctx.restore(); }); } },
+    draw(d) { if (d.t < 0.5) return; d.losers.forEach(p => { if (Math.floor(d.t * 4) % 2 && d.t < 1.6) return; ctx.save(); ctx.font = `20px ${HYPE}`; ctx.textAlign = 'center'; ctx.fillStyle = '#ff2d55'; ctx.shadowColor = '#ff2d55'; ctx.shadowBlur = 12; noCase = true; ctx.fillText('GAME OVER', p.x, GROUND - 130); noCase = false; ctx.font = `12px ${TEXT}`; ctx.fillStyle = '#00f0ff'; ctx.fillText('Insert coin', p.x, GROUND - 110); ctx.restore(); }); } },
   thumbsdown: { at: 0.6, hit(d) { boom(0.2); shake = Math.max(shake, 12); d.losers.forEach(p => dust(p.x, GROUND - 4, 14)); },
     step(d, p, el) { crushStep(d, p, el, 0.6); },
     draw(d) { d.losers.forEach(p => { const down = d.t < 0.6 ? fall(d.t, 0.05, 0.6, -40, GROUND - 6) : d.t < 1.0 ? GROUND - 6 : GROUND - 6 - ease(clamp((d.t - 1.0) / 0.6, 0, 1)) * (GROUND + 160); if (down < -10) return; drawThumb(p.x, down, '#e8b58a'); if (d.t > 0.6) drawStars(p.x, GROUND - 24, d.t); }); } },
@@ -7012,12 +7035,24 @@ const DOOM2 = {
   hydrant: { at: 0.55, hit() { hiss(0.8, 0.07); },
     step(d, p, el) { if (d.t < 0.55) return; blastStep(p, el, -d.side, 820, -620); if (Math.random() < el * 30 && !dfx(p).gone) spark(p.x + dfx(p).ox, p.Hd.y + dfx(p).oy, 'rgba(170,215,255,.9)', rand(-100, 100), rand(-100, 50), true); },
     draw(d) { d.losers.forEach((p, i) => { const hx = p.x + d.side * 240; if (i === 0 || Math.abs(hx - (d.losers[0].x + d.side * 240)) > 40) { ctx.fillStyle = '#d63a3a'; ctx.fillRect(hx - 10, GROUND - 36, 20, 36); ctx.beginPath(); ctx.arc(hx, GROUND - 36, 10, Math.PI, 0); ctx.fill(); ctx.fillRect(hx - 15, GROUND - 27, 30, 7); ctx.fillStyle = '#b02a2a'; ctx.fillRect(hx - 13, GROUND - 6, 26, 6); }
-      if (d.t > 0.25 && d.t < 1.4) { const f = dfx(p), tx = p.x + f.ox, ty = p.Hd.y + 30 + f.oy; ctx.strokeStyle = 'rgba(160,210,255,.8)'; ctx.lineWidth = 14 * Math.min(1, (d.t - 0.25) * 6); ctx.beginPath(); ctx.moveTo(hx - d.side * 14, GROUND - 24); ctx.quadraticCurveTo((hx + tx) / 2, GROUND - 90, d.t < 0.55 ? lerp(hx, p.x, (d.t - 0.25) / 0.3) : tx, d.t < 0.55 ? lerp(GROUND - 24, p.Hd.y + 30, (d.t - 0.25) / 0.3) : ty); ctx.stroke(); } }); } },
+      if (d.t > 0.25 && d.t < 0.9) { const f = dfx(p), tx = p.x + f.ox, ty = p.Hd.y + 30 + f.oy; const ex2 = d.t < 0.55 ? lerp(hx, p.x, (d.t - 0.25) / 0.3) : tx, ey2 = d.t < 0.55 ? lerp(GROUND - 24, p.Hd.y + 30, (d.t - 0.25) / 0.3) : ty, gw = Math.min(1, (d.t - 0.25) * 6) * (d.t > 0.65 ? Math.max(0, (0.9 - d.t) / 0.25) : 1); ctx.lineCap = 'round';
+        for (const [lw, c] of [[30, 'rgba(120,190,255,.3)'], [17, 'rgba(160,215,255,.75)'], [6, 'rgba(255,255,255,.95)']]) { ctx.strokeStyle = c; ctx.lineWidth = lw * gw; ctx.beginPath(); ctx.moveTo(hx - d.side * 14, GROUND - 24); ctx.quadraticCurveTo((hx + ex2) / 2, GROUND - 100, ex2, ey2); ctx.stroke(); }
+        for (let q = 0; q < 8; q++) { const u2 = (q / 8 + time * 3) % 1, qx = lerp(hx, ex2, u2), qy = lerp(GROUND - 24, ey2, u2) - Math.sin(u2 * Math.PI) * 50 + Math.sin(q * 7 + time * 20) * 8; ctx.fillStyle = 'rgba(220,240,255,.9)'; ctx.beginPath(); ctx.arc(qx, qy, 3 + (q % 3), 0, 7); ctx.fill(); } } }); } },
   lasso: { at: 0.5, hit(d) { tone(300, 0.15, 'triangle', 0.05); d.losers.forEach(p => doomHit(p, -d.side, 3)); },
     step(d, p, el) { if (d.t < 0.5) return; p.down = Math.max(p.down || 0, 0.5); p.downCD = Math.max(p.downCD || 0, 0.6); p.vx = 0; if (d.t < 0.85) return; const f = dfx(p), u = d.t - 0.85; f.ox = d.side * -(u * u * 900 + u * 120); if (Math.random() < el * 30 && !f.gone) spark(p.x + f.ox, GROUND - 4, pick(['#c8a878', '#a88858']), rand(-40, 40) + d.side * 120, rand(-120, -30), true); if (offScreen(p, f)) f.gone = true; },
     draw(d) { const ex = d.side > 0 ? -40 : W + 40; d.losers.forEach(p => { const f = dfx(p), tx = p.x + f.ox, ty = d.t < 0.5 ? lerp(GROUND - 200, p.Hd.y + 40, ease(clamp((d.t - 0.1) / 0.4, 0, 1))) : GROUND - 18; if (d.t < 0.1 || f.gone) return; const lx = d.t < 0.5 ? lerp(ex, p.x, ease(clamp((d.t - 0.1) / 0.4, 0, 1))) : tx;
       ctx.strokeStyle = '#c8a060'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(ex, GROUND - 120); ctx.quadraticCurveTo((ex + lx) / 2, GROUND - 160 + (d.t > 0.85 ? 60 : 0), lx, ty); ctx.stroke(); ctx.beginPath(); ctx.ellipse(lx, ty, 22, 8, d.t < 0.5 ? d.t * 12 : 0, 0, 7); ctx.stroke(); }); } },
 };
+const DOOM_WORD = { lava: ['ERUPTION!', '#ff7a3d'], cry: ['WAAAH!', '#8fd8ff'], iceblock: ['CRUNCH!', '#bfe6ff'], abduct: ['ZWOOP!', '#7dff9a'], deaddragon: ['THOOM!', '#ff7a3d'], dragunder: ['GOTCHA!', '#9fe06a'], snowman: ['BRRR!', '#d8f0ff'], chomp: ['CHOMP!', '#ff4f6d'], washaway: ['SPLOOSH!', '#6fc4ff'], boulder: ['BONK!', '#e0b070'], mummy: ['WRAPPED!', '#f0e2b8'], cannonblast: ['KABOOM!', '#ffb02e'], fall: ['WHOOPS!', '#9fd0ff'], weight: ['SPLAT!', '#ff4f6d'], bubblegum: ['BLOOP!', '#ff6fd8'], pigeons: ['COO COO!', '#c8ccd8'], skyrocket: ['BOING!', '#ff6fd8'], fried: ['ZZZAP!', '#ffe14d'], thumbsdown: ['DENIED!', '#ffd34d'], ballcrush: ["DISCO'D!", '#ff4fd8'], cavein: ['CRASH!', '#b49cff'], hydrant: ['SPLASH!', '#6fc4ff'], lasso: ['YEEHAW!', '#ffb02e'] };
+function drawDoomWord(d) {
+  const w = DOOM_WORD[d.kind], K = DOOM2[d.kind]; if (!w || !d.hit) return; const th = d.t - (K ? K.at : 0.85); if (th > 1.6) return;
+  const a = th < 1.1 ? 1 : 1 - (th - 1.1) / 0.5, s = (th < 0.14 ? 0.3 + ease(th / 0.14) * 0.95 : 1.25 - Math.min(0.2, (th - 0.14) * 0.4)) * 0.82, x = clamp(d.cx - d.side * 40, 130, W - 130), y = GROUND - 128;
+  ctx.save(); ctx.globalAlpha = a; ctx.translate(x, y); ctx.rotate(-0.08 * d.side); ctx.scale(s, s);
+  ctx.beginPath(); for (let i = 0; i < 28; i++) { const an = i / 28 * Math.PI * 2, r = i % 2 ? 46 : 70 + hash(i + d.seed) * 14; i ? ctx.lineTo(Math.cos(an) * r * 1.35, Math.sin(an) * r * 0.8) : ctx.moveTo(Math.cos(an) * r * 1.35, Math.sin(an) * r * 0.8); } ctx.closePath();
+  ctx.fillStyle = w[1]; ctx.fill(); ctx.lineWidth = 5; ctx.strokeStyle = INK; ctx.lineJoin = 'round'; ctx.stroke();
+  ctx.font = `${w[0].length > 7 ? 26 : 32}px ${HYPE}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; noCase = true; try { twill(w[0], 0, 2, w[0].length > 7 ? 26 : 32, '#ffffff', w[1], 1); } finally { noCase = false; }
+  ctx.restore();
+}
 const DOOM2_KIND = { arena: 'cry', ice: 'iceblock', moon: 'abduct', castle: 'deaddragon', haunted: 'dragunder', snow: 'snowman', water: 'chomp', beach: 'washaway', jungle: 'boulder', egypt: 'mummy',
   pirate: 'cannonblast', sky: 'fall', heavy: 'weight', candy: 'bubblegum', roof: 'pigeons', bounce: 'skyrocket', rain: 'fried', neon: 'derez', rome: 'thumbsdown', disco: 'ballcrush', cave: 'cavein', street: 'hydrant', ranch: 'lasso' };
 Object.assign(DOOM_KIND, DOOM2_KIND);
@@ -7030,8 +7065,8 @@ drawPlayer = (orig => p => {
   if (f.sc && f.sc !== 1) { ctx.translate(cx, cy); ctx.scale(f.sc, f.sc); ctx.translate(-cx, -cy); }
   if (f.sq) { ctx.translate(p.x, GROUND); ctx.scale(1 + f.sq * 0.7, 1 - f.sq * 0.84); ctx.translate(-p.x, -GROUND); }
   if (f.alpha < 1) ctx.globalAlpha *= f.alpha;
-  if (f.char) ctx.filter = 'brightness(0.32) sepia(0.5)';
-  orig(p); ctx.filter = 'none';
+  let sv = null; if (f.char) { const T = teams[p.team]; sv = [T.color, T.dark, p.skin]; T.color = '#3a2e28'; T.dark = '#221a16'; p.skin = '#4a3a30'; }
+  try { orig(p); } finally { if (sv) { const T = teams[p.team]; T.color = sv[0]; T.dark = sv[1]; p.skin = sv[2]; } }
   const K = DOOM2[doom.kind]; if (K && K.post) { try { K.post(doom, p, f); } catch (e) {} }
   ctx.restore();
 })(drawPlayer);
@@ -7039,10 +7074,10 @@ drawPlayer = (orig => p => {
 function startGreenBurst(hp) {
   try { startDoom(hp); } catch (e) {}
   const kind = GFX[court.deco] ? court.deco : 'arena', fx = GFX[kind];
-  greenBurst = { x: hp.cx, y: hp.rimY + 8, t: 0, h: hp, kind, dur: fx.dur, seed: Math.floor(Math.random() * 1000) };
+  greenBurst = { x: hp.cx, y: hp.rimY + 8, t: 0, h: hp, kind, dur: fx.dur * 1.25, seed: Math.floor(Math.random() * 1000) };
   if (fx.sfx) fx.sfx();
 }
-function drawGreenBurst() { try { drawDoom(); } catch (e) { doom = null; } drawGreenBurst0(); }
+function drawGreenBurst() { try { drawDoom(); } catch (e) { doom = null; } if (doom && doom.kind === 'lava') { ctx.save(); try { drawDoomWord(doom); } catch (e) {} ctx.restore(); } drawGreenBurst0(); }
 function drawGreenBurst0() {
   // a green make lights the rim itself (the ring flares, a tight ripple runs out), then the court's own show plays right at the rim
   const g = greenBurst, h = g && g.h, n = h && h.net; if (!n) return;
@@ -7078,7 +7113,12 @@ function drawGreenBurst0() {
         ctx.save(); ctx.translate(sx, sy); ctx.scale(1.35, 1.35); ctx.translate(-geo.cx, -geo.cy); fx.draw({ ...g, t: tt }, tt, geo, h); ctx.restore();
       }
     }
-  } else if (fx) fx.draw(g, t, geo, h);
+  } else if (fx) {
+    const pk = clamp(t / 0.12, 0, 1) * clamp(1 - (t - 0.3) / 0.7, 0, 1);
+    if (pk > 0) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; const gr = ctx.createLinearGradient(0, geo.cy - 280, 0, geo.cy); gr.addColorStop(0, 'rgba(93,255,122,0)'); gr.addColorStop(1, `rgba(93,255,122,${0.32 * pk})`); ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(geo.cx - geo.R * 1.1, geo.cy); ctx.lineTo(geo.cx - geo.R * 0.35, geo.cy - 280); ctx.lineTo(geo.cx + geo.R * 0.35, geo.cy - 280); ctx.lineTo(geo.cx + geo.R * 1.1, geo.cy); ctx.fill(); ctx.restore(); }
+    if (!g.sp) { g.sp = 1; const pal = MAP_PAL[g.kind] || MAP_PAL.arena; for (let i = 0; i < 22; i++) spark(geo.cx + rand(-10, 10), geo.cy, pick(pal), rand(-280, 280), rand(-420, -90), true); }
+    ctx.save(); ctx.translate(geo.cx, geo.cy); ctx.scale(1.3, 1.3); ctx.translate(-geo.cx, -geo.cy); fx.draw(g, t * 0.8, geo, h); ctx.restore();
+  }
   ctx.restore();
 }
 function drawFloorFx() {
@@ -7935,7 +7975,7 @@ function say(txt, force) {
   sub = { t, at: n, dur: clamp(1500 + t.length * 45, 1900, 4600) };
 }
 function drawSubs() {
-  if (!sub) return;
+  if (!sub || state === 'over') return;
   noCase = true; try { drawSubs0(); } finally { noCase = false; }
 }
 function drawSubs0() {
@@ -8821,6 +8861,7 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhLocker">
 .mpick{position:relative;padding-left:calc(var(--k)*58)!important;text-align:left}
 .mpick .micon{position:absolute;left:calc(var(--k)*12);top:50%;transform:translateY(-50%);width:calc(var(--k)*32);height:calc(var(--k)*32);display:grid;color:var(--mustard);filter:drop-shadow(2px 2px 0 rgba(0,0,0,.45))}
 .mpick .micon svg{width:100%;height:100%;fill:currentColor}
+@media (max-height:430px){.door{min-height:0!important;padding:6px 8px!important;flex-direction:row!important;justify-content:center;align-items:center;gap:6px}.door .plate,.door .handle,.door .vents{display:none!important}.door i{margin:0!important;width:16px!important;height:16px!important}.doors{margin-bottom:4px!important}#panel h2{font-size:22px!important;margin-bottom:4px!important}}
 @media (max-height:500px){.door{min-height:58px;padding-bottom:6px}.door .vents{display:none}.door .plate{top:5px}.door i{margin-top:14px;width:20px;height:20px}.doors{margin-bottom:6px}}
 @media (max-width:560px){.doors{gap:4px}.door b{font-size:10px}.door .vents{display:none}.door .plate{top:6px}.door i{margin-top:18px}.door{min-height:74px}}
 @media (prefers-reduced-motion:reduce){.room.from-r,.room.from-l{animation:none}.door{transition:none}}
@@ -8961,8 +9002,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 115;
+const GAME_VERSION = 116;
 const UPDATES = [
+  [116, 'Polish', ['Every loser fate now lands with a big comic-book sound effect, like a shark chomp or a cannon kaboom.', 'Green shows are bigger and last a little longer, with a light column and a spray of the court colours.', 'Sneakers are real high-tops now: sole, collar, stripe and laces. Gold and diamond ones shine, neon, lava and galaxy ones glow.', 'Headbands have a sport stripe and knot tails that flutter when you run.', 'A better thumbs-down at the Colosseum and a proper fire-hydrant blast on the street.', 'Fixed a big slowdown when lightning fries the losers at Rainy Park.']],
   [115, 'Sore losers', ['Every court has its own fate for the team that gets greened on: a dead dragon lands on them at the castle, they run off crying at Hardwood Arena, an ice block flattens them on the rink, aliens beam them up on the moon, sharks, snowmen, mummies, a 16-ton weight and more.']],
   [114, 'Tidy', ['The practice toolbar only shows up in Practice now, nowhere else.', 'Havoc rounds: the court title shows first, then the Havoc card, then tip-off. The card is just the name now.']],
   [112, 'Your turn', ['New in the locker: choose court outfits, your custom jersey, or a plain jersey for every game.', 'Every jersey pattern is redrawn as a full design, plus five new ones: Finish Line, Camo, Retro Sunset, Graffiti and Neon Circuit.', 'Havoc round and golden ball cards now wait until the match intro is over.', 'Online, both players now see the match intro and the Havoc cards.']],
