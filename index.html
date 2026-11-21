@@ -501,6 +501,7 @@ const HAVOC = {
   tiny: { name: 'Tiny hoops', desc: 'Rims the size of a cup.', c: '#ff4f6d' }, moon: { name: 'Moon gravity', desc: 'Float like an astronaut.', c: '#c9c9ff' }, bowl: { name: 'Bowling ball', desc: 'Heavy. Very heavy.', c: '#6c7bff' },
   stilts: { name: 'Stilts', desc: 'Everyone is super tall.', c: '#ffd34d' } };
 let pregame = null;
+let pendingHavoc = null, havocHold = false;
 let havocCard = null, lastHavoc = -9, lastHavocKind = null, stipQ = null;
 let hoops = [], players = [], ball = {}, orb = null, powerT = 6, wind = 0;
 let state = 'intro', stateT = 0, timeScale = 1, attract = true, paused = false, mode = 1, diff = 'pro', teamSize = 2;
@@ -646,6 +647,7 @@ function startRound(fresh = true) {
   }
   chaos = null;
   wind = 0;   // the wind turns around every point, so nobody keeps the good side
+  pendingHavoc = null; havocHold = false;
   if (fresh && !attract && !practice() && !daily && goalCount > 1 && !rules().calm && !rules().nohavoc && (rules().allhavoc || round - lastHavoc >= 3 && Math.random() < 0.09)) {   // now and then: a Havoc Round
     chaos = pick(['blackout', 'quake', 'mega', 'super', 'giant', 'tiny', 'moon', 'bowl', 'stilts'], lastHavocKind); lastHavoc = round; lastHavocKind = chaos;
     if (chaos === 'giant') ballT = BALLS[7];
@@ -657,7 +659,7 @@ function startRound(fresh = true) {
     if (chaos === 'mega') hoopT = HOOP_TYPES[1];
     if (chaos === 'super') ballT = BALLS[5];
     const hv = HAVOC[chaos];
-    afterIntro(() => { havocCard = { t: 0, ...hv }; if (state === 'intro') stateT = Math.max(stateT, 2.1); say(`Havoc round! ${hv.name}.`, true); tone(196, 0.35, 'sawtooth', 0.05, 2); tone(147, 0.5, 'square', 0.04, 1.5); roar(0.9, 0.07); shake = Math.max(shake, 10); }, 300);
+    pendingHavoc = () => { havocCard = { t: 0, ...hv }; say(`Havoc round! ${hv.name}.`, true); tone(196, 0.35, 'sawtooth', 0.05, 2); tone(147, 0.5, 'square', 0.04, 1.5); roar(0.9, 0.07); shake = Math.max(shake, 10); };   // shown once the court title is done
   }
   if (contest && contest.kind === 'dunk') contest.t = 9;
   if (tut) tut.needSetup = true;
@@ -4093,6 +4095,8 @@ function stateUpdate(el) {
   if (wipe && state !== 'scored') { wipe.t += el / 0.42; if (wipe.t >= 2) wipe = null; }
   shake *= Math.pow(0.01, el); crowdJump *= Math.pow(0.15, el);
   if (pregame) { pregame.t += el; if (pregame.t >= pregame.dur) pregame = null; else stateT = Math.max(stateT, INTRO * 0.6); }
+  if (state === 'intro' && pendingHavoc && !pregame && !paused && stateT - el <= 0.05) { const f = pendingHavoc; pendingHavoc = null; f(); stateT = 2.3; havocHold = true; }   // court title first, then the Havoc card, then tip-off
+  if (state !== 'intro') havocHold = false;
   if (state === 'intro') { stateT -= el; if (stateT <= 0) { state = 'play'; ball.frozen = false; ball.vy = 0; if (tutorial() && tutCast() === 'block') { const bl = players.find(q => q.team === 1); if (bl) catchBall(bl); } } }
   else if (state === 'play' && blockReplay && SV.replays === false) blockReplay = null;   // replays are off: no block replays either
   else if (state === 'play' && blockReplay && time >= blockReplay.at && rec.length > 30) {
@@ -4244,9 +4248,9 @@ function drawHavoc(dt) {
   ctx.fillStyle = 'rgba(10,6,20,.72)'; ctx.fillRect(0, H * 0.34, W, 112);
   ctx.fillStyle = c.c; ctx.fillRect(0, H * 0.34, W, 5); ctx.fillRect(0, H * 0.34 + 107, W, 5);
   ctx.translate(W / 2 - slide, H * 0.34 + 50); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = `700 15px ${TEXT}`; ctx.fillStyle = CREAM; ctx.fillText(c.tag || 'Havoc round', 0, -28);
-  ctx.font = `44px ${HYPE}`; const fit = Math.min(1, (W - 90) / Math.max(1, ctx.measureText(c.name).width)), s = (1 + Math.max(0, 0.25 - c.t) * 1.6) * fit; ctx.scale(s, s); twill(c.name, 0, 4, 44, c.c, INK, 0.9);
-  ctx.setTransform(scale, 0, 0, scale, 0, 0); ctx.translate(W / 2 - slide, H * 0.34 + 92); ctx.font = `600 15px ${TEXT}`; ctx.fillStyle = CREAM; ctx.fillText(c.desc, 0, 0);
+  ctx.font = `700 15px ${TEXT}`; ctx.fillStyle = CREAM; ctx.fillText(c.tag || 'Havoc round', 0, c.tag ? -28 : -18);
+  ctx.font = `44px ${HYPE}`; const fit = Math.min(1, (W - 90) / Math.max(1, ctx.measureText(c.name).width)), s = (1 + Math.max(0, 0.25 - c.t) * 1.6) * fit; if (!c.tag) ctx.translate(0, 14); ctx.scale(s, s); twill(c.name, 0, 4, 44, c.c, INK, 0.9);
+  ctx.setTransform(scale, 0, 0, scale, 0, 0); ctx.translate(W / 2 - slide, H * 0.34 + 92); ctx.font = `600 15px ${TEXT}`; ctx.fillStyle = CREAM; if (c.tag && c.desc) ctx.fillText(c.desc, 0, 0);
   ctx.restore();
 }
 const CROWD_LINES = {"dunk": ["OHHHH!", "He took off!", "Posterize him!", "Get up!", "What a slam!", "Rim is shaking!", "Did you see that?!"], "green": ["Splash!", "Cash money!", "Wet!", "From way out!", "Too easy!", "Bang!", "Ice in his veins!"], "miss": ["Brick!", "Airball!", "Nooo!", "So close!", "Ouch.", "Come on!"], "block": ["Rejected!", "Get it out!", "Not today!", "Swat!", "Denied!"], "steal": ["Pickpocket!", "Stolen!", "Too slow!", "Snatched!"], "chant": ["De-fense!", "Let's go!", "MVP! MVP!", "Ref, you blind?", "Hot dogs here!", "I love this game!", "Shoot it!", "Pass it!", "Dunk it!", "Wave! Wave!", "Clap clap!", "Go team go!", "We want a dunk!", "Who are you?", "Let's go, let's go!"], "close": ["Tie game!", "This is close!", "I can't watch!", "Clutch time!", "One more!", "Win it!"]};
@@ -6115,7 +6119,7 @@ function titleText(txt, size, S) {
 }
 function drawIntro() {
   // the point's setup slams in on a band of tube-sock stripes
-  if (state !== 'intro' || quietIntro || pregame) return;
+  if (state !== 'intro' || quietIntro || pregame || havocHold) return;
   const t = INTRO - stateT, kin = ease(clamp(t / 0.3, 0, 1)), out = clamp(stateT / 0.2, 0, 1), y = 196;
   ctx.save(); ctx.globalAlpha = out; ctx.translate((1 - out) * 80, 0);
   const TS = TITLES[court.deco] || TITLES.arena, cName = niceName(court.name); ctx.font = `56px ${HYPE}`; const nameW = ctx.measureText(cName).width;
@@ -8025,7 +8029,7 @@ function netDec(v, ctx) {
 }
 // the game globals the drawing code reads (checked at start: anything missing or not settable is left out)
 const NET_G = ['state', 'stateT', 'round', 'WIN', 'chaos', 'goldenRound', 'banner', 'pops', 'sub', 'flashA', 'shake', 'greenFx', 'greenBurst', 'timeScale', 'slowT', 'hitstop', 'wind', 'orb', 'powerT', 'meterFx', 'rings', 'wipe', 'crowdJump', 'quakeT',
-  'fxStreaks', 'fxFlares', 'fxBulbs', 'fxSwipes', 'fxSkids', 'goalCount', 'halfDone', 'roundStart', 'quietIntro', 'replay', 'attack', 'recentDunks', 'blockReplay', 'htOpen', 'lastTouchT', 'pregame', 'havocCard', 'hypeFlash', 'pendingReplay', 'mvpT', 'shots', 'greenBurst', 'paused']
+  'fxStreaks', 'fxFlares', 'fxBulbs', 'fxSwipes', 'fxSkids', 'goalCount', 'halfDone', 'roundStart', 'quietIntro', 'replay', 'attack', 'recentDunks', 'blockReplay', 'htOpen', 'lastTouchT', 'pregame', 'havocCard', 'havocHold', 'hypeFlash', 'pendingReplay', 'mvpT', 'shots', 'greenBurst', 'paused']
   .filter((n, i, a) => a.indexOf(n) === i && n !== 'paused').filter(n => { try { eval(`${n} = ${n};`); return true; } catch (e) { return false; } });
 const netGet = eval(`() => ({ ${NET_G.join(', ')} })`);
 const netSet = eval(`o => { ${NET_G.map(n => `if ('${n}' in o) ${n} = o.${n};`).join(' ')} }`);
@@ -8758,9 +8762,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 113;
+const GAME_VERSION = 114;
 const UPDATES = [
-  [113, 'Tidy', ['The practice toolbar only shows up in Practice now, nowhere else.']],
+  [114, 'Tidy', ['The practice toolbar only shows up in Practice now, nowhere else.', 'Havoc rounds: the court title shows first, then the Havoc card, then tip-off. The card is just the name now.']],
   [112, 'Your turn', ['New in the locker: choose court outfits, your custom jersey, or a plain jersey for every game.', 'Every jersey pattern is redrawn as a full design, plus five new ones: Finish Line, Camo, Retro Sunset, Graffiti and Neon Circuit.', 'Havoc round and golden ball cards now wait until the match intro is over.', 'Online, both players now see the match intro and the Havoc cards.']],
   [111, 'Eruption', ['When a green punishes the other team, they stay frozen, buried, stuck or knocked down until the next point starts.', 'Practice has a dummy: pick Dunk on me to posterize him, or Defender to have him guard you and block your shots. He always hands the ball back.', 'Volcano Island greens are terrifying now: the ground rumbles, lava bombs rain down with smoke trails and a red flash, and the floor under the losers turns into bubbling lava with geysers.']],
   [110, 'The look', ['Cosmetics, rebuilt: every item has a rarity (Common, Rare, Epic or Legendary) with its own colour.', 'New jersey patterns: twin stripes, pinstripes, two-tone, sash, chevron, stars, lightning bolt, flames, galaxy, gold trim and royal.', 'New sneakers, from Fire Red and Neon to Galaxy, Lava and Diamond (the best ones sparkle).', 'New score effects that go off at the rim when your team scores: confetti, hearts, thunder, a jackpot, ink, fireworks, pixels, shockwaves, a supernova, crowns and GOAT Mode.', 'A live preview in the Locker shows your look as you pick it.']],
