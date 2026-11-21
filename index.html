@@ -662,7 +662,6 @@ function startRound(fresh = true) {
   if (!attract && mode !== 4 && !SV.maps.includes(court.deco)) { SV.maps.push(court.deco); persist(); if (SV.maps.length >= 12) unlock('maps'); }
   goldenRound = !attract && !practice() && goalCount > 0 && Math.random() < 0.12;   // every so often: a golden ball worth double
   if (goldenRound) setTimeout(() => { havocCard = { t: 0, name: 'Golden ball', desc: 'Every basket counts double this point.', c: '#ffd34d', tag: 'Bonus' }; tone(988, 0.2, 'triangle', 0.06); setTimeout(() => tone(1319, 0.3, 'triangle', 0.06), 120); }, 120);
-  stipQ = fresh && !attract && !practice() && !tutorial() ? stipList(false) : null; if (stipQ && !stipQ.length) stipQ = null;
   if (tutorial()) { teams[1].cpu = tutCast() === 'block'; }
   if (tutorial()) { court = COURTS[0]; ballT = BALLS[0]; body = BODIES[0]; hoopT = HOOP_TYPES[0]; wind = 0; }
   if (fresh) setupHoops(); else for (const h of hoops) { h.shattered = false; h.flex = 0; h.flexV = 0; }
@@ -4108,8 +4107,54 @@ function drawSceneryMore(d) {
     for (let i = 0; i < 14; i++) { const x = (hash(i) * W + Math.sin(T * 0.7 + i) * 40), y = 160 + hash(i + 30) * 260 + Math.cos(T * 0.9 + i) * 20, a = 0.5 + 0.5 * Math.sin(T * 4 + i * 2); ctx.fillStyle = `rgba(200,255,150,${a})`; ctx.beginPath(); ctx.arc(x, y, 2.2, 0, 7); ctx.fill(); }
   }
 }
+function drawSceneryMore2(d) {
+  const G = GROUND, T = time;
+  if (d === 'rain') {   // umbrellas on a park bench, puddles that ripple, now and then a lightning flash
+    ctx.fillStyle = '#5a3a24'; ctx.fillRect(560, G - 34, 110, 8); ctx.fillRect(566, G - 26, 6, 26); ctx.fillRect(656, G - 26, 6, 26); ctx.fillRect(560, G - 56, 110, 6);
+    for (const [x, c] of [[600, '#ff4f6d'], [640, '#ffd34d']]) { ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, G - 34); ctx.lineTo(x, G - 86); ctx.stroke(); ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x, G - 86, 26, Math.PI, 0); ctx.fill(); }
+    for (const x of [260, 420, 760]) { const u = (T * 0.8 + x) % 1; ctx.strokeStyle = `rgba(200,220,255,${0.6 * (1 - u)})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(x, G - 3, 8 + u * 22, 2 + u * 4, 0, 0, 7); ctx.stroke(); }
+    const fl = (T * 0.37) % 7; if (fl < 0.12 || fl > 0.2 && fl < 0.26) { ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(0, 0, W, G); }
+  } else if (d === 'ranch') {   // a windmill, a rolling tumbleweed and a wooden fence
+    const mx = 640, my = G - 150; ctx.strokeStyle = '#5a3a24'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(mx - 24, G); ctx.lineTo(mx, my); ctx.lineTo(mx + 24, G); ctx.moveTo(mx - 16, G - 50); ctx.lineTo(mx + 16, G - 50); ctx.stroke();
+    ctx.save(); ctx.translate(mx, my); ctx.rotate(T * 1.2); ctx.fillStyle = '#d9c9a8'; for (let i = 0; i < 8; i++) { ctx.rotate(Math.PI / 4); ctx.fillRect(0, -4, 40, 8); } ctx.restore(); ctx.fillStyle = '#7a2a1a'; ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx + 34, my - 6); ctx.lineTo(mx + 34, my + 6); ctx.fill();
+    ctx.fillStyle = '#8a5a2b'; for (let x = 200; x < 780; x += 46) ctx.fillRect(x, G - 40, 6, 40); ctx.fillRect(200, G - 34, 580, 5); ctx.fillRect(200, G - 18, 580, 5);
+    const tx = (T * 90) % (W + 120) - 60, ty = G - 16 - Math.abs(Math.sin(T * 4)) * 18; ctx.strokeStyle = '#a8865a'; ctx.lineWidth = 2; for (let i = 0; i < 7; i++) { ctx.beginPath(); ctx.arc(tx, ty, 8 + i * 1.4, T * 6 + i, T * 6 + i + 4); ctx.stroke(); }
+  } else if (d === 'water') {   // coral, a treasure chest, a jellyfish and rising bubbles
+    for (const [x, c] of [[250, '#ff6f91'], [300, '#ffb15e'], [700, '#c77dff']]) { ctx.strokeStyle = c; ctx.lineWidth = 6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x, G); ctx.lineTo(x, G - 40); ctx.moveTo(x, G - 20); ctx.lineTo(x - 14, G - 48); ctx.moveTo(x, G - 26); ctx.lineTo(x + 16, G - 54); ctx.stroke(); }
+    ctx.fillStyle = '#7a4a1a'; ctx.fillRect(540, G - 30, 50, 30); ctx.fillStyle = '#5a3410'; ctx.beginPath(); ctx.ellipse(565, G - 30, 25, 12, 0, Math.PI, 0); ctx.fill(); ctx.fillStyle = '#ffd34d'; ctx.fillRect(560, G - 26, 10, 8); ctx.globalAlpha = 0.5 + 0.5 * Math.sin(T * 3); ctx.beginPath(); ctx.arc(565, G - 40, 6, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+    const jx = 420 + Math.sin(T * 0.5) * 60, jy = 200 + Math.sin(T * 1.3) * 30, p = 1 + Math.sin(T * 4) * 0.1; ctx.fillStyle = 'rgba(255,170,230,.7)'; ctx.beginPath(); ctx.ellipse(jx, jy, 22 * p, 16 / p, 0, Math.PI, 0); ctx.fill();
+    ctx.strokeStyle = 'rgba(255,170,230,.6)'; ctx.lineWidth = 2; for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(jx + i * 8, jy); ctx.quadraticCurveTo(jx + i * 8 + Math.sin(T * 3 + i) * 6, jy + 18, jx + i * 8, jy + 36); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(220,245,255,.6)'; ctx.lineWidth = 1.5; for (let i = 0; i < 18; i++) { const x = hash(i) * W + Math.sin(T * 2 + i) * 6, y = G - ((T * (30 + hash(i + 4) * 40) + hash(i + 8) * G) % G); ctx.beginPath(); ctx.arc(x, y, 2 + hash(i + 2) * 3, 0, 7); ctx.stroke(); }
+  } else if (d === 'lava') {   // embers drift up, lava bubbles pop at the volcano's foot
+    for (let i = 0; i < 26; i++) { const u = (T * (0.15 + hash(i) * 0.2) + hash(i + 5)) % 1, x = hash(i + 11) * W + Math.sin(T + i) * 14, y = G - u * G; ctx.fillStyle = `rgba(255,${120 + hash(i) * 100 | 0},40,${1 - u})`; ctx.fillRect(x, y, 3, 3); }
+    for (const x of [250, 470, 710]) { const u = (T * 0.7 + x * 0.01) % 1; if (u < 0.6) { ctx.fillStyle = '#ff8a3d'; ctx.beginPath(); ctx.arc(x, G - 4, 4 + u * 14, Math.PI, 0); ctx.fill(); } else { ctx.fillStyle = '#ffd34d'; for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.arc(x + (k - 1.5) * 10 * (u - 0.5) * 4, G - 10 - (u - 0.6) * 60 + k * 2, 2.5, 0, 7); ctx.fill(); } } }
+  } else if (d === 'haunted') {   // a little ghost drifts across, peeking out
+    const gx = 220 + ((T * 30) % 560), gy = 230 + Math.sin(T * 2) * 14; ctx.globalAlpha = 0.55 + Math.sin(T * 1.7) * 0.2; ctx.fillStyle = '#f4f0ff'; ctx.beginPath(); ctx.arc(gx, gy, 22, Math.PI, 0); ctx.lineTo(gx + 22, gy + 30);
+    for (let i = 0; i < 4; i++) ctx.quadraticCurveTo(gx + 16 - i * 11, gy + 22 + (i % 2) * 8, gx + 11 - i * 11, gy + 30); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#2a1c3a'; ctx.beginPath(); ctx.ellipse(gx - 8, gy - 4, 3.5, 5, 0, 0, 7); ctx.ellipse(gx + 8, gy - 4, 3.5, 5, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
+  } else if (d === 'egypt') {   // a sphinx and a camel on the dunes, torches by the court
+    ctx.fillStyle = '#c8a050'; ctx.fillRect(560, G - 52, 120, 30); ctx.beginPath(); ctx.moveTo(560, G - 52); ctx.lineTo(560, G - 96); ctx.lineTo(600, G - 96); ctx.lineTo(606, G - 52); ctx.fill(); ctx.fillStyle = '#2f7de1'; ctx.fillRect(556, G - 100, 48, 8); ctx.fillStyle = '#a07a30'; ctx.fillRect(560, G - 22, 130, 22);
+    const cx = (T * 20) % (W + 140) - 70; ctx.fillStyle = '#8a6a3a'; ctx.beginPath(); ctx.ellipse(cx, G - 50, 26, 12, 0, 0, 7); ctx.arc(cx - 6, G - 62, 9, 0, 7); ctx.fill(); ctx.fillRect(cx + 18, G - 78, 6, 28); ctx.fillRect(cx + 18, G - 80, 14, 6);
+    for (let k = 0; k < 4; k++) ctx.fillRect(cx - 20 + k * 12, G - 42, 4, 34 + Math.sin(T * 6 + k * 1.6) * 3);
+    for (const x of [230, 730]) { ctx.fillStyle = '#5a4020'; ctx.fillRect(x - 3, G - 70, 6, 70); const f = Math.sin(T * 18 + x) * 2; ctx.fillStyle = '#ff8a3d'; ctx.beginPath(); ctx.ellipse(x, G - 80 + f / 2, 7, 12 + f, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.ellipse(x, G - 77, 3.5, 6, 0, 0, 7); ctx.fill(); }
+  } else if (d === 'pirate') {   // cannons on deck, a treasure chest, a parrot on the rail
+    for (const [x, k] of [[260, 1], [700, -1]]) { ctx.fillStyle = '#2a2a2a'; ctx.save(); ctx.translate(x, G - 22); ctx.rotate(-0.25 * k); ctx.fillRect(-26 * (k < 0), -9, 26, 18); ctx.restore(); ctx.fillStyle = '#6a3a1a'; ctx.beginPath(); ctx.arc(x - 6 * k, G - 10, 10, 0, 7); ctx.fill(); ctx.fillStyle = '#1a1a1a'; ctx.beginPath(); ctx.arc(x + 30 * k, G - 6, 6, 0, 7); ctx.arc(x + 42 * k, G - 6, 6, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#7a4a1a'; ctx.fillRect(455, G - 30, 50, 30); ctx.fillStyle = '#ffd34d'; for (let i = 0; i < 5; i++) { ctx.beginPath(); ctx.arc(462 + i * 9, G - 32 - (i % 2) * 4, 5, 0, 7); ctx.fill(); } ctx.fillStyle = '#5a3410'; ctx.fillRect(455, G - 30, 50, 5);
+    const px = 380, py = G - 70 + Math.abs(Math.sin(T * 2)) * -3; ctx.fillStyle = '#e8483b'; ctx.beginPath(); ctx.ellipse(px, py, 9, 14, 0.2, 0, 7); ctx.fill(); ctx.fillStyle = '#2f7de1'; ctx.beginPath(); ctx.ellipse(px + 4, py + 6, 5, 10, 0.4, 0, 7); ctx.fill(); ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.moveTo(px - 4, py - 12); ctx.lineTo(px - 14, py - 8); ctx.lineTo(px - 5, py - 6); ctx.fill(); ctx.fillStyle = '#111'; ctx.fillRect(px - 3, py - 13, 2, 2);
+  } else if (d === 'sky') {   // a hot-air balloon and a flock of birds
+    const bx = 480 + Math.sin(T * 0.25) * 200, by = 150 + Math.sin(T * 0.6) * 18; ctx.fillStyle = '#ff6f5e'; ctx.beginPath(); ctx.arc(bx, by, 36, 0, 7); ctx.fill(); ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.ellipse(bx, by, 14, 36, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#6a4a2a'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(bx - 20, by + 30); ctx.lineTo(bx - 9, by + 56); ctx.moveTo(bx + 20, by + 30); ctx.lineTo(bx + 9, by + 56); ctx.stroke(); ctx.fillStyle = '#8a5a2b'; ctx.fillRect(bx - 10, by + 56, 20, 14);
+    ctx.strokeStyle = '#4a4a6a'; ctx.lineWidth = 2; for (let i = 0; i < 5; i++) { const x = (T * 40 + i * 22) % (W + 100) - 50, y = 90 + (i % 2) * 12 + i * 4, f = Math.sin(T * 8 + i) * 4; ctx.beginPath(); ctx.moveTo(x - 7, y - f); ctx.quadraticCurveTo(x - 3, y - 4, x, y); ctx.quadraticCurveTo(x + 3, y - 4, x + 7, y - f); ctx.stroke(); }
+  } else if (d === 'ice') {   // pennants hanging from the rafters
+    for (let i = 0; i < 6; i++) { const x = 250 + i * 92, c = ['#2f7de1', '#e8483b', '#ffd34d', '#5fd068', '#9b7bff', '#ffffff'][i], sw = Math.sin(T * 1.5 + i) * 0.05; ctx.save(); ctx.translate(x, 20); ctx.rotate(sw); ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(-16, 0); ctx.lineTo(16, 0); ctx.lineTo(16, 40); ctx.lineTo(0, 52); ctx.lineTo(-16, 40); ctx.fill(); ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(-16, 0, 32, 6); ctx.restore(); }
+  } else if (d === 'castle') {   // a dragon flies past the moon now and then
+    const u = (T * 0.08) % 1; if (u < 0.3) { const x = -60 + u / 0.3 * (W + 120), y = 110 + Math.sin(u * 20) * 10, f = Math.sin(T * 10) * 12; ctx.fillStyle = '#3a1a2a'; ctx.beginPath(); ctx.ellipse(x, y, 24, 8, 0, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x - 18, y - 24 - f); ctx.lineTo(x + 8, y - 2); ctx.fill(); ctx.beginPath(); ctx.moveTo(x + 22, y - 3); ctx.lineTo(x + 34, y - 8); ctx.lineTo(x + 30, y + 2); ctx.fill(); ctx.beginPath(); ctx.moveTo(x - 22, y); ctx.lineTo(x - 44, y + 6); ctx.lineTo(x - 22, y + 3); ctx.fill(); }
+  } else if (d === 'disco') {   // the dance floor tiles light up to the beat
+    const beat = Math.floor(T * 2.2); for (let i = 0; i < 12; i++) { const x = 220 + i * 44; ctx.fillStyle = `hsla(${(i * 40 + beat * 70) % 360},90%,60%,${(i + beat) % 3 ? 0.18 : 0.5})`; ctx.fillRect(x, G - 4, 40, 4); }
+  }
+}
 function drawSceneryExtra() {
-  const d = court.deco; drawSceneryMore(d);
+  const d = court.deco; drawSceneryMore(d); drawSceneryMore2(d);
   if (d === 'neon') {   // arcade cabinets lined up along the horizon
     for (const [x, hue] of [[46, 300], [128, 190], [W - 128, 60], [W - 46, 330]]) {
       const y = 300, w = 62, h = 160;
@@ -5636,10 +5681,14 @@ function drawHUD() {
     ctx.beginPath(); ctx.moveTo(ax + d * 10, ay); ctx.lineTo(ax - d * 3, ay - 7.5); ctx.lineTo(ax - d * 3, ay + 7.5); ctx.closePath(); ctx.fill();
   }
   // what's special about this game / this point, right under the scoreboard
-  { const tags = []; if (!practice()) { if (rules().by2) tags.push(['Win by 2', MUSTARD]); if (goldenRound) tags.push(['Double points', '#ffd34d']); if (chaos && HAVOC[chaos]) tags.push(['Havoc: ' + HAVOC[chaos].name, HAVOC[chaos].c]); }
-    if (tags.length) { ctx.font = `700 12px ${TEXT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const txt = tags.map(t => t[0]).join('   '), tw = ctx.measureText(txt).width + 22, yy = by + bh + 14;
-      ctx.fillStyle = 'rgba(18,11,28,.82)'; rr(cx - tw / 2, yy - 10, tw, 20, 10); ctx.fill(); let x = cx - tw / 2 + 11; ctx.textAlign = 'left';
-      for (const [t, c] of tags) { ctx.fillStyle = c; ctx.fillText(t, x, yy + 1); x += ctx.measureText(t + '   ').width; } } }
+  { const tags = []; if (!practice()) { if (rules().by2) tags.push(['Win by 2', MUSTARD]); if (goldenRound) tags.push(['Double points', '#ffd34d']); if (chaos && HAVOC[chaos]) tags.push(['Havoc: ' + HAVOC[chaos].name, HAVOC[chaos].c, 1, 'Havoc: ']); }
+    const sAge = time - roundStart, sA = attract || tutorial() || practice() || state === 'intro' ? 0 : clamp((10 - sAge) / 0.8, 0, 1) * clamp((sAge - INTRO) / 0.3, 0, 1);
+    if (sA > 0) for (const [lab, nm, col] of stipList(false)) tags.push([lab + ': ' + nm, col, sA, lab + ': ']);
+    if (tags.length) { ctx.font = `700 12px ${TEXT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; const txt = tags.map(t => t[0]).join('   '), tw = ctx.measureText(txt).width + 22 + tags.length * 12, yy = by + bh + 14;
+      ctx.globalAlpha = Math.max(...tags.map(t => t[2] == null ? 1 : t[2])); ctx.fillStyle = 'rgba(18,11,28,.82)'; rr(cx - tw / 2, yy - 10, tw, 20, 10); ctx.fill(); ctx.globalAlpha = 1; let x = cx - tw / 2 + 11; ctx.textAlign = 'left';
+      for (const [t, c, a, pre] of tags) { ctx.globalAlpha = a == null ? 1 : a; ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x + 4, yy + 0.5, 4, 0, 7); ctx.fill(); x += 12;
+        if (pre) { ctx.fillText(pre, x, yy + 1); const pw = ctx.measureText(pre).width; ctx.fillStyle = CREAM; ctx.fillText(t.slice(pre.length), x + pw, yy + 1); } else ctx.fillText(t, x, yy + 1);
+        x += ctx.measureText(t + '   ').width; } ctx.globalAlpha = 1; } }
   // status chips hang under each team's tab
   let side = 0;
   for (let i = 0; i < 2; i++) {
@@ -8068,10 +8117,11 @@ function decorateButtons(root) {
   });
 }
 decorateButtons(); { let q = 0; new MutationObserver(() => { if (q) return; q = requestAnimationFrame(() => { q = 0; decorateButtons(); }); }).observe(document.body, { childList: true, subtree: true }); }
-const GAME_VERSION = 93;
+const GAME_VERSION = 94;
 const UPDATES = [
+  [94, 'Even better courts', ['Point setups (like Ball: Beach ball) show in the small tag under the scoreboard for a few seconds, then fade.', 'More courts got props: umbrellas, puddles and lightning in Rainy Park, a windmill and tumbleweed on the ranch, coral, treasure and a jellyfish under the sea, embers on Volcano Island, a ghost in the graveyard, a sphinx and camel in the desert, cannons and a parrot on the pirate ship, a hot-air balloon in the clouds, pennants at the ice rink, a dragon over the castle and a lit-up disco floor.']],
   [93, 'Better courts', ['Beach Court has palm trees, a beach umbrella, a lifeguard chair, gulls and a sailboat.', 'Bounce House has inflatable castle towers and balloons.', 'Moon Base has craters, a lunar lander and a flag. Heavy Planet has red rocks, alien crystals and meteors.', 'Rooftop has a water tower, string lights and an antenna. Snow Day has a log cabin, snowmen and falling snow.', 'Crystal Cave has stalactites, glowing mushrooms and fireflies.']],
-  [92, 'Icons and new rules', ['Buttons across the game have icons, and the home buttons show theirs again.', 'Headings and buttons are back in the classic Hoop Havoc font.', 'Court tiles show their colours again, each with its own badge.', 'Four new house rules: Slow Motion, Heavy Gravity, Havoc Every Point and No Havoc Rounds.', 'Three new power-ups: Heavy (the other team jumps lower), Speed (longer hops) and Boom (knocks the other team flying).', 'Hype time is harder to earn but lasts 30 seconds.', 'Wind only blows during a Havoc wind storm.', 'Each point shows its ball, players and hoop in a Havoc-style banner that says what they do, then gets out of the way.', 'Save codes are gone. Sign in to keep your progress across devices.']],
+  [92, 'Icons and new rules', ['Buttons across the game have icons, and the home buttons show theirs again.', 'Headings and buttons are back in the classic Hoop Havoc font.', 'Court tiles show their colours again, each with its own badge.', 'Four new house rules: Slow Motion, Heavy Gravity, Havoc Every Point and No Havoc Rounds.', 'Three new power-ups: Heavy (the other team jumps lower), Speed (longer hops) and Boom (knocks the other team flying).', 'Hype time is harder to earn but lasts 30 seconds.', 'Wind only blows during a Havoc wind storm.', 'Each point lists its ball, players and hoop in the small tag under the scoreboard for a few seconds, then it fades away.', 'Save codes are gone. Sign in to keep your progress across devices.']],
   [91, 'Livelier screens', ['Menus spring in with a bounce, their rows slide in one after another and a light sheen sweeps across.', 'The home screen plays a short intro when it opens. Animations switch off if your device asks for reduced motion.']],
   [90, 'Cleaner home screen', ['The music, sound, effects and pause buttons no longer sit in the corner of the home screen. They come back once a game starts.']],
   [89, 'Tutorial controls', ['Move back and forth through the tutorial with the Back and Next buttons (or B and S).', 'The tutorial buttons only show during a lesson, never on other screens.', '3v3 has been removed. Games are 1v1 or 2v2.']],
