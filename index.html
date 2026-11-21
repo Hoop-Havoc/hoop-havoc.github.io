@@ -1835,7 +1835,7 @@ function cpuThink(ti, dt) {
 const CELEBS = ['HOLD IT', 'GOGGLES', 'SHIMMY', 'SKY POINT', 'FLEX', 'ICE COLD', 'NIGHT NIGHT', 'TOO SMALL', 'BACKPEDAL', 'JUMP SPIN'];
 // every court has its own green celebration
 const MAP_CELEB = { arena: 'MIC DROP', ice: 'AXEL', moon: 'FLAG PLANT', beach: 'SURF', roof: 'CAPE', bounce: 'FLIPS', snow: 'SNOWBALL', heavy: 'GROUND POUND', street: 'BOOMBOX', rain: 'UMBRELLA', ranch: 'LASSO', water: 'SWIM', lava: 'HUMAN TORCH', jungle: 'SNAKES', haunted: 'GHOST RIDE', egypt: 'THRONE', candy: 'LOLLIPOP', pirate: 'SPYGLASS', neon: 'RAGE QUIT', rome: 'LAUREL', sky: 'WINGS', castle: 'SWORD', disco: 'DISCO', cave: 'DIAMOND' };
-const CELEB_CALL = { 'MIC DROP': 'MIC DROP!', AXEL: 'TRIPLE AXEL!', 'FLAG PLANT': 'PLANTED IT!', SURF: "SURF'S UP!", CAPE: 'HERO MODE!', FLIPS: 'BACKFLIPS!', SNOWBALL: 'SNOWBALL!', 'GROUND POUND': 'GROUND POUND!', BOOMBOX: 'DROP THE BEAT!', UMBRELLA: 'RAIN OR SHINE!', LASSO: 'YEEHAW!', SWIM: 'MAKING WAVES!', 'HOT FEET': 'TOO HOT!', 'CHEST POUND': 'KING OF THE JUNGLE!', ZOMBIE: 'BRAINS!', PHARAOH: 'PHARAOH MODE!', THRONE: 'BOW DOWN!', 'GHOST RIDE': 'GHOST RIDE!', LOLLIPOP: 'SWEET!', SPYGLASS: 'LAND HO!', ROBOT: 'BEEP BOOP!', 'RAGE QUIT': 'RAGE QUIT!', LAUREL: 'VICTORY!', WINGS: 'TAKE FLIGHT!', SWORD: 'FOR THE KINGDOM!', DISCO: 'GROOVY!', PICKAXE: 'JACKPOT!', 'HUMAN TORCH': 'FLAME ON!', SNAKES: 'SNAKES! RUN!', DIAMOND: 'SHINE BRIGHT!' };
+const CELEB_CALL = { LAUREL: 'GLADIATOR!', 'MIC DROP': 'MIC DROP!', AXEL: 'TRIPLE AXEL!', 'FLAG PLANT': 'PLANTED IT!', SURF: "SURF'S UP!", CAPE: 'HERO MODE!', FLIPS: 'BACKFLIPS!', SNOWBALL: 'SNOWBALL!', 'GROUND POUND': 'GROUND POUND!', BOOMBOX: 'DROP THE BEAT!', UMBRELLA: 'RAIN OR SHINE!', LASSO: 'YEEHAW!', SWIM: 'MAKING WAVES!', 'HOT FEET': 'TOO HOT!', 'CHEST POUND': 'KING OF THE JUNGLE!', ZOMBIE: 'BRAINS!', PHARAOH: 'PHARAOH MODE!', THRONE: 'BOW DOWN!', 'GHOST RIDE': 'GHOST RIDE!', LOLLIPOP: 'SWEET!', SPYGLASS: 'LAND HO!', ROBOT: 'BEEP BOOP!', 'RAGE QUIT': 'RAGE QUIT!', LAUREL: 'VICTORY!', WINGS: 'TAKE FLIGHT!', SWORD: 'FOR THE KINGDOM!', DISCO: 'GROOVY!', PICKAXE: 'JACKPOT!', 'HUMAN TORCH': 'FLAME ON!', SNAKES: 'SNAKES! RUN!', DIAMOND: 'SHINE BRIGHT!' };
 function celebPose(p) { const o = celebPoseMore(p); return o || celebPose0(p); }
 function celebPose0(p) {
   // phi/reach = shooting arm, phiB = other arm, lean = body
@@ -1880,7 +1880,7 @@ function celebPose0(p) {
     case 'THRONE':       return c.sat ? { phi: 0.95, reach: 0.75, phiB: 0.95, lean: -0.14 * f } : { phi: 3.0, reach: 1, phiB: 0.5, lean: -0.1 * f };
     case 'GHOST RIDE':   return c.lift ? { phi: 3.05 + Math.sin(u * 6) * 0.06, reach: 0.9, phiB: 3.05 - Math.sin(u * 6) * 0.06, lean: 0.55 * f + Math.sin(u * 4) * 0.1 } : { phi: 2.9, reach: 1, phiB: 2.7, lean: -0.08 * f };
     case 'ROBOT': { const st2 = Math.floor(u / 0.22) % 4; return [{ phi: 1.57, reach: 0.55, phiB: 0.3, lean: 0 }, { phi: 0.3, reach: 1, phiB: 1.57, lean: 0 }, { phi: 3.0, reach: 0.55, phiB: 1.57, lean: 0 }, { phi: 1.57, reach: 1, phiB: 3.0, lean: 0 }][st2]; }
-    case 'LAUREL':       return { phi: 2.85, reach: 1, phiB: 2.85, lean: 0 };
+    case 'LAUREL':       return c.raise ? { phi: 3.05, reach: 1, phiB: 1.25, lean: -0.08 * f } : { phi: 2.2 + Math.sin(u * 5) * 0.15, reach: 1, phiB: 1.3, lean: 0.12 * f };   // sword ready, shield up; then the sword goes up
     case 'WINGS':        return { phi: 1.9 + Math.sin(u * 9) * 0.3, reach: 1, phiB: 1.9 + Math.sin(u * 9) * 0.3, lean: u > 0.35 && u < 3.6 ? 0.7 * f : 0 };
     case 'SWORD':        if (u > 1.25 && u < 1.6) return { phi: lerp(3.3, 1.1, clamp((u - 1.25) / 0.18, 0, 1)), reach: 1, phiB: 0.6, lean: 0.25 * f };   // the slash
       if (u >= 1.6) return { phi: 3.05, reach: 1, phiB: 0.4 + Math.sin(u * 3) * 0.1, lean: -0.1 * f };   // victorious
@@ -2507,7 +2507,13 @@ function celebTick(p, c, dt) {
       break;
     case 'LAUREL':   // the crowd throws roses; two victory hops
       if (Math.random() < dt * 40) particles.push({ x: rand(40, W - 40), y: -10, vx: rand(-40, 40), vy: rand(40, 120), c: pick(['#dc283c', '#ff6f8a', '#ffd34d', '#ffffff']), life: 3, max: 3, g: 60, s: rand(3, 5) });
-      if (p.grounded && (c.hops || 0) < 2 && u > 0.5 + (c.hops || 0) * 0.8) { c.hops = (c.hops || 0) + 1; p.vy = -360; p.grounded = false; tone(523 + c.hops * 131, 0.25, 'triangle', 0.04); }
+      if (!c.lion && u > 0.55) { const from = p.x < W / 2 ? 1 : -1; c.lion = { x: from > 0 ? W + 90 : -90, d: -from, run: true }; tone(110, 0.5, 'sawtooth', 0.05, 0.6); hiss(0.4, 0.06); quip(p, ['Bring it!', 'Come on then!'], false, 1); }
+      if (c.lion && c.lion.run) { c.lion.x += c.lion.d * 520 * dt; const gap = (p.x - c.lion.x) * c.lion.d;
+        if (!c.vault && gap > 0 && gap < 120 && p.grounded) { c.vault = u; p.vy = -560 * Math.sqrt(g / 1400); p.grounded = false; p.y = GROUND - 1; tone(660, 0.12, 'triangle', 0.05); }
+        if (c.lion.x < -160 || c.lion.x > W + 160) c.lion.run = false; }
+      if (c.vault && !p.grounded) { const k = clamp((u - c.vault) / 0.5, 0, 1); p.a = c.lion.d * Math.PI * 2 * ease(k) * 0 + Math.sin(k * Math.PI) * 0.25 * c.lion.d; p.w = 0; syncPts(p); }   // a clean vault, body tilted over the mane
+      if (c.vault && p.grounded && !c.raise && u - c.vault > 0.45) { c.raise = u; quip(p, ['Are you not entertained?!', 'For Rome!'], true, 1.6); roar(1, 0.08); shake = Math.max(shake, 6);
+        for (let i = 0; i < 30; i++) particles.push({ x: rand(60, W - 60), y: -10, vx: rand(-40, 40), vy: rand(60, 160), c: pick(['#ffd34d', '#e8b82a']), life: 3, max: 3, g: 120, s: rand(4, 6), shape: 'coin' }); }
       break;
     case 'SWORD':   // a dragon swoops in; leap and slay it
       if (!c.dr) { c.dr = { x0: clamp(p.x + f * 240, 80, W - 80), hit: 0 }; tone(110, 0.6, 'sawtooth', 0.05, 0.6); }
@@ -2568,8 +2574,32 @@ function celebTick(p, c, dt) {
 }
 function star(x, y, r) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const r2 = i % 2 ? r * 0.45 : r, a = i * Math.PI / 5 - Math.PI / 2; ctx.lineTo(x + Math.cos(a) * r2, y + Math.sin(a) * r2); } ctx.closePath(); ctx.fill(); }
 function noteGlyph(x, y, s) { ctx.beginPath(); ctx.ellipse(x, y, 3.4 * s, 2.5 * s, -0.4, 0, 7); ctx.fill(); ctx.fillRect(x + 2.4 * s, y - 11 * s, 1.4 * s, 11 * s); ctx.beginPath(); ctx.moveTo(x + 3.8 * s, y - 11 * s); ctx.quadraticCurveTo(x + 8 * s, y - 8 * s, x + 6.5 * s, y - 4.5 * s); ctx.lineTo(x + 3.8 * s, y - 7.5 * s); ctx.fill(); }
+function gladFx(p, layer, sc) {
+  const c = p.celeb, f = p.facing, u = c.t;
+  if (layer === 'front' && c.lion && c.lion.run) {   // the lion: tawny body, big mane, running legs
+    const x = c.lion.x, y = GROUND - 34, d = c.lion.d, st = Math.sin(u * 26);
+    ctx.save(); ctx.translate(x, y); ctx.scale(d, 1);
+    ctx.fillStyle = '#c98a3a'; for (const [lx, ph] of [[-26, 0], [-14, Math.PI], [14, 0], [26, Math.PI]]) { const s2 = Math.sin(u * 26 + ph); ctx.save(); ctx.translate(lx, 10); ctx.rotate(s2 * 0.5); ctx.fillRect(-3.5, 0, 7, 24); ctx.restore(); }
+    ctx.beginPath(); ctx.ellipse(0, 4, 38, 16, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#c98a3a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-36, 0); ctx.quadraticCurveTo(-56, -10 + st * 6, -60, 6); ctx.stroke(); ctx.fillStyle = '#6a3a12'; ctx.beginPath(); ctx.arc(-60, 6, 5, 0, 7); ctx.fill();
+    ctx.fillStyle = '#7a4214'; ctx.beginPath(); for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2, r = i % 2 ? 22 : 28; ctx.lineTo(40 + Math.cos(a) * r, -8 + Math.sin(a) * r); } ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#d9a050'; ctx.beginPath(); ctx.arc(44, -8, 15, 0, 7); ctx.fill(); ctx.fillStyle = '#1a1006'; ctx.beginPath(); ctx.arc(50, -12, 2.4, 0, 7); ctx.fill(); ctx.beginPath(); ctx.moveTo(56, -4); ctx.lineTo(60, 2); ctx.lineTo(52, 2); ctx.fill();
+    ctx.restore();
+  }
+  if (layer === 'over') {   // sword in the shooting hand, round shield on the other arm
+    const ad = p.armDir || { x: 0, y: -1 }, hx = p.hand.x, hy = p.hand.y, L = 40 * sc;
+    ctx.save(); ctx.lineCap = 'round'; ctx.strokeStyle = INKD; ctx.lineWidth = 7 * sc; ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(hx + ad.x * L, hy + ad.y * L); ctx.stroke();
+    ctx.strokeStyle = '#e8eef6'; ctx.lineWidth = 4.5 * sc; ctx.beginPath(); ctx.moveTo(hx + ad.x * 4, hy + ad.y * 4); ctx.lineTo(hx + ad.x * L, hy + ad.y * L); ctx.stroke();
+    ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 4 * sc; ctx.beginPath(); ctx.moveTo(hx - ad.y * 8 * sc, hy + ad.x * 8 * sc); ctx.lineTo(hx + ad.y * 8 * sc, hy - ad.x * 8 * sc); ctx.stroke();
+    if (c.raise && u - c.raise < 0.6) { const gc = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter'; glowAt(hx + ad.x * L, hy + ad.y * L, 30 * sc, '255,240,180', 0.6 * (1 - (u - c.raise) / 0.6)); ctx.globalCompositeOperation = gc; }
+    const sx = lerp(p.F.x, p.Hd.x, 0.62) + f * 10 * sc, sy = lerp(p.F.y, p.Hd.y, 0.62);
+    ctx.fillStyle = INKD; ctx.beginPath(); ctx.ellipse(sx, sy, 15 * sc, 17 * sc, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#b3243b'; ctx.beginPath(); ctx.ellipse(sx, sy, 12.5 * sc, 14.5 * sc, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.arc(sx, sy, 4 * sc, 0, 7); ctx.fill(); ctx.strokeStyle = '#ffd34d'; ctx.lineWidth = 2 * sc; ctx.beginPath(); ctx.ellipse(sx, sy, 9.5 * sc, 11.5 * sc, 0, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
+}
 function celebFx(p, layer, sc, neck, ux, uy, fwx, fwy) {
-  celebFxMore(p, layer, sc);
+  celebFxMore(p, layer, sc); if (p.celeb && p.celeb.kind === 'LAUREL') { try { gladFx(p, layer, sc); } catch (e) {} }
   if (layer === 'under' && p.celeb && !attract) {   // a spotlight follows the shooter
     const k = clamp(p.celeb.t / 0.3, 0, 1) * clamp((4 - p.celeb.t) / 0.5, 0, 1);
     if (k > 0) { const pg = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = `rgba(255,240,200,${0.16 * k})`; ctx.beginPath(); ctx.ellipse(p.x, GROUND + 2, 46, 9, 0, 0, 7); ctx.fill();
@@ -8271,8 +8301,9 @@ function pracShuffle() { const opts = COURTS.filter(c => c.deco !== court.deco);
 #pracBar .pbtn:focus-within,#pracBar .pbtn:focus-visible{outline:3px solid var(--cream,#fff0cf);outline-offset:2px}</style>`); }
 function syncPrac(force) { const b = $('pracBar'); if (!b) return; const on = mode === 3 && !attract && !paused && !contest && state !== 'replay' && $('menu').hidden && $('panel').hidden; if (b.hidden === on) b.hidden = !on;
   if (on || force) { const g = $('pGreen'), v = String(!!SV.pracGreen); if (g.getAttribute('aria-pressed') !== v) g.setAttribute('aria-pressed', v); const s = $('pCourt'); if (s && document.activeElement !== s && s.value !== court.deco) s.value = court.deco; } }
-const GAME_VERSION = 100;
+const GAME_VERSION = 101;
 const UPDATES = [
+  [101, 'Gladiator', ['Green in the Colosseum and you become a gladiator: sword and shield out, a lion charges, you vault right over it, then raise the sword to the crowd as gold rains down.']],
   [100, 'Practice tools', ['Bouncy Castle backflips are smooth and Speed-style: a quick dip, a tight tuck spinning round the hips, and a clean landing.', 'Practice has a toolbar: turn on Big green for a huge green window, pick any court from the list, or hit Shuffle (or R) for a random one.']],
   [99, 'Faster arenas', ['Hardwood Arena and Ice Rink run much smoother. The crowd is drawn in a smarter way, so slower computers and Chromebooks keep up.']],
   [98, 'Smarter CPUs', ['Pro and Legend CPUs crash the glass for rebounds, grab nearby power-ups when nobody needs guarding, wait out a defender who is already in the air, drive past a hand in the face instead of forcing the shot, and react faster near the end of a game. Rookies stay relaxed.']],
