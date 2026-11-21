@@ -7568,12 +7568,13 @@ function applyTeam() {
 }
 // ---- panels ----
 function openPanel(title, html, buttons) {
+  { const P = $('panel'); clearTimeout(P._ot); P.classList.remove('hhout'); }
   $('panelTitle').textContent = title; $('panelBody').innerHTML = html; $('panelBody').scrollTop = 0;
   const row = $('panelBtns'); row.innerHTML = '';
   for (const [label, fn, cls] of buttons) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + (cls || 'alt'); b.innerHTML = `<b>${label}</b>`; b.onclick = fn; row.appendChild(b); }
   $('panel').hidden = false; if (row.firstChild) row.firstChild.focus();
 }
-function closePanel() { const P = $('panel'); if (!P.hidden && !P.classList.contains('hhout') && !matchMedia('(prefers-reduced-motion: reduce)').matches) { P.classList.add('hhout'); clearTimeout(P._ot); P._ot = setTimeout(() => { P.classList.remove('hhout'); closePanel(); }, 170); return; } P.classList.remove('hhout'); $('panel').hidden = true; if (!$('menu').hidden) { syncLevel(); syncMenuBtns(); } }
+function closePanel(now) { const P = $('panel'); if (P.classList.contains('hhout') && now !== true) return; if (now !== true && !P.hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches) { P.classList.add('hhout'); clearTimeout(P._ot); P._ot = setTimeout(() => closePanel(true), 170); return; } clearTimeout(P._ot); P.classList.remove('hhout'); $('panel').hidden = true; if (!$('menu').hidden) { syncLevel(); syncMenuBtns(); } }
 function syncMenuBtns() {   // keep the icon, change only the words
   const setT = (id, t) => { const b = $(id), n = [...b.childNodes].filter(x => x.nodeType === 3); if (n.length) { n[0].nodeValue = t; n.slice(1).forEach(x => x.remove()); } else b.append(t); };
   const c = lockedCourt(); setT('bCourt', c ? 'Court ✓' : 'Court'); setT('bRules', Object.values(SV.rules).some(Boolean) ? 'Rules ✓' : 'Rules'); }
