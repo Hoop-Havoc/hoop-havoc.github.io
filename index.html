@@ -1905,7 +1905,8 @@ function celebPose0(p) {
                              : u < 0.98 ? { phi: lerp(1.3, 3.5, (u - 0.75) / 0.23), reach: 1, phiB: 0.5, lean: -0.18 * f }
                              : { phi: Math.max(0.9, 3.5 - (u - 0.98) * 14), reach: 1, phiB: 0.4, lean: 0.2 * f };
     case 'HUMAN TORCH':  return u < 0.9 ? { phi: 2.8 + Math.sin(u * 22) * 0.6, reach: 1, phiB: 2.8 - Math.sin(u * 22) * 0.6, lean: 0.25 * f } : u < 3.5 ? { phi: 2.55, reach: 1, phiB: 2.45, lean: 1.15 * f } : { phi: 2.9, reach: 1, phiB: 2.9, lean: 0 };
-    case 'SNAKES':       return { phi: 2.7 + Math.sin(u * 24) * 0.55, reach: 1, phiB: 2.7 - Math.sin(u * 24) * 0.55, lean: 0.3 * f + Math.sin(u * 18) * 0.06 };
+    case 'SNAKES':       if (c.ph === 'jump' || c.ph === 'swing') return { phi: 3.1, reach: 1, phiB: 2.85 + Math.sin(u * 8) * 0.1, lean: 0.05 * f };
+      return { phi: 2.7 + Math.sin(u * 24) * 0.55, reach: 1, phiB: 2.7 - Math.sin(u * 24) * 0.55, lean: 0.3 * f + Math.sin(u * 18) * 0.06 };
     case 'DIAMOND':      return c.got ? { phi: 3.05 + Math.sin(u * 5) * 0.08, reach: 0.82, phiB: 3.0 - Math.sin(u * 5) * 0.08, lean: -0.08 * f } : { phi: 2.85, reach: 1, phiB: 2.85, lean: -0.12 * f };
     case 'THRONE':       return c.sat ? { phi: 0.95, reach: 0.75, phiB: 0.95, lean: -0.14 * f } : { phi: 3.0, reach: 1, phiB: 0.5, lean: -0.1 * f };
     case 'GHOST RIDE':   return c.lift ? { phi: 3.05 + Math.sin(u * 6) * 0.06, reach: 0.9, phiB: 3.05 - Math.sin(u * 6) * 0.06, lean: 0.55 * f + Math.sin(u * 4) * 0.1 } : { phi: 2.9, reach: 1, phiB: 2.7, lean: -0.08 * f };
@@ -2245,7 +2246,7 @@ const GOOD = new Set(['highfive', 'chestbump', 'point', 'flex', 'wag', 'dance', 
 function quip(p, lines, good, dur = 1.3) { if (!p || attract || p.celeb || (p.react && p.react.say && p.react.t < 0.8)) return; react(p, 'quip', dur, { say: pick(lines), good }); }
 function drawEmotes() {
   // comic speech bubbles: white with a team-coloured outline, a tail pointing at the speaker, and they never stack on top of each other
-  if (attract || state === 'replay') return;
+  if (attract || state === 'replay' || greenOn()) return;
   const list = players.filter(p => p.react && p.react.say && !p.celeb && !p.iceShatter).sort((a, b) => a.Hd.x - b.Hd.x);
   ctx.font = `700 13px ${TEXT}`;
   const placed = [];
@@ -2587,13 +2588,28 @@ function celebTick(p, c, dt) {
       const n = u < 3.5 ? 5 : 2;
       for (let i = 0; i < n; i++) { const s = Math.random(), x = lerp(p.F.x, p.Hd.x, s), y = lerp(p.F.y, p.Hd.y, s); if (Math.random() < dt * 60) spark(x + rand(-7, 7), y + rand(-7, 7), pick(['#ffd34d', '#ff8a3d', '#ff3d1f', '#fff1a8']), rand(-50, 50) - p.vx * 0.35, rand(-190, -60) - p.vy * 0.3, true); }
       break; }
-    case 'SNAKES': {
+    case 'SNAKES': {   // snakes from behind: run across the court, hop the rolling boulder, grab a vine and swing away
+      const ay = -40;
       if (!c.sn) { c.dir = p.x < W / 2 ? 1 : -1; c.sn = [0, 1, 2, 3, 4, 5].map(i => ({ x: p.x - c.dir * (330 + i * 60), d: c.dir, ph: i * 1.3 })); tone(900, 0.4, 'sawtooth', 0.02, 0.5); }
-      if (!c.away && u > 0.3) { c.away = true; c.dir = p.x < W / 2 ? -1 : 1; quip(p, ['Snakes?! Nope!', 'I\'m out!', 'Not today!'], true, 1.2); }   // run for the nearest exit
-      if (p.x < -120 || p.x > W + 120) { p.vx = 0; p.vy = 0; p.grounded = true; p.y = GROUND; }   // gone
-      if (p.grounded && p.x > -120 && p.x < W + 120) { p.vx = c.dir * (u < 0.3 ? 60 : 340); p.facing = c.dir; if (!c.away && Math.random() < dt * 2.5) { p.vy = -230; p.grounded = false; } }
+      if (!c.away && u > 0.3) c.away = true;
+      if (c.away && c.bx === undefined && u > 0.45) { c.bx = c.dir > 0 ? W + 60 : -60; c.br = 0; }
+      if (c.bx !== undefined && Math.abs(c.bx - W / 2) < W / 2 + 200) { c.bx -= c.dir * 330 * dt; c.br -= c.dir * 330 * dt / 34; if (Math.random() < dt * 8) shake = Math.max(shake, 2); }
+      const pin = (x, y) => { p.x = x; p.y = y; p.vx = 0; p.vy = 0; p.grounded = false; p.facing = c.dir; syncPts(p); };
+      if (c.ph === 'jump') { c.jt += dt; const k = Math.min(1, c.jt / 0.5); pin(lerp(c.j0x, c.cx, k), lerp(c.j0y, c.cy, k) - Math.sin(k * Math.PI) * 130); if (k >= 1) { c.ph = 'swing'; tone(330, 0.6, 'sawtooth', 0.04, 1.8); } }
+      else if (c.ph === 'swing') { c.w += -(1500 / c.L) * Math.sin(c.th) * dt; c.th += c.w * dt; const hx = c.ax + Math.sin(c.th) * c.L, hy = ay + Math.cos(c.th) * c.L; pin(hx, hy + 100 * p.scale);
+        if (c.th * c.dir > 0.8 || Math.abs(c.w) < 0.05) { c.ph = 'fly'; c.relT = 0; p.vx = c.dir * 950; p.vy = -440; p.grounded = false; tone(660, 0.3, 'triangle', 0.04, 1.5); } }
+      else if (c.ph === 'fly') { c.relT += dt; p.grounded = false; if (p.x < -120 || p.x > W + 120) c.ph = 'gone'; }
+      else if (c.ph === 'gone') { p.vx = 0; p.vy = 0; p.grounded = true; p.y = GROUND; p.x = c.dir > 0 ? W + 220 : -220; }
+      else {
+        if (p.x < -120 || p.x > W + 120) { p.vx = 0; p.vy = 0; p.grounded = true; p.y = GROUND; }
+        else if (p.grounded) { p.vx = c.dir * (u < 0.3 ? 60 : 340); p.facing = c.dir; if (!c.away && Math.random() < dt * 2.5) { p.vy = -230; p.grounded = false; } }
+        const gap = c.bx === undefined ? 9e9 : (c.bx - p.x) * c.dir;
+        if (p.grounded && gap > 0 && gap < 160) { c.ph = 'jump'; c.jt = 0; c.j0x = p.x; c.j0y = p.y; c.L = GROUND - 190 - ay; c.ax = clamp(p.x + c.dir * 230, 140, W - 140); c.th = -c.dir * 0.5; c.w = c.dir * 1.1;
+          c.cx = c.ax + Math.sin(c.th) * c.L; c.cy = ay + Math.cos(c.th) * c.L + 100 * p.scale; tone(520, 0.2, 'square', 0.03, 1.6); }
+      }
       const gone = p.x < -100 || p.x > W + 100;
-      c.sn.forEach((s, i) => { if (gone) { s.d = c.dir; s.x += c.dir * 380 * dt; return; } const tx = p.x - c.dir * (58 + i * 44), mv = clamp(tx - s.x, -370 * dt, 370 * dt); if (Math.abs(mv) > 0.2) s.d = Math.sign(mv); s.x += mv; });
+      c.sn.forEach((s2, i) => { if (s2.flat) return; if (c.bx !== undefined && Math.abs(s2.x - c.bx) < 30) { s2.flat = true; for (let k = 0; k < 6; k++) spark(s2.x, GROUND - 6, pick(['#3f9e3a', '#ffd34d']), rand(-140, 140), rand(-160, -40), true); return; }
+        if (gone || c.ph) { s2.d = c.dir; s2.x += c.dir * 300 * dt; return; } const tx = p.x - c.dir * (58 + i * 44), mv = clamp(tx - s2.x, -370 * dt, 370 * dt); if (Math.abs(mv) > 0.2) s2.d = Math.sign(mv); s2.x += mv; });
       if (Math.random() < dt * 3) hiss(0.25, 0.05);
       break; }
     case 'DIAMOND':
@@ -2841,8 +2857,18 @@ function celebFx(p, layer, sc, neck, ux, uy, fwx, fwy) {
       ctx.globalCompositeOperation = pg; break; }
     case 'SNAKES': {
       if (layer !== 'front' || !c.sn) break;
+      if (c.bx !== undefined && Math.abs(c.bx - W / 2) < W / 2 + 60) { shadowAt(c.bx, 30, 0.3); drawBoulder(c.bx, GROUND - 34, 34, c.br); }
+      if (c.ph && c.ax !== undefined) {   // the vine
+        const ay = -40, th = c.ph === 'jump' ? c.th : c.ph === 'swing' ? c.th : c.th * Math.cos((c.relT || 0) * 4) * Math.max(0, 1 - (c.relT || 0) * 0.6), L = c.L;
+        const ex = c.ph === 'swing' ? p.hand.x : c.ax + Math.sin(th) * L, ey = c.ph === 'swing' ? p.hand.y : ay + Math.cos(th) * L;
+        const drop = c.ph === 'jump' ? Math.min(1, c.jt / 0.25) : 1, fx = lerp(c.ax, ex, drop), fy = lerp(ay, ey, drop);
+        ctx.lineCap = 'round'; ctx.strokeStyle = INKD; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(c.ax, ay); ctx.quadraticCurveTo((c.ax + fx) / 2 - c.dir * 8, (ay + fy) / 2, fx, fy); ctx.stroke();
+        ctx.strokeStyle = '#3f8a2e'; ctx.lineWidth = 4.5; ctx.stroke();
+        for (let k = 1; k < 7; k++) { const q = k / 7, lx = lerp(c.ax, fx, q), ly = lerp(ay, fy, q); ctx.fillStyle = k % 2 ? '#4cb846' : '#2f7a24'; ctx.beginPath(); ctx.ellipse(lx + (k % 2 ? 7 : -7), ly, 7, 3.5, k % 2 ? 0.6 : -0.6, 0, 7); ctx.fill(); }
+      }
       for (const s of c.sn) {
         if (s.x < -80 || s.x > W + 80) continue;
+        if (s.flat) { ctx.fillStyle = INKD; ctx.beginPath(); ctx.ellipse(s.x, GROUND - 2, 40, 5, 0, 0, 7); ctx.fill(); ctx.fillStyle = '#3f9e3a'; ctx.beginPath(); ctx.ellipse(s.x, GROUND - 2, 38, 3.5, 0, 0, 7); ctx.fill(); ctx.strokeStyle = INKD; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(s.x + s.d * 26, GROUND - 6); ctx.lineTo(s.x + s.d * 31, GROUND - 1); ctx.moveTo(s.x + s.d * 31, GROUND - 6); ctx.lineTo(s.x + s.d * 26, GROUND - 1); ctx.stroke(); continue; }
         const y = GROUND - 7, L = 74, path = () => { ctx.beginPath(); for (let j = 0; j <= 14; j++) { const q = j / 14, x = s.x - s.d * q * L, yy = y + Math.sin(time * 13 + s.ph - q * 7) * 6 * Math.min(1, q * 3); j ? ctx.lineTo(x, yy) : ctx.moveTo(x, yy); } };
         ctx.lineCap = 'round'; ctx.lineJoin = 'round';
         path(); ctx.strokeStyle = INKD; ctx.lineWidth = 12; ctx.stroke();
@@ -3762,12 +3788,13 @@ function interactions() {
       const bd = Math.hypot(ball.x - (p.F.x + ex * s), ball.y - (p.F.y + ey * s));
       const slow = Math.hypot(ball.vx - p.vx, ball.vy - p.vy) < 650 * glue;
       if (d < ball.r + 14 * glue * p.scale || (slow && bd < ball.r + 14 * glue * p.scale)) { catchBall(p); break; }
-    } else if (ball.holder.team !== p.team && !ball.holder.dunkAnim && !(attack && attack.d === ball.holder) && !(p.down > 0) && !(p.bitT > 0.2) && !(p.stun > 0) && !(p.stealCD > 0) && time > (ball.protectUntil || 0) && t.pressed && t.frozen <= 0 && d < ball.r + 14 * glue * p.scale) {
+    } else if (ball.holder.team !== p.team && !ball.holder.dunkAnim && !(attack && attack.d === ball.holder) && !(p.down > 0) && !(p.bitT > 0.2) && !(p.stun > 0) && !(p.stealCD > 0) && time > (ball.protectUntil || 0) && t.frozen <= 0 && d < ball.r + (t.pressed ? 16 : 11) * glue * p.scale) {
       const h = ball.holder, shielded = Math.sign(ball.x - h.x) !== Math.sign(p.x - h.x) && Math.abs(p.x - h.x) > 10;   // body between you and the ball
-      if (shielded ? Math.random() > 0.15 : Math.random() > 0.62) { p.stealCD = 0.45; continue; }   // reached in and missed: a beat to recover
+      if (shielded && Math.random() > 0.3) { p.stealCD = 0.45; continue; }   // their body was in the way: a beat to recover
       h.stealCD = 0.9; p.stealCD = 0.6;   // the player who got picked can't instantly grab it back
-      p.swipeT = 0.2; fxSwipes.push({ x: ball.x, y: ball.y, d: Math.sign(p.hv.x) || p.facing, t: 0 });
-      if (!shielded && Math.abs(p.x - h.x) < 70 && Math.random() < 0.6) { ball.holder = null; h.cool = 0.5; h.oop = 0; h.dive = 0; ball.shotTeam = -1; ball.oop = false; ball.lob = null; catchBall(p); p.cool = 0; ball.protectUntil = time + 0.6; } else knockLoose(p.hv);
+      p.swipeT = 0.22; const bx0 = ball.x, by0 = ball.y; fxSwipes.push({ x: ball.x, y: ball.y, d: Math.sign(p.x - h.x) * -1 || -p.facing, t: 0, c: t.color, fx: bx0, fy: by0, p }); tone(1400, 0.08, 'triangle', 0.04, 0.5); tone(700, 0.12, 'sine', 0.03, 1.8);
+      for (let k = 0; k < 10; k++) spark(bx0, by0, pick([t.color, '#ffffff']), rand(-200, 200), rand(-220, 40), false);
+      if (!shielded || Math.random() < 0.6) { ball.holder = null; h.cool = 0.5; h.oop = 0; h.dive = 0; ball.shotTeam = -1; ball.oop = false; ball.lob = null; catchBall(p); p.cool = 0; ball.protectUntil = time + 0.6; } else knockLoose(p.hv);
       ball.stolenAt = time; if (t.stats) t.stats.steals++; hypeAdd(teams.indexOf(t), 0.2); react(p, 'flex', 0.7); pop('STEAL!', p.Hd.x, p.Hd.y - 50, '#ffffff'); break;
     }
   }
@@ -3958,7 +3985,7 @@ function updateParticles(dt) {
   for (const f of fxStreaks) f.t += dt; fxStreaks = fxStreaks.filter(f => f.t < 0.2);
   for (const f of fxFlares) f.t += dt; fxFlares = fxFlares.filter(f => f.t < 0.45);
   for (const f of fxBulbs) f.t += dt; fxBulbs = fxBulbs.filter(f => f.t < 0.25);
-  for (const f of fxSwipes) f.t += dt; fxSwipes = fxSwipes.filter(f => f.t < 0.22);
+  for (const f of fxSwipes) f.t += dt; fxSwipes = fxSwipes.filter(f => f.t < 0.4);
   for (const f of fxSkids) f.t += dt; fxSkids = fxSkids.filter(f => f.t < 1.6);
   for (const p of players) if (p.greenHand > 0) p.greenHand -= dt;
   particles = particles.filter(p => p.life > 0);
@@ -4279,8 +4306,9 @@ function crowdSay(kind, n = 1) {
   if (attract || !crowdMap() || !crowd.length || state === 'replay') return;
   for (let i = 0; i < n; i++) { if (crowdBubbles.length > 3) crowdBubbles.shift(); const c = pick(crowd); crowdBubbles.push({ c, txt: pick(CROWD_LINES[kind] || CROWD_LINES.chant), t: -i * 0.35 }); }
 }
+function greenOn() { return !!(greenBurst || doom); }
 function drawCrowdBubbles() {
-  if (!crowdBubbles.length) return;
+  if (!crowdBubbles.length || greenOn()) return;
   ctx.font = `700 11px ${TEXT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const b of crowdBubbles) { if (b.t < 0) continue; const a = clamp(Math.min(b.t / 0.15, (1.8 - b.t) / 0.3), 0, 1), y = b.c.y - 22 - b.t * 6, w = ctx.measureText(b.txt).width + 14;
     ctx.globalAlpha = a; ctx.fillStyle = '#ffffff'; rr(b.c.x - w / 2, y - 10, w, 19, 9); ctx.fill(); ctx.beginPath(); ctx.moveTo(b.c.x - 3, y + 8); ctx.lineTo(b.c.x, y + 14); ctx.lineTo(b.c.x + 3, y + 8); ctx.fill(); ctx.fillStyle = '#1b1226'; ctx.fillText(b.txt, b.c.x, y); }
@@ -6942,7 +6970,6 @@ function drawStars(x, y, t) { for (let s = 0; s < 3; s++) { const a = t * 6 + s 
 const DOOM2 = {
   cry: { at: 0.25, hit(d) { tone(520, 0.5, 'triangle', 0.04, 0.6); },
     step(d, p, el) { if (d.t < 0.25) return; const dir = p.cryDir || (p.cryDir = Math.sign(p.x - W / 2) || 1); p.doomRun = 1; p.mood = 'sad'; p.moodT = 2;
-      if (!p.cried) { p.cried = 1; quip(p, ['Waaah!', 'Mommyyy!', 'Not fair!', 'I wanna go home!', 'Nooo!'], false, 1.6); }
       if (p.x > -150 && p.x < W + 150) { if (p.grounded) { p.vx = dir * 300; p.facing = dir; if (Math.random() < el * 2.2) { p.vy = -170; p.grounded = false; } }
         if (Math.random() < el * 50) for (const s of [-1, 1]) spark(p.Hd.x + s * 5, p.Hd.y - 2, pick(['#8fd8ff', '#c9ecff']), s * rand(60, 170) - p.vx * 0.2, rand(-170, -60), true); }
       else { p.vx = 0; p.vy = 0; p.grounded = true; p.y = GROUND; } },
@@ -7130,9 +7157,15 @@ function drawReleaseFx() {
     if (b.t < 0 || b.t > 0.22) continue; const k = 1 - b.t / 0.22, pg = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter';
     glowAt(b.x, b.y, 18 + 10 * k, '255,255,255', 0.85 * k); ctx.fillStyle = `rgba(255,255,255,${k})`; starPath(b.x, b.y, 9 * k + 2, 1.5, 4, 0.4); ctx.fill(); ctx.globalCompositeOperation = pg;
   }
-  for (const w of fxSwipes) {   // a steal's swipe arc
-    const k = 1 - w.t / 0.22; ctx.strokeStyle = `rgba(255,255,255,${0.75 * k})`; ctx.lineWidth = 3 * k + 1; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.arc(w.x - w.d * 10, w.y - 4, 22 + w.t * 60, w.d > 0 ? -0.9 : Math.PI - 0.4, w.d > 0 ? 0.4 : Math.PI + 0.9); ctx.stroke();
+  for (const w of fxSwipes) {   // a steal: a fat crescent swipe in the thief's colour, speed lines, and the ball yanked into their hands
+    const k = clamp(1 - w.t / 0.4, 0, 1), d = w.d || 1, R = 30 + w.t * 60, a0 = d > 0 ? -1.2 : Math.PI - 0.5, a1 = d > 0 ? 0.5 : Math.PI + 1.2;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = `rgba(0,0,0,${0.25 * k})`; ctx.lineWidth = 18 * k + 3; ctx.beginPath(); ctx.arc(w.x - d * 10, w.y - 2, R, a0, a1); ctx.stroke();
+    ctx.strokeStyle = w.c || '#ffffff'; ctx.globalAlpha = Math.min(1, 1.3 * k); ctx.lineWidth = 14 * k + 2; ctx.beginPath(); ctx.arc(w.x - d * 10, w.y - 2, R, a0, a1); ctx.stroke();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3 * k + 0.5; ctx.beginPath(); ctx.arc(w.x - d * 10, w.y - 2, R - 2, a0 + 0.2 * d, a1 - 0.2 * d); ctx.stroke();
+    for (let i = 0; i < 3; i++) { const yy = w.y - 14 + i * 14, x0 = w.x + d * (18 + w.t * 120); ctx.strokeStyle = `rgba(255,255,255,${0.7 * k})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(x0 + d * (18 + i * 6), yy); ctx.stroke(); }
+    if (w.p && w.p.hand && w.t < 0.18) { const hx = w.p.hand.x, hy = w.p.hand.y; for (let i = 1; i <= 3; i++) { const q = i / 4; ctx.globalAlpha = 0.35 * (1 - q) * k; ctx.fillStyle = '#ff8a3d'; ctx.beginPath(); ctx.arc(lerp(w.fx, hx, q), lerp(w.fy, hy, q), ball.r * (1 - q * 0.2), 0, 7); ctx.fill(); } }
+    ctx.globalAlpha = 1;
   }
   // the snap of a release: three quick streaks off the fingertips; a green also flares like a lens hit
   const prev = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
@@ -7975,7 +8008,7 @@ function say(txt, force) {
   sub = { t, at: n, dur: clamp(1500 + t.length * 45, 1900, 4600) };
 }
 function drawSubs() {
-  if (!sub || state === 'over') return;
+  if (!sub || state === 'over' || greenOn()) return;
   noCase = true; try { drawSubs0(); } finally { noCase = false; }
 }
 function drawSubs0() {
@@ -8299,7 +8332,10 @@ function netTick(now) {
 }
 let netLast = null, netFull = null;
 // host: what the guest pressed
+setInterval(() => { if (net && net.ready && net.rxAt && performance.now() - net.rxAt > 6000) netLost(); }, 1000);   // nothing heard for 6s: they're gone
+addEventListener('pagehide', () => { try { net && net.conn && net.conn.send({ t: 'bye' }); } catch (e) {} });
 function netRecv(m) {
+  if (net) net.rxAt = performance.now();
   if (!m || !net) return;
   if (m.t === 'ping') { net.conn.send({ t: 'pong', c: m.c }); return; }
   if (m.t === 'hello') { if (net.host && m.me) { net.guest = m.me; netApplyTeams(); } return; }
@@ -9002,8 +9038,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 116;
+const GAME_VERSION = 117;
 const UPDATES = [
+  [117, 'Snatch', ['Touch the ball in the other player\'s hands and you snatch it, like Basket Random. If their body is in the way, it might not work.', 'Steals get a big swipe in your team colour, and the ball gets yanked into your hands.', 'No more chatter during a green: the players and the crowd stay quiet while the green show plays.', 'Online: if your friend closes the game or loses connection, you find out within a few seconds instead of waiting forever.', 'Jungle celebration: the shooter runs from the snakes, hops a rolling boulder, grabs a vine and swings away. The boulder squashes the snakes.']],
   [116, 'Polish', ['Every loser fate now lands with a big comic-book sound effect, like a shark chomp or a cannon kaboom.', 'Green shows are bigger and last a little longer, with a light column and a spray of the court colours.', 'Sneakers are real high-tops now: sole, collar, stripe and laces. Gold and diamond ones shine, neon, lava and galaxy ones glow.', 'Headbands have a sport stripe and knot tails that flutter when you run.', 'A better thumbs-down at the Colosseum and a proper fire-hydrant blast on the street.', 'Fixed a big slowdown when lightning fries the losers at Rainy Park.']],
   [115, 'Sore losers', ['Every court has its own fate for the team that gets greened on: a dead dragon lands on them at the castle, they run off crying at Hardwood Arena, an ice block flattens them on the rink, aliens beam them up on the moon, sharks, snowmen, mummies, a 16-ton weight and more.']],
   [114, 'Tidy', ['The practice toolbar only shows up in Practice now, nowhere else.', 'Havoc rounds: the court title shows first, then the Havoc card, then tip-off. The card is just the name now.']],
