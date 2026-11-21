@@ -6919,6 +6919,129 @@ document.querySelectorAll('.seg button[data-d]').forEach(b => b.addEventListener
 }));
 function applyBtnSize() { document.body.classList.remove('btn-s', 'btn-l'); if (SV.btn === 's' || SV.btn === 'l') document.body.classList.add('btn-' + SV.btn); }
 applyBtnSize();
+
+// ---- accounts: Supabase sign-in (Google or email) + a cloud copy of your save ----
+const SB_URL = 'https://sylhrqjtktxifjkptvdm.supabase.co', SB_KEY = 'sb_publishable_rJ7tVF_1V18zEhMaewgsSQ_jEUhDXAl';
+const SITE_URL = 'https://hoop-havoc.github.io/hoop-havoc/';
+let acct = null, acctSyncT = 0, acctPushTimer = null, acctState = '';
+function acctLoad() { try { acct = JSON.parse(localStorage.getItem('hh-acct') || 'null'); } catch (e) { acct = null; } }
+function acctSave() { try { acct ? localStorage.setItem('hh-acct', JSON.stringify(acct)) : localStorage.removeItem('hh-acct'); } catch (e) {} }
+async function sb(path, opt = {}, auth = true) {
+  const h = { apikey: SB_KEY, 'Content-Type': 'application/json', ...(opt.headers || {}) };
+  if (auth && acct && acct.access_token) h.Authorization = 'Bearer ' + acct.access_token; else if (/^eyJ/.test(SB_KEY)) h.Authorization = 'Bearer ' + SB_KEY;   // new sb_publishable keys go in apikey only
+  const r = await fetch(SB_URL + path, { ...opt, headers: h });
+  const txt = await r.text(); let j = null; try { j = txt ? JSON.parse(txt) : null; } catch (e) {}
+  if (!r.ok) { const m = (j && (j.msg || j.error_description || j.message || j.error)) || ('Error ' + r.status); const err = new Error(m); err.status = r.status; throw err; }
+  return j;
+}
+function acctFromToken(j) {
+  const u = j.user || {}; acct = { access_token: j.access_token, refresh_token: j.refresh_token, exp: Date.now() + (j.expires_in || 3600) * 1000, id: u.id, email: u.email || '', name: (u.user_metadata && (u.user_metadata.full_name || u.user_metadata.name)) || '' }; acctSave();
+}
+async function acctFresh() {
+  if (!acct) return false;
+  if (Date.now() < acct.exp - 60000) return true;
+  try { const j = await sb('/auth/v1/token?grant_type=refresh_token', { method: 'POST', body: JSON.stringify({ refresh_token: acct.refresh_token }) }, false); acctFromToken(j); return true; }
+  catch (e) { if (e.status === 400 || e.status === 401) { acct = null; acctSave(); acctUI(); } return false; }
+}
+async function acctUser() { const u = await sb('/auth/v1/user'); acct.id = u.id; acct.email = u.email || acct.email; acct.name = (u.user_metadata && (u.user_metadata.full_name || u.user_metadata.name)) || acct.name; acctSave(); }
+// pull the cloud save; if both exist, keep the one that's further along (and say so)
+async function acctPull(first) {
+  if (!(await acctFresh())) return;
+  try {
+    const rows = await sb(`/rest/v1/saves?select=data,updated_at&user_id=eq.${acct.id}`);
+    const cloud = rows && rows[0] && rows[0].data;
+    if (!cloud || typeof cloud !== 'object') { await acctPush(true); if (first) toast('Signed in', 'Your progress now saves to your account.'); return; }
+    const lx = SV.xp || 0, cx = cloud.xp || 0;
+    if (cx > lx || (first && cx === lx && JSON.stringify(cloud).length > JSON.stringify(SV).length)) {
+      Object.keys(SV).forEach(k => delete SV[k]); Object.assign(SV, cloud); SV.onboarded = true; persist(); try { syncLevel(); syncSettingsUI(); } catch (e) {}
+      if (first) toast('Welcome back!', `Loaded your account: level ${lvlInfo().L}.`);
+    } else { await acctPush(true); if (first) toast('Signed in', lx > cx ? 'This device was further along, so your account got updated.' : 'Your progress is saved to your account.'); }
+    acctSyncT = Date.now(); acctUI();
+  } catch (e) { acctState = "Couldn't reach your account. Progress is still saved on this device."; acctUI(); }
+}
+async function acctPush(now) {
+  if (!acct || !acct.id) return;
+  if (!now) { clearTimeout(acctPushTimer); acctPushTimer = setTimeout(() => acctPush(true), 4000); return; }
+  if (!(await acctFresh())) return;
+  try { await sb('/rest/v1/saves?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: acct.id, data: SV, updated_at: new Date().toISOString() }) }); acctSyncT = Date.now(); acctState = ''; acctUI(); }
+  catch (e) { acctState = "Couldn't save to your account just now. It'll try again."; acctUI(); }
+}
+// every local save also goes up to the cloud (a few seconds later, batched)
+{ const _p = persist; persist = function () { _p(); if (acct && acct.id) acctPush(); }; }
+async function acctEmail(mode) {
+  const em = ($('acEmail') || {}).value || '', pw = ($('acPass') || {}).value || '';
+  if (!/^\S+@\S+\.\S+$/.test(em)) { acctState = 'Type your email address.'; acctUI(); return; }
+  if (mode === 'reset') { try { await sb('/auth/v1/recover', { method: 'POST', body: JSON.stringify({ email: em, redirect_to: SITE_URL }) }, false); acctState = 'Check your email for a link to reset your password.'; } catch (e) { acctState = e.message; } acctUI(); return; }
+  if (pw.length < 6) { acctState = 'Passwords need at least 6 characters.'; acctUI(); return; }
+  acctState = mode === 'up' ? 'Creating your account...' : 'Signing in...'; acctUI();
+  try {
+    if (mode === 'up') {
+      const j = await sb('/auth/v1/signup?redirect_to=' + encodeURIComponent(SITE_URL), { method: 'POST', body: JSON.stringify({ email: em, password: pw }) }, false);
+      if (j && j.access_token) { acctFromToken(j); acctState = ''; await acctPull(true); }
+      else { acctState = 'Almost there! Check your email and tap the link to confirm your account, then sign in.'; acctUI(); }
+    } else { const j = await sb('/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify({ email: em, password: pw }) }, false); acctFromToken(j); acctState = ''; await acctPull(true); }
+  } catch (e) { acctState = /invalid login/i.test(e.message) ? 'That email and password don\'t match.' : /not confirmed/i.test(e.message) ? 'Confirm your email first: check your inbox for the link.' : /already registered/i.test(e.message) ? 'That email already has an account. Sign in instead.' : e.message; acctUI(); }
+}
+function acctGoogle() {
+  if (!/github\.io$/i.test(location.hostname) && !/localhost/.test(location.hostname)) { acctState = 'Google sign-in works on hoop-havoc.github.io. Open the game there to use it.'; acctUI(); return; }
+  location.href = `${SB_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(location.origin + location.pathname)}`;
+}
+async function acctOut() { try { await sb('/auth/v1/logout', { method: 'POST' }); } catch (e) {} acct = null; acctSave(); acctState = 'Signed out. Your progress stays on this device too.'; acctUI(); }
+function acctHTML() {
+  const ago = acctSyncT ? Math.max(0, Math.round((Date.now() - acctSyncT) / 60000)) : -1;
+  if (acct && acct.id) return `<div class="acct"><div class="acct-h">Account</div><p class="acct-who">Signed in as <b>${(acct.name || acct.email || 'you').replace(/</g, '&lt;')}</b>${acct.name && acct.email ? `<small>${acct.email.replace(/</g, '&lt;')}</small>` : ''}</p>
+    <p class="acct-s">${acctState || (ago < 0 ? 'Your progress saves to your account automatically.' : ago === 0 ? 'Saved to your account just now.' : `Saved to your account ${ago} min ago.`)}</p>
+    <div class="seg2"><button type="button" class="pick" id="acSync">Save now</button><button type="button" class="pick" id="acOut">Sign out</button></div></div>`;
+  return `<div class="acct"><div class="acct-h">Account</div><p class="acct-s">Sign in to save your level, trophies and stats, and play on any device.</p>
+    <button type="button" class="pick gbtn" id="acGoogle"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5a5.6 5.6 0 0 1-2.4 3.7v3h3.9c2.3-2.1 3.5-5.2 3.5-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.3a12 12 0 0 0 0 10.8z"/><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z"/></svg>Continue with Google</button>
+    <div class="acct-or">or use email</div>
+    <input id="acEmail" type="email" autocomplete="email" placeholder="Email" aria-label="Email"><input id="acPass" type="password" autocomplete="current-password" placeholder="Password (6 or more characters)" aria-label="Password">
+    <div class="seg2"><button type="button" class="pick" id="acIn">Sign in</button><button type="button" class="pick" id="acUp">Create account</button></div>
+    <button type="button" class="linkb" id="acReset">Forgot your password?</button>
+    ${acctState ? `<p class="acct-s warn" role="status">${acctState}</p>` : ''}</div>`;
+}
+function acctUI() {
+  const box = document.querySelector('#panelBody .acct'); if (!box) return;
+  const em = ($('acEmail') || {}).value, pw = ($('acPass') || {}).value;
+  box.outerHTML = acctHTML(); acctWire();
+  if (em && $('acEmail')) $('acEmail').value = em; if (pw && $('acPass')) $('acPass').value = pw;
+}
+function acctWire() {
+  const on = (id, f) => { const b = $(id); if (b) b.onclick = f; };
+  on('acGoogle', acctGoogle); on('acIn', () => acctEmail('in')); on('acUp', () => acctEmail('up')); on('acReset', () => acctEmail('reset')); on('acOut', acctOut); on('acSync', () => { acctState = 'Saving...'; acctUI(); acctPush(true); });
+  ['acEmail', 'acPass'].forEach(id => { const x = $(id); if (x) x.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') acctEmail('in'); }); });
+}
+// coming back from Google, or from an email link: the tokens arrive in the address bar
+async function acctBoot() {
+  acctLoad();
+  const h = location.hash || '';
+  if (/access_token=|error_description=/.test(h)) {
+    const q = {}; h.slice(1).split('&').forEach(kv => { const i = kv.indexOf('='); if (i > 0) q[decodeURIComponent(kv.slice(0, i))] = decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' ')); });
+    history.replaceState(null, '', location.pathname + location.search);
+    if (q.error_description) { setTimeout(() => toast("Couldn't sign in", q.error_description), 800); }
+    else if (q.access_token) { acct = { access_token: q.access_token, refresh_token: q.refresh_token, exp: Date.now() + (+q.expires_in || 3600) * 1000 }; acctSave();
+      try { await acctUser(); if (q.type === 'recovery') setTimeout(() => acctNewPassword(), 600); await acctPull(true); } catch (e) { acct = null; acctSave(); } }
+  } else if (acct && acct.id) acctPull(false);
+}
+function acctNewPassword() {
+  openPanel('New password', `<p style="margin:0 0 10px">Type a new password for your account.</p><input id="acNew" type="password" autocomplete="new-password" placeholder="New password (6 or more characters)" style="width:100%"><p id="acNewMsg" class="acct-s"></p>`,
+    [['Save password', async () => { const pw = $('acNew').value; if (pw.length < 6) { $('acNewMsg').textContent = 'Passwords need at least 6 characters.'; return; } try { await sb('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ password: pw }) }); toast('Password changed', 'You can sign in with it now.'); closePanel(); } catch (e) { $('acNewMsg').textContent = e.message; } }, 'red'], ['Cancel', closePanel]]);
+  $('acNew').addEventListener('keydown', e => e.stopPropagation());
+}
+document.head.insertAdjacentHTML('beforeend', `<style>
+.acct{display:grid;gap:8px;margin:0 0 14px;padding:12px;background:#0b061266;border:3px solid #0b0612;box-shadow:inset 0 -3px 0 rgba(0,0,0,.3)}
+.acct-h{font-family:var(--pixel,inherit);font-weight:700;color:var(--mustard);font-size:1.1em}
+.acct-s{margin:0;opacity:.88;font-size:.92em}.acct-s.warn{color:#ffd34d;opacity:1}
+.acct-who{margin:0}.acct-who small{display:block;opacity:.75}
+.acct input{font:inherit;padding:9px 10px;border:3px solid #0b0612;background:#140c22;color:inherit;width:100%;max-width:100%;box-sizing:border-box;border-radius:0}
+.acct .pick.gbtn{display:flex!important;align-items:center;justify-content:center;gap:10px;background:#ffffff!important;color:#1f1f1f!important;font-weight:700;border-color:#0b0612!important}.acct .pick.gbtn:hover{filter:brightness(.95)}
+.gbtn svg{width:20px;height:20px}
+.acct-or{text-align:center;opacity:.7;font-size:.85em}
+.linkb{background:none;border:0;color:inherit;opacity:.8;text-decoration:underline;font:inherit;font-size:.88em;cursor:pointer;justify-self:center}
+</style>`);
+acctBoot();
+KEEPWORDS.add('Google');
+
 function setTeamSize(n) { teamSize = n === 1 ? 1 : n === 3 ? 3 : 2; document.querySelectorAll('.seg button[data-size]').forEach(x => x.setAttribute('aria-pressed', String(+x.dataset.size === teamSize))); }
 document.querySelectorAll('.seg button[data-size]').forEach(b => b.addEventListener('click', () => { setTeamSize(+b.dataset.size); saveSettings(); }));
 $('bFx').addEventListener('click', toggleFx);
@@ -7497,7 +7620,7 @@ function openTour() {
     [ICON.modes, 'Modes', 'Online, tournaments, dunk contests, practice and more.'], [ICON.court, 'Court', 'Pick a court, or get a new one every point.'],
     [ICON.rules, 'Rules', 'Fun house rules like big heads or win by 2.'], [ICON.locker, 'Locker', 'Your team, your style, trophies and settings.'],
     [ICON.cpu, 'Teams and CPU', 'Pick 1v1, 2v2 or 3v3, and how good the CPU is.']].map(r => row(...r)).join('')}</div>
-    <p style="margin:12px 0 0">You can replay the tutorial any time from Modes.</p>`, [['Let\'s play', closePanel]]);
+    <p style="margin:12px 0 0">You can replay the tutorial any time from Modes. Sign in from Locker, Settings to save your progress to an account.</p>`, [['Let\'s play', closePanel]]);
 }
 const CH_DAY = [["d_win", "Win a game", "win", 1, 60], ["d_green", "Hit 3 greens", "greens", 3, 50], ["d_dunk", "Make 4 dunks", "dunks", 4, 50], ["d_block", "Get 2 blocks", "blocks", 2, 50], ["d_steal", "Get 2 steals", "steals", 2, 50], ["d_deep", "Make 2 deep shots", "deep", 2, 50], ["d_oop", "Finish 2 alley-oops", "oops", 2, 60], ["d_games", "Play 3 games", "games", 3, 40]], CH_WEEK = [["w_win", "Win 7 games", "win", 7, 300], ["w_green", "Hit 20 greens", "greens", 20, 300], ["w_dunk", "Make 30 dunks", "dunks", 30, 300], ["w_courts", "Win on 5 different courts", "courts", 5, 350], ["w_block", "Get 12 blocks", "blocks", 12, 250], ["w_cpu", "Beat a Legend CPU", "legend", 1, 400]];
 function weekKey(d = new Date()) { const t = new Date(d); t.setHours(0, 0, 0, 0); t.setDate(t.getDate() - ((t.getDay() + 6) % 7)); return dayKey(t); }
@@ -7569,7 +7692,7 @@ function openLocker(tab) {
       <div class="h3">Star player</div><div class="pgrid">${[[0, 'None', 1, 0], ...STARS].map(([L, n, num]) => `<button class="pick" type="button" data-star="${L ? n : ''}" aria-pressed="${String((st.star || '') === (L ? n : ''))}" ${lock(L || 1) ? 'disabled' : ''}>${L ? n + ` <small>#${num}${lock(L) ? ', level ' + L : ''}</small>` : 'None'}</button>`).join('')}</div>
       <div class="h3" style="margin-top:14px">Headband</div><div class="swrow">${BANDS.map(([c, n, L], i) => `<button class="sw" type="button" data-hb="${i}" style="background:${c || 'repeating-linear-gradient(45deg,#33244a 0 6px,#21162f 6px 12px)'}" aria-label="${n}${lock(L) ? ', unlocks at level ' + L : ''}" aria-pressed="${String((st.band || 0) === i)}" ${lock(L) ? 'disabled' : ''}>${lock(L) ? `<small>Lv ${L}</small>` : ''}</button>`).join('')}</div>`;
   } else if (lockerTab === 'settings') {
-    body = '<div class="credit"><b>Hoop Havoc</b><span>A Morningfall Corp game</span><small>Beta v' + GAME_VERSION + '</small></div>' + `<div class="rlist" style="margin-bottom:12px"><button class="tog" type="button" role="switch" data-sw="replays" aria-checked="${SV.replays !== false}"><span>Instant replays<small>On: big plays and blocks get a slow-motion replay. Off: no replays during games (highlights still save).</small></span><i></i></button>
+    body = acctHTML() + '<div class="credit"><b>Hoop Havoc</b><span>A Morningfall Corp game</span><small>Beta v' + GAME_VERSION + '</small></div>' + `<div class="rlist" style="margin-bottom:12px"><button class="tog" type="button" role="switch" data-sw="replays" aria-checked="${SV.replays !== false}"><span>Instant replays<small>On: big plays and blocks get a slow-motion replay. Off: no replays during games (highlights still save).</small></span><i></i></button>
       <button class="tog" type="button" role="switch" data-sw="study" aria-checked="${!!SV.study}"><span>Study mix<small>A calmer crowd, softer sound effects and mellow music. Great with Auto Mode.</small></span><i></i></button>
       ${isTouch ? `<button class="tog" type="button" role="switch" data-sw="noVib" aria-checked="${!!SV.noVib}"><span>No vibration<small>Turn off the buzz on blocks and dunks.</small></span><i></i></button>` : ''}</div>
       ${isTouch ? `<div class="h3">Button size</div><div class="seg2">${['Small', 'Medium', 'Large'].map(n => `<button type="button" class="pick" data-bs="${n[0].toLowerCase()}" aria-pressed="${String((SV.btn || 'm') === n[0].toLowerCase())}">${n}</button>`).join('')}</div>` : ''}
@@ -7586,6 +7709,7 @@ function openLocker(tab) {
       try { const v = box.value.trim(); if (!v.startsWith('HH1-')) throw 0; const o = JSON.parse(decodeURIComponent(escape(atob(v.slice(4))))); if (typeof o !== 'object' || !o) throw 0; Object.keys(SV).forEach(k => delete SV[k]); Object.assign(SV, o); persist(); toast('Save loaded', 'Your progress is on this device now.'); syncLevel(); closePanel(); } catch (e) { toast('That code didn\'t work', 'Copy the whole code, starting with HH1-.'); } };
     box && box.addEventListener('keydown', e => e.stopPropagation()); }
   $('panelBody').querySelectorAll('[data-bs]').forEach(b => b.onclick = () => { SV.btn = b.dataset.bs; persist(); applyBtnSize(); $('panelBody').querySelectorAll('[data-bs]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); });
+  acctWire();
   $('panelBody').querySelectorAll('[data-star]').forEach(b => b.onclick = () => { SV.style = SV.style || {}; SV.style.star = b.dataset.star; persist(); $('panelBody').querySelectorAll('[data-star]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); });
   const P = $('panelBody');
   P.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { openLocker(b.dataset.t); P.querySelector(`[data-t="${b.dataset.t}"]`)?.focus(); });
@@ -7778,8 +7902,9 @@ function newCup() {
 function saveCup() { SV.cup = tourney ? { round: tourney.round, me: tourney.me, opps: TOURNEY.map(o => [o.name, o.color, o.dark]) } : null; persist(); }
 function loadCup() { const c = SV.cup; if (!c || !c.opps) return false; TOURNEY.forEach((o, i) => { if (c.opps[i]) { o.name = c.opps[i][0]; o.color = c.opps[i][1]; o.dark = c.opps[i][2]; } }); tourney = { round: c.round, me: c.me }; return true; }
 // ---- update log ----
-const GAME_VERSION = 87;
+const GAME_VERSION = 88;
 const UPDATES = [
+  [88, 'Accounts', ['Sign in with Google or email (Locker, Settings) and your level, XP, trophies and stats save to your account.', 'Play on another device and your progress comes with you. If both have progress, the one that is further along wins.', 'Forgot your password? There is a reset link.']],
   [87, 'Replay switch', ['The Instant replays switch now turns off every replay during games, block replays included. It is on by default.', 'You can flip it from the pause menu too.', 'Long dunks ease into their arm swing instead of snapping.', 'No more Over the top text when you bounce off someone\'s head.', 'Hype time is now yours to fire: when your meter is full, press R (or → for the right player, or the glowing Hype button on phones). The screen glows in your color while it runs, and the tutorial has a new Hype time lesson.', 'After a game, a big XP bar fills up with level badges, a count-up, where your XP came from, and a flash when you level up.']],
   [86, 'New look', ['A blocky new look for every menu, with chunky bevelled buttons, square panels and pixel headings, in the Hoop Havoc colors.', 'On phones, the Pass button now shows up in the tutorial\'s teammate lessons.']],
   [85, 'Finishing touches', ['Fixed bugs where a finished dunk sometimes didn\'t count.', 'Fixed odd capitals in words like freeze and let\'s.', 'Every court has its own game-winner shower: snowflakes on Snow Day, bats in the graveyard, coins on the pirate ship, pixels in the arcade and more.', 'Crystal Cave greens light up a glowing halo of crystals; Colosseum greens raise a golden eagle and rain gold coins.']],
