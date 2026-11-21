@@ -497,7 +497,7 @@ const HAVOC = {
   tiny: { name: 'Tiny hoops', desc: 'Rims the size of a cup.', c: '#ff4f6d' }, moon: { name: 'Moon gravity', desc: 'Float like an astronaut.', c: '#c9c9ff' }, bowl: { name: 'Bowling ball', desc: 'Heavy. Very heavy.', c: '#6c7bff' },
   stilts: { name: 'Stilts', desc: 'Everyone is super tall.', c: '#ffd34d' } };
 let pregame = null;
-let havocCard = null, lastHavoc = -9, lastHavocKind = null;
+let havocCard = null, lastHavoc = -9, lastHavocKind = null, stipQ = null;
 let hoops = [], players = [], ball = {}, orb = null, powerT = 6, wind = 0;
 let state = 'intro', stateT = 0, timeScale = 1, attract = true, paused = false, mode = 1, diff = 'pro', teamSize = 2;
 let goalCount = 0;
@@ -662,6 +662,7 @@ function startRound(fresh = true) {
   if (!attract && mode !== 4 && !SV.maps.includes(court.deco)) { SV.maps.push(court.deco); persist(); if (SV.maps.length >= 12) unlock('maps'); }
   goldenRound = !attract && !practice() && goalCount > 0 && Math.random() < 0.12;   // every so often: a golden ball worth double
   if (goldenRound) setTimeout(() => { havocCard = { t: 0, name: 'Golden ball', desc: 'Every basket counts double this point.', c: '#ffd34d', tag: 'Bonus' }; tone(988, 0.2, 'triangle', 0.06); setTimeout(() => tone(1319, 0.3, 'triangle', 0.06), 120); }, 120);
+  stipQ = fresh && !attract && !practice() && !tutorial() ? stipList(false) : null; if (stipQ && !stipQ.length) stipQ = null;
   if (tutorial()) { teams[1].cpu = tutCast() === 'block'; }
   if (tutorial()) { court = COURTS[0]; ballT = BALLS[0]; body = BODIES[0]; hoopT = HOOP_TYPES[0]; wind = 0; }
   if (fresh) setupHoops(); else for (const h of hoops) { h.shattered = false; h.flex = 0; h.flexV = 0; }
@@ -4023,7 +4024,7 @@ function drawHavoc(dt) {
   ctx.fillStyle = c.c; ctx.fillRect(0, H * 0.34, W, 5); ctx.fillRect(0, H * 0.34 + 107, W, 5);
   ctx.translate(W / 2 - slide, H * 0.34 + 50); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = `700 15px ${TEXT}`; ctx.fillStyle = CREAM; ctx.fillText(c.tag || 'Havoc round', 0, -28);
-  const s = 1 + Math.max(0, 0.25 - c.t) * 1.6; ctx.scale(s, s); ctx.font = `44px ${HYPE}`; twill(c.name, 0, 4, 44, c.c, INK, 0.9);
+  ctx.font = `44px ${HYPE}`; const fit = Math.min(1, (W - 90) / Math.max(1, ctx.measureText(c.name).width)), s = (1 + Math.max(0, 0.25 - c.t) * 1.6) * fit; ctx.scale(s, s); twill(c.name, 0, 4, 44, c.c, INK, 0.9);
   ctx.setTransform(scale, 0, 0, scale, 0, 0); ctx.translate(W / 2 - slide, H * 0.34 + 92); ctx.font = `600 15px ${TEXT}`; ctx.fillStyle = CREAM; ctx.fillText(c.desc, 0, 0);
   ctx.restore();
 }
@@ -4043,8 +4044,72 @@ function drawCrowdBubbles() {
     ctx.globalAlpha = a; ctx.fillStyle = '#ffffff'; rr(b.c.x - w / 2, y - 10, w, 19, 9); ctx.fill(); ctx.beginPath(); ctx.moveTo(b.c.x - 3, y + 8); ctx.lineTo(b.c.x, y + 14); ctx.lineTo(b.c.x + 3, y + 8); ctx.fill(); ctx.fillStyle = '#1b1226'; ctx.fillText(b.txt, b.c.x, y); }
   ctx.globalAlpha = 1;
 }
+function drawSceneryMore(d) {
+  const G = GROUND, T = time;
+  const palm = (x, y, h, lean) => { ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 9; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + lean * 0.4, y - h * 0.6, x + lean, y - h); ctx.stroke();
+    ctx.fillStyle = '#2f9e4a'; for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + (i - 2.5) * 0.55 + Math.sin(T * 1.5 + i) * 0.05; ctx.beginPath(); ctx.ellipse(x + lean + Math.cos(a) * 28, y - h + Math.sin(a) * 18 + 10, 34, 8, a, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#6b3d1e'; ctx.beginPath(); ctx.arc(x + lean - 5, y - h + 6, 6, 0, 7); ctx.arc(x + lean + 6, y - h + 8, 6, 0, 7); ctx.fill(); };
+  if (d === 'beach') {
+    // a sailboat on the horizon, gulls, palms, an umbrella and a lifeguard chair on the sand
+    const bx = (T * 12) % (W + 200) - 100, by = G - 76 + Math.sin(T * 1.6) * 2;
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(bx, by - 46); ctx.lineTo(bx, by - 4); ctx.lineTo(bx + 30, by - 4); ctx.fill(); ctx.fillStyle = '#ff6f5e'; ctx.beginPath(); ctx.moveTo(bx - 2, by - 40); ctx.lineTo(bx - 2, by - 4); ctx.lineTo(bx - 22, by - 4); ctx.fill();
+    ctx.fillStyle = '#7a4a2a'; ctx.beginPath(); ctx.moveTo(bx - 26, by - 2); ctx.lineTo(bx + 34, by - 2); ctx.lineTo(bx + 26, by + 6); ctx.lineTo(bx - 18, by + 6); ctx.fill();
+    ctx.strokeStyle = '#3a3a3a'; ctx.lineWidth = 2; for (let i = 0; i < 3; i++) { const gx = (T * (30 + i * 9) + i * 330) % (W + 80) - 40, gy = 90 + i * 34 + Math.sin(T * 2 + i) * 8, f = Math.sin(T * 9 + i) * 4; ctx.beginPath(); ctx.moveTo(gx - 9, gy - f); ctx.quadraticCurveTo(gx - 4, gy - 5, gx, gy); ctx.quadraticCurveTo(gx + 4, gy - 5, gx + 9, gy - f); ctx.stroke(); }
+    palm(250, G - 2, 150, -26); palm(712, G - 2, 170, 30);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(352, G); ctx.lineTo(362, G - 74); ctx.stroke();
+    for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#ffffff' : '#ff4f6d'; ctx.beginPath(); ctx.moveTo(362, G - 80); ctx.arc(362, G - 74, 46, Math.PI + i * Math.PI / 6, Math.PI + (i + 1) * Math.PI / 6); ctx.fill(); }
+    ctx.fillStyle = '#3fd0c9'; ctx.fillRect(330, G - 6, 56, 6);
+    ctx.strokeStyle = '#d64545'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(586, G); ctx.lineTo(598, G - 62); ctx.moveTo(626, G); ctx.lineTo(614, G - 62); ctx.moveTo(590, G - 30); ctx.lineTo(622, G - 30); ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(592, G - 74, 28, 12); ctx.fillStyle = '#d64545'; ctx.fillRect(592, G - 92, 28, 18); ctx.fillStyle = '#ffffff'; ctx.fillRect(603, G - 90, 6, 14); ctx.fillRect(599, G - 86, 14, 6);
+  } else if (d === 'bounce') {
+    // the inflatable castle walls: puffy towers with pointed tops, and balloons drifting up
+    for (const [x, c] of [[260, '#ff6fb5'], [480, '#5ec8ff'], [700, '#ffd34d']]) {
+      ctx.fillStyle = c; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.ellipse(x, G - 40 - i * 46, 34, 26, 0, 0, 7); ctx.fill(); }
+      ctx.fillStyle = 'rgba(255,255,255,.35)'; for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.ellipse(x - 12, G - 48 - i * 46, 9, 6, -0.4, 0, 7); ctx.fill(); }
+      ctx.fillStyle = '#ff4f6d'; ctx.beginPath(); ctx.moveTo(x - 30, G - 200); ctx.lineTo(x, G - 262 + Math.sin(T * 3 + x) * 3); ctx.lineTo(x + 30, G - 200); ctx.fill();
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, G - 262); ctx.lineTo(x, G - 286); ctx.stroke(); ctx.fillStyle = '#5dff7a'; ctx.beginPath(); ctx.moveTo(x, G - 286); ctx.lineTo(x + 18 + Math.sin(T * 8) * 2, G - 280); ctx.lineTo(x, G - 274); ctx.fill(); }
+    for (let i = 0; i < 6; i++) { const x = 220 + i * 105 + Math.sin(T + i) * 10, y = (G - 60 - ((T * 22 + i * 90) % 420)); if (y < -30) continue; const c = ['#ff4f6d', '#ffd34d', '#5ec8ff', '#9b7bff', '#5dff7a', '#ff8a3d'][i];
+      ctx.strokeStyle = 'rgba(80,60,90,.5)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y + 16); ctx.quadraticCurveTo(x - 6, y + 34, x, y + 52); ctx.stroke(); ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x, y, 12, 15, 0, 0, 7); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.beginPath(); ctx.arc(x - 4, y - 5, 3, 0, 7); ctx.fill(); }
+  } else if (d === 'moon') {
+    // craters, a lunar lander and a planted flag
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; for (const [x, r] of [[230, 34], [400, 18], [560, 26], [690, 40]]) { ctx.beginPath(); ctx.ellipse(x, G - 8, r, r * 0.22, 0, 0, 7); ctx.fill(); }
+    const lx = 320, ly = G - 14; ctx.strokeStyle = '#c9c9d6'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(lx - 30, ly); ctx.lineTo(lx - 18, ly - 30); ctx.moveTo(lx + 30, ly); ctx.lineTo(lx + 18, ly - 30); ctx.stroke();
+    ctx.fillStyle = '#e8b82a'; ctx.fillRect(lx - 24, ly - 46, 48, 20); ctx.fillStyle = '#d9d9e6'; ctx.beginPath(); ctx.moveTo(lx - 16, ly - 46); ctx.lineTo(lx - 10, ly - 70); ctx.lineTo(lx + 10, ly - 70); ctx.lineTo(lx + 16, ly - 46); ctx.fill(); ctx.fillStyle = '#2a2a44'; ctx.beginPath(); ctx.arc(lx, ly - 58, 5, 0, 7); ctx.fill();
+    ctx.strokeStyle = '#ddd'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(640, G - 10); ctx.lineTo(640, G - 92); ctx.stroke(); ctx.fillStyle = '#ff4f6d'; ctx.fillRect(641, G - 92, 34, 22); ctx.fillStyle = '#ffffff'; ctx.fillRect(641, G - 85, 34, 4); ctx.fillStyle = '#2f7de1'; ctx.fillRect(641, G - 92, 12, 10);
+    for (let i = 0; i < 40; i++) { const a = 0.4 + 0.6 * Math.abs(Math.sin(T * (1 + hash(i) * 2) + i)); ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.fillRect(hash(i + 7) * W, hash(i + 19) * 260, 2, 2); }
+  } else if (d === 'heavy') {
+    // red rocks, glowing alien crystals and the odd meteor
+    ctx.fillStyle = '#5a2a22'; for (const [x, w, h] of [[240, 70, 40], [300, 40, 24], [640, 90, 52], [720, 46, 28]]) { ctx.beginPath(); ctx.moveTo(x - w / 2, G); ctx.lineTo(x - w * 0.3, G - h); ctx.lineTo(x + w * 0.2, G - h * 1.1); ctx.lineTo(x + w / 2, G); ctx.fill(); }
+    for (const [x, c] of [[420, '#5dff7a'], [540, '#ff8ad8']]) { ctx.fillStyle = c; ctx.globalAlpha = 0.85 + Math.sin(T * 3 + x) * 0.15; for (const [dx, h, r] of [[-10, 40, -0.2], [0, 58, 0], [12, 34, 0.25]]) { ctx.save(); ctx.translate(x + dx, G); ctx.rotate(r); ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(0, -h); ctx.lineTo(6, 0); ctx.fill(); ctx.restore(); } ctx.globalAlpha = 1; }
+    const m = (T * 0.5) % 6; if (m < 1) { const x = 200 + m * 500, y = 40 + m * 160; const gr = ctx.createLinearGradient(x - 80, y - 26, x, y); gr.addColorStop(0, 'rgba(255,180,80,0)'); gr.addColorStop(1, 'rgba(255,220,140,.9)'); ctx.strokeStyle = gr; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 80, y - 26); ctx.lineTo(x, y); ctx.stroke(); }
+  } else if (d === 'roof') {
+    // a water tower, string lights over the court and a blinking antenna
+    const wx = 600, wy = G - 160; ctx.strokeStyle = '#2a1c33'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(wx - 28, G - 18); ctx.lineTo(wx - 22, wy); ctx.moveTo(wx + 28, G - 18); ctx.lineTo(wx + 22, wy); ctx.moveTo(wx - 25, G - 70); ctx.lineTo(wx + 25, G - 110); ctx.stroke();
+    ctx.fillStyle = '#7a4a3a'; ctx.fillRect(wx - 34, wy - 70, 68, 70); ctx.fillStyle = '#5a3428'; for (let i = 0; i < 4; i++) ctx.fillRect(wx - 34, wy - 62 + i * 18, 68, 3); ctx.beginPath(); ctx.moveTo(wx - 38, wy - 70); ctx.lineTo(wx, wy - 98); ctx.lineTo(wx + 38, wy - 70); ctx.fill();
+    ctx.strokeStyle = '#2a1c33'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(380, G - 18); ctx.lineTo(380, G - 150); ctx.stroke(); ctx.fillStyle = Math.sin(T * 4) > 0 ? '#ff4f4f' : '#5a1a1a'; ctx.beginPath(); ctx.arc(380, G - 152, 4, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(30,20,40,.8)'; ctx.lineWidth = 1.5; ctx.beginPath(); const sag = x => 200 + Math.sin((x - 200) / 560 * Math.PI) * 40; for (let x = 200; x <= 760; x += 10) ctx.lineTo(x, sag(x)); ctx.stroke();
+    for (let x = 214; x < 760; x += 28) { const on = 0.6 + 0.4 * Math.sin(T * 3 + x * 0.1); ctx.fillStyle = `hsla(${(x * 3) % 360},90%,65%,${on})`; ctx.beginPath(); ctx.arc(x, sag(x) + 5, 4, 0, 7); ctx.fill(); }
+    ctx.fillStyle = '#8d93a3'; ctx.fillRect(230, G - 46, 54, 28); ctx.fillStyle = '#6d7383'; ctx.beginPath(); ctx.arc(257, G - 32, 10, 0, 7); ctx.fill(); ctx.strokeStyle = '#4d5363'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(257 + Math.cos(T * 12) * 9, G - 32 + Math.sin(T * 12) * 9); ctx.lineTo(257 - Math.cos(T * 12) * 9, G - 32 - Math.sin(T * 12) * 9); ctx.stroke();
+  } else if (d === 'snow') {
+    // a log cabin with a smoking chimney, two snowmen and falling snow
+    const cx = 480, cy = G - 4; ctx.fillStyle = '#7a4a2a'; ctx.fillRect(cx - 60, cy - 60, 120, 60); ctx.fillStyle = '#5a3418'; for (let i = 0; i < 5; i++) ctx.fillRect(cx - 60, cy - 56 + i * 12, 120, 2);
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(cx - 72, cy - 58); ctx.lineTo(cx, cy - 104); ctx.lineTo(cx + 72, cy - 58); ctx.fill(); ctx.fillStyle = '#6a3a24'; ctx.fillRect(cx + 26, cy - 108, 16, 30);
+    ctx.fillStyle = '#ffd36b'; ctx.fillRect(cx - 40, cy - 44, 22, 18); ctx.fillRect(cx + 18, cy - 44, 22, 18); ctx.fillStyle = '#4a2a14'; ctx.fillRect(cx - 9, cy - 36, 18, 36);
+    for (let i = 0; i < 5; i++) { const u = (T * 0.4 + i / 5) % 1; ctx.fillStyle = `rgba(220,226,236,${0.6 * (1 - u)})`; ctx.beginPath(); ctx.arc(cx + 34 + u * 30 + Math.sin(u * 6 + i) * 6, cy - 112 - u * 90, 7 + u * 12, 0, 7); ctx.fill(); }
+    for (const x of [300, 670]) { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, G - 18, 20, 0, 7); ctx.arc(x, G - 50, 14, 0, 7); ctx.arc(x, G - 72, 10, 0, 7); ctx.fill(); ctx.fillStyle = '#ff8a3d'; ctx.beginPath(); ctx.moveTo(x, G - 72); ctx.lineTo(x + 14, G - 70); ctx.lineTo(x, G - 68); ctx.fill();
+      ctx.fillStyle = '#222'; ctx.fillRect(x - 4, G - 76, 2, 2); ctx.fillRect(x + 3, G - 76, 2, 2); ctx.fillStyle = '#d64545'; ctx.fillRect(x - 13, G - 62, 26, 5); ctx.fillStyle = '#222'; ctx.fillRect(x - 9, G - 92, 18, 12); ctx.fillRect(x - 13, G - 82, 26, 3); }
+    ctx.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 70; i++) { const x = (hash(i) * W + Math.sin(T + i) * 20 + T * 10) % W, y = (hash(i + 50) * H + T * (30 + hash(i + 9) * 40)) % G; ctx.beginPath(); ctx.arc(x, y, 1.2 + hash(i + 3) * 1.8, 0, 7); ctx.fill(); }
+  } else if (d === 'cave') {
+    // stalactites, glowing mushrooms and drifting fireflies
+    ctx.fillStyle = '#1a1230'; for (let i = 0; i < 16; i++) { const x = i * 64 + hash(i) * 30, h = 30 + hash(i + 4) * 70; if (x > 110 && x < 200 || x > 760 && x < 850) continue; ctx.beginPath(); ctx.moveTo(x - 14, 0); ctx.lineTo(x, h); ctx.lineTo(x + 14, 0); ctx.fill(); }
+    for (const [x, c, s] of [[250, '#5ee6ff', 1], [290, '#c79bff', 0.7], [600, '#ff6fd8', 0.9], [720, '#5ee6ff', 0.8], [430, '#c79bff', 0.6]]) {
+      const g = 0.6 + 0.4 * Math.sin(T * 2 + x); ctx.fillStyle = '#e8e0f0'; ctx.fillRect(x - 3 * s, G - 26 * s, 6 * s, 26 * s);
+      ctx.fillStyle = c; ctx.globalAlpha = 0.25 * g; ctx.beginPath(); ctx.arc(x, G - 28 * s, 34 * s, 0, 7); ctx.fill(); ctx.globalAlpha = 1; ctx.beginPath(); ctx.ellipse(x, G - 28 * s, 18 * s, 11 * s, 0, Math.PI, 0); ctx.fill(); }
+    for (let i = 0; i < 14; i++) { const x = (hash(i) * W + Math.sin(T * 0.7 + i) * 40), y = 160 + hash(i + 30) * 260 + Math.cos(T * 0.9 + i) * 20, a = 0.5 + 0.5 * Math.sin(T * 4 + i * 2); ctx.fillStyle = `rgba(200,255,150,${a})`; ctx.beginPath(); ctx.arc(x, y, 2.2, 0, 7); ctx.fill(); }
+  }
+}
 function drawSceneryExtra() {
-  const d = court.deco;
+  const d = court.deco; drawSceneryMore(d);
   if (d === 'neon') {   // arcade cabinets lined up along the horizon
     for (const [x, hue] of [[46, 300], [128, 190], [W - 128, 60], [W - 46, 330]]) {
       const y = 300, w = 62, h = 160;
@@ -4114,7 +4179,7 @@ function drawBackground0() {
     for (const b of skyline) for (let y = GROUND - 30 - b.h; y < GROUND - 50; y += 18) for (let x = b.x + 6; x < b.x + b.w - 8; x += 14) if ((x * 7 + y * 3) % 5 < 2) ctx.fillRect(x, y, 6, 8);
     ctx.fillStyle = '#3d4150'; ctx.fillRect(0, GROUND - 18, W, 18);
     // wind flags
-    const dir = Math.sign(wind);
+    const dir = Math.sign(wind) || 1;   // flags still flutter on a calm day
     for (const fx of [200, 760]) {
       ctx.strokeStyle = '#ddd'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(fx, GROUND - 18); ctx.lineTo(fx, GROUND - 110); ctx.stroke();
       ctx.fillStyle = '#ffd34d'; ctx.beginPath(); ctx.moveTo(fx, GROUND - 110);
@@ -5596,7 +5661,7 @@ function drawHUD() {
   // what this point rolled: shown for a few seconds, then only what you can't see (wind, golden ball) stays
   const fresh = state === 'intro' || state === 'scored' || quietIntro ? 0 : clamp((INTRO + 3.6 - since) / 0.4, 0, 1);
   const tags = [];
-  const stY = side ? by + bh + 72 : by + bh + 12, stH = fresh > 0 ? drawStips(stipList(false), cx, stY, () => fresh) : 0;
+  const stY = side ? by + bh + 72 : by + bh + 12, stH = 0;
   if (goldenRound) tags.push(['Golden Ball, Double Points', MUSTARD, 1]);
   if (wind) tags.push([`Wind ${wind > 0 ? '→' : '←'}`, '#9fe8ff', 1]);
   if (tags.length) {
@@ -5776,7 +5841,7 @@ function drawIntro() {
     titleText(cName, 56, TS);
     ctx.restore();
   }
-  drawStips(stipList(true), W / 2, y + 58, i => out * ease(clamp((t - 0.22 - i * 0.07) / 0.16, 0, 1)));
+
   ctx.restore(); ctx.textBaseline = 'alphabetic';
 }
 const ease = x => x < 0.5 ? 2 * x * x : 1 - (-2 * x + 2) ** 2 / 2;
@@ -6825,6 +6890,8 @@ function frame(now) {
   if (pregame) drawPregame();
   if (reelCard) drawReelCard(Math.min(0.05, el || 0.016));
   if (tut && tutorial()) drawTutBig();
+  if (!havocCard && stipQ && !pregame && state === 'play' && !paused) { const L = stipQ; stipQ = null;
+    havocCard = { t: 0, tag: L.length > 1 ? 'This point' : 'This point: ' + L[0][0].toLowerCase(), name: L.map(x => x[1]).join(' + '), desc: L.map(x => (L.length > 1 ? x[0] + ': ' : '') + (STIP_INFO[x[1]] || x[1]).toLowerCase()).join('. ').replace(/^./, m => m.toUpperCase()) + '.', c: L[0][2] }; tone(523, 0.12, 'triangle', 0.05); setTimeout(() => tone(784, 0.16, 'triangle', 0.05), 90); }
   if (havocCard) drawHavoc(Math.min(0.05, el || 0.016));
   if (!attract) drawHypeScreen(Math.min(0.05, el || 0.016));
   syncHypeBtn();
@@ -8001,9 +8068,10 @@ function decorateButtons(root) {
   });
 }
 decorateButtons(); { let q = 0; new MutationObserver(() => { if (q) return; q = requestAnimationFrame(() => { q = 0; decorateButtons(); }); }).observe(document.body, { childList: true, subtree: true }); }
-const GAME_VERSION = 92;
+const GAME_VERSION = 93;
 const UPDATES = [
-  [92, 'Icons and new rules', ['Buttons across the game have icons, and the home buttons show theirs again.', 'Headings and buttons are back in the classic Hoop Havoc font.', 'Court tiles show their colours again, each with its own badge.', 'Four new house rules: Slow Motion, Heavy Gravity, Havoc Every Point and No Havoc Rounds.', 'Three new power-ups: Heavy (the other team jumps lower), Speed (longer hops) and Boom (knocks the other team flying).', 'Hype time is harder to earn but lasts 30 seconds.', 'Wind only blows during a Havoc wind storm.', 'Each point shows its ball, players and hoop as clear cards with what they do.', 'Save codes are gone. Sign in to keep your progress across devices.']],
+  [93, 'Better courts', ['Beach Court has palm trees, a beach umbrella, a lifeguard chair, gulls and a sailboat.', 'Bounce House has inflatable castle towers and balloons.', 'Moon Base has craters, a lunar lander and a flag. Heavy Planet has red rocks, alien crystals and meteors.', 'Rooftop has a water tower, string lights and an antenna. Snow Day has a log cabin, snowmen and falling snow.', 'Crystal Cave has stalactites, glowing mushrooms and fireflies.']],
+  [92, 'Icons and new rules', ['Buttons across the game have icons, and the home buttons show theirs again.', 'Headings and buttons are back in the classic Hoop Havoc font.', 'Court tiles show their colours again, each with its own badge.', 'Four new house rules: Slow Motion, Heavy Gravity, Havoc Every Point and No Havoc Rounds.', 'Three new power-ups: Heavy (the other team jumps lower), Speed (longer hops) and Boom (knocks the other team flying).', 'Hype time is harder to earn but lasts 30 seconds.', 'Wind only blows during a Havoc wind storm.', 'Each point shows its ball, players and hoop in a Havoc-style banner that says what they do, then gets out of the way.', 'Save codes are gone. Sign in to keep your progress across devices.']],
   [91, 'Livelier screens', ['Menus spring in with a bounce, their rows slide in one after another and a light sheen sweeps across.', 'The home screen plays a short intro when it opens. Animations switch off if your device asks for reduced motion.']],
   [90, 'Cleaner home screen', ['The music, sound, effects and pause buttons no longer sit in the corner of the home screen. They come back once a game starts.']],
   [89, 'Tutorial controls', ['Move back and forth through the tutorial with the Back and Next buttons (or B and S).', 'The tutorial buttons only show during a lesson, never on other screens.', '3v3 has been removed. Games are 1v1 or 2v2.']],
