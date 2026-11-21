@@ -2340,6 +2340,11 @@ function celebFly(p, c, u, t0, t1, amp, hgt) {
   }
   p.vy = Math.min(p.vy, 150); return false;
 }
+function armSync(p) {
+  const dx = p.F.x - p.Hd.x, dy = p.F.y - p.Hd.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, th = -p.phi * p.facing, c = Math.cos(th), s = Math.sin(th), ax = ux * c - uy * s, ay = ux * s + uy * c;
+  const shx = p.Hd.x + ux * (p.headR + 11 * p.scale), shy = p.Hd.y + uy * (p.headR + 11 * p.scale), len = p.L * armK() * p.reach;
+  p.hand.x = shx + ax * len; p.hand.y = shy + ay * len; p.armDir.x = ax; p.armDir.y = ay; p.shoulder = { x: shx, y: shy };
+}
 function celebTick(p, c, dt) {
   celebMore(p, c, dt);
   if (!c.conf && !attract) {   // every green celebration kicks off with a burst in the team's colors
@@ -2379,11 +2384,11 @@ function celebTick(p, c, dt) {
       if (c.fl > 0) {
         const k = clamp((u - c.t0) / c.T, 0, 1), e = k < 0.12 ? 0.5 * (k / 0.12) ** 2 * 0.12 / 0.94 : k > 0.88 ? 1 - 0.5 * ((1 - k) / 0.12) ** 2 * 0.12 / 0.94 : (k - 0.06) / 0.88;   // fast, even spin with soft ends
         const ang = -f * Math.PI * 2 * (c.turns || 1) * e, hh = p.L * 0.55, tuck = Math.sin(Math.PI * clamp((k - 0.05) / 0.85, 0, 1));
-        p.a = ang; p.w = 0; p.squash = 0.5 * tuck;   // knees pulled in tight mid-flip, smoothly in and out
+        p.a = ang; p.w = 0; p.squash = 0; p.sqV = 0; p.flipTuck = Math.min(1, tuck * 1.15); c.armFix = true;   // knees pulled in tight mid-flip, smoothly in and out
         const Hgt = c.H || (c.H = (c.turns > 1 ? 230 : 160) * Math.sqrt(1400 / g)), baseY = GROUND - Hgt * 4 * k * (1 - k);   // a clean parabola, start to landing
         const offY = hh * (Math.cos(ang) - 1); p.x = c.x0 - hh * Math.sin(ang); p.y = Math.min(GROUND - 0.5, baseY + offY); p.vx = 0; p.vy = -Hgt * 4 * (1 - 2 * k) / c.T; p.grounded = false; c.offY = offY;   // spin round the hips, not the feet
         syncPts(p);
-        if (k >= 1) { c.fl = 0; c.H = 0; p.a = 0; p.y = GROUND; p.vy = 0; p.grounded = true; c.offY = 0; p.x = c.x0; p.squash = 0.35; p.sqV = 0; syncPts(p); for (let i = 0; i < 16; i++) spark(p.Hd.x, p.Hd.y - 10, pick([MUSTARD, teams[p.team].color, CREAM]), rand(-200, 200), rand(-280, -40), true); }
+        if (k >= 1) { c.fl = 0; c.H = 0; p.flipTuck = null; p.a = 0; p.y = GROUND; p.vy = 0; p.grounded = true; c.offY = 0; p.x = c.x0; p.squash = 0.35; p.sqV = 0; syncPts(p); for (let i = 0; i < 16; i++) spark(p.Hd.x, p.Hd.y - 10, pick([MUSTARD, teams[p.team].color, CREAM]), rand(-200, 200), rand(-280, -40), true); }
       }
       break;
     case 'SNOWBALL':
@@ -2477,7 +2482,8 @@ function celebTick(p, c, dt) {
       if (!c.away && u > 0.3) { c.away = true; c.dir = p.x < W / 2 ? -1 : 1; quip(p, ['Snakes?! Nope!', 'I\'m out!', 'Not today!'], true, 1.2); }   // run for the nearest exit
       if (p.x < -120 || p.x > W + 120) { p.vx = 0; p.vy = 0; p.grounded = true; p.y = GROUND; }   // gone
       if (p.grounded && p.x > -120 && p.x < W + 120) { p.vx = c.dir * (u < 0.3 ? 60 : 340); p.facing = c.dir; if (!c.away && Math.random() < dt * 2.5) { p.vy = -230; p.grounded = false; } }
-      c.sn.forEach((s, i) => { const tx = p.x - c.dir * (58 + i * 44), mv = clamp(tx - s.x, -370 * dt, 370 * dt); if (Math.abs(mv) > 0.2) s.d = Math.sign(mv); s.x += mv; });
+      const gone = p.x < -100 || p.x > W + 100;
+      c.sn.forEach((s, i) => { if (gone) { s.d = c.dir; s.x += c.dir * 380 * dt; return; } const tx = p.x - c.dir * (58 + i * 44), mv = clamp(tx - s.x, -370 * dt, 370 * dt); if (Math.abs(mv) > 0.2) s.d = Math.sign(mv); s.x += mv; });
       if (Math.random() < dt * 3) hiss(0.25, 0.05);
       break; }
     case 'DIAMOND':
@@ -3904,7 +3910,7 @@ function animate(dt) {
     p.blinkT -= dt; if (p.blinkT < -0.13) p.blinkT = rand(1.5, 4.5);
     // celebrating players bounce around; the other team stands there
     if (p.celeb) {
-      const c = p.celeb; c.t += dt; celebTick(p, c, dt);
+      const c = p.celeb; c.t += dt; celebTick(p, c, dt); if (c.kind === 'FLIPS' || c.kind === 'LAUREL' || c.kind === 'SNAKES') armSync(p);
       if (c.kind === 'HOLD IT') p.shoot = Math.max(p.shoot, 0.2);   // keep the wrist flick up
       if (c.kind === 'BACKPEDAL' && p.grounded && Math.random() < dt * 4) { p.vx = -p.facing * 170; p.vy = -260; p.grounded = false; p.y = GROUND - 1; }
       if (c.kind === 'JUMP SPIN') {
@@ -5236,13 +5242,13 @@ function drawPlayerBody(p) {
       { x: hip.x - ux * legL * (1.9 - tuck * 0.95) + fwx * legL * (0.7 * tuck + 0.9 * split), y: hip.y - uy * legL * (1.9 - tuck * 0.95) + fwy * legL * (0.7 * tuck + 0.9 * split) },
       { x: hip.x - ux * legL * (1.85 - tuck * 0.5) - fwx * legL * (0.4 * tuck + 1.1 * split), y: hip.y - uy * legL * (1.85 - tuck * 0.5) - fwy * legL * (0.4 * tuck + 1.1 * split) },
     ];
-  } else if (p.grounded) {
+  } else if (p.grounded && !(p.celeb && p.celeb.kind === 'FLIPS' && p.celeb.fl > 0)) {
     const sp = (5.5 + p.squash * 12) * sc, idle = Math.abs(p.vx) < 25 && !(p.down > 0) && state !== 'over';
     const tap = idle ? Math.pow(Math.max(0, Math.sin(time * 2.3 + p.wob * 3)), 10) * 4 * sc : 0;   // idle: the front foot taps now and then
     feet = [1, -1].map(k => ({ x: F.x + k * p.facing * sp, y: GROUND - (k > 0 ? tap : 0) }));
   } else {
     // rising: legs long; near the top: front knee tucks, back leg trails; falling: reach for the floor
-    const ph = clamp((p.vy + 350) / 700, 0, 1), tuck = Math.sin(ph * Math.PI) * (p.dive > 0 ? 0.3 : 1);
+    const ph = clamp((p.vy + 350) / 700, 0, 1), tuck = p.flipTuck != null && p.celeb && p.celeb.kind === 'FLIPS' && p.celeb.fl > 0 ? p.flipTuck : Math.sin(ph * Math.PI) * (p.dive > 0 ? 0.3 : 1);
     const kick = p.dive > 0 ? 0 : Math.sin(time * 15 + p.wob) * 0.12;
     const fl = 1.9 - tuck * 0.85, bl = 1.85 - tuck * 0.3;
     const fade = (ball.holder === p && t.pressed && t.pressT > TAP) || (p.holdShot && p.shoot > 0.12);
@@ -5624,9 +5630,10 @@ function keyHint(x, y, items, col, right, plate = true) {
   const kw = items.map(([k]) => { ctx.font = `15px ${DISPLAY}`; return Math.max(24, ctx.measureText(k).width + 13); });
   ctx.font = `600 14px ${TEXT}`;
   const ws = items.map(([, l], i) => kw[i] + 7 + ctx.measureText(l).width), tw = ws.reduce((a, b) => a + b, 0) + (items.length - 1) * 14 + 20, x0 = right ? x - tw : x;
-  if (plate) inkTag(x0, y, tw, 36, 11, INK);
+  if (plate) { const ga = ctx.globalAlpha; ctx.globalAlpha = ga * 0.88; inkTag(x0, y, tw, 36, 11, INK); ctx.globalAlpha = ga; }
   let xx = x0 + 10;
-  items.forEach(([k, l], i) => { keycap(xx, y + 6, k, col); ctx.font = `600 14px ${TEXT}`; ctx.fillStyle = CREAM; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(l, xx + kw[i] + 7, y + 17.5); xx += ws[i] + 14; });
+  items.forEach(([k, l], i) => { keycap(xx, y + 6, k, col); ctx.font = `600 14px ${TEXT}`; ctx.fillStyle = CREAM; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(l, xx + kw[i] + 7, y + 17.5);
+    if (i < items.length - 1) { ctx.fillStyle = 'rgba(255,240,207,.18)'; ctx.fillRect(xx + ws[i] + 6, y + 9, 2, 18); } xx += ws[i] + 14; });
   return tw;
 }
 function drawNameTag() {
@@ -5792,9 +5799,10 @@ function drawHUD() {
   ctx.restore();
   // controls reminder for the first couple of points
   if (!attract && !autoPlay && !net && round <= 2 && state !== 'scored' && !isTouch) {
-    const one = mode !== 2;
+    const one = mode !== 2, ga = ctx.globalAlpha; ctx.globalAlpha = ga * clamp((time - roundStart) / 0.4, 0, 1) * (round === 2 ? clamp((roundStart + 8 - time) / 1, 0, 1) : 1);
     keyHint(14, H - 50, [['W', one ? 'Hop, Hold To Shoot' : 'Hop, Shoot'], ['E', 'Lob'], ['Q', 'Pass']], teams[0].color, false);
     if (!one) keyHint(W - 14, H - 50, [['↑', 'Hop, Shoot'], ['↓', 'Lob'], ['←', 'Pass']], teams[1].color, true);
+    ctx.globalAlpha = ga;
   }
   ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
 }
@@ -8362,8 +8370,19 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhFluid">
 @media (prefers-reduced-motion:reduce){.btn,.pick,.door,.sw,.tog,.ib,.pbtn{transition:none!important}}
 </style>`);
 document.head.insertAdjacentHTML('beforeend', '<style>.lscore{display:grid;grid-template-columns:1fr 1fr;gap:8px}.lscore div{display:flex;flex-direction:column;align-items:center;padding:8px;background:var(--tc);border:3px solid var(--edge,#0b0612);color:#fff;text-shadow:2px 2px 0 rgba(0,0,0,.4)}.lscore span{font-weight:700}.lscore b{font:700 34px/1 var(--pixel,inherit)}</style>');
-const GAME_VERSION = 104;
+document.head.insertAdjacentHTML('beforeend', `<style id="hhMobile">
+/* a quieter hype button on phones: small, tucked up top under the scoreboard, a soft glow */
+.hypebtn{left:50%!important;top:calc(var(--u,1px)*86)!important;bottom:auto!important;font-size:max(13px,calc(var(--u,1px)*15))!important;padding:.3em .9em!important;border-width:3px!important;box-shadow:inset 0 -3px 0 rgba(0,0,0,.25),0 0 10px rgba(255,200,61,.45)!important;animation:hypeSoft 1.6s ease-in-out infinite alternate!important;opacity:.92}
+@keyframes hypeSoft{from{transform:translateX(-50%) scale(1)}to{transform:translateX(-50%) scale(1.05)}}
+/* phones sideways: no frame or padding, the court uses the whole height */
+@media (pointer:coarse) and (orientation:landscape){
+  body{padding:0 max(0px,env(safe-area-inset-right,0px)) 0 max(0px,env(safe-area-inset-left,0px))!important}
+  #wrap{border-radius:0!important;box-shadow:none!important}
+}
+</style>`);
+const GAME_VERSION = 105;
 const UPDATES = [
+  [105, 'Phones and polish', ['Fixed menus not closing when you pressed Done, OK or Back.', 'On phones held sideways the court fills the whole height of the screen.', 'The Hype button on phones is smaller and calmer, tucked under the scoreboard.', 'The controls guide is tidier and fades away after the first points.', 'In the jungle, the snakes chase him all the way off screen.']],
   [104, 'Backflip fix', ['Bouncy Castle backflips no longer get stuck against the wall or knocked sideways. The shooter jogs to open floor, then flips cleanly.']],
   [103, 'Online names', ['If your friend quits an online game, a popup tells you, with the final score and a button to play online again.', 'The tutorial dunker is smarter: it hops into range, gathers for a beat, then attacks the rim, so blocking it feels like the real thing.', 'Set a username in the Locker. Online, both of your players use it, and your team is called your username plus your team name.']],
   [102, 'Cleaner screens', ['The practice toolbar only shows in practice, never on the home screen.', 'The How to play box is gone from the home screen. The tutorial and the pause menu still show the controls.', 'Jungle Temple greens: the shooter runs right off the screen, past the hoop, with the snakes still chasing.', 'Backflips follow a clean scripted arc, so they stay smooth every time.', 'Smoother everything: menus fade out when they close, buttons glide and press, switches spring, and toasts bounce in.', 'The Colosseum lion is much bigger, and you leap higher to clear it.', 'The pause menu is redesigned: a scoreboard with both teams, the game info as chips, big Resume, Restart and Quit buttons, and settings with icons.']],
