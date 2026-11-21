@@ -2363,16 +2363,17 @@ function celebTick(p, c, dt) {
       if (onF && (c.n || 0) < 4 && !(c.fl > 0) && !(c.dip >= 0)) { c.dip = u; p.vy = 0; p.y = GROUND; p.grounded = true; tone(180, 0.08, 'sine', 0.03); }   // a quick dip before every flip
       if (c.dip >= 0 && !(c.fl > 0)) { const dk = clamp((u - c.dip) / 0.16, 0, 1); p.squash = Math.max(p.squash, 0.5 * Math.sin(dk * Math.PI * 0.5)); p.a += (0 - p.a) * Math.min(1, dt * 20); p.vy = 0; p.vx *= 0.5; p.y = GROUND; p.grounded = true; syncPts(p); if (dk < 1) break; c.dip = -1; }
       if ((p.grounded || p.y >= GROUND - 4) && (c.n || 0) < 4 && !(c.fl > 0)) {
-        c.n = (c.n || 0) + 1; c.fl = 1; c.t0 = u; c.x0 = p.x; c.offY = 0; const big = c.n === 4, vy0 = (big ? 860 : 640) * Math.sqrt(g / 1400); c.T = Math.min(big ? 1.1 : 0.8, 0.85 * 2 * vy0 / g); c.turns = big ? 2 : 1; if (big) quip(p, ['Double backflip!', 'Watch this!'], true, 1);
+        c.n = (c.n || 0) + 1; c.fl = 1; c.t0 = u; c.x0 = p.x; c.offY = 0; const big = c.n === 4, vy0 = (big ? 860 : 640) * Math.sqrt(g / 1400); c.T = big ? 0.95 : 0.66; c.H = 0; c.turns = big ? 2 : 1; if (big) quip(p, ['Double backflip!', 'Watch this!'], true, 1);
         p.vy = -vy0; p.vx = 0; p.grounded = false; p.y = GROUND - 1; tone(330 + c.n * 110, 0.14, 'triangle', 0.05, 1.6);
       }
       if (c.fl > 0) {
         const k = clamp((u - c.t0) / c.T, 0, 1), e = k < 0.12 ? 0.5 * (k / 0.12) ** 2 * 0.12 / 0.94 : k > 0.88 ? 1 - 0.5 * ((1 - k) / 0.12) ** 2 * 0.12 / 0.94 : (k - 0.06) / 0.88;   // fast, even spin with soft ends
         const ang = -f * Math.PI * 2 * (c.turns || 1) * e, hh = p.L * 0.55, tuck = Math.sin(Math.PI * clamp((k - 0.05) / 0.85, 0, 1));
-        p.a = ang; p.w = 0; p.squash = Math.max(p.squash, 0.55 * tuck);   // knees pulled in tight mid-flip
-        const offY = hh * (Math.cos(ang) - 1); p.x = c.x0 - hh * Math.sin(ang); p.y += offY - (c.offY || 0); c.offY = offY;   // spin round the hips, not the feet
+        p.a = ang; p.w = 0; p.squash = 0.5 * tuck;   // knees pulled in tight mid-flip, smoothly in and out
+        const Hgt = c.H || (c.H = (c.turns > 1 ? 230 : 160) * Math.sqrt(1400 / g)), baseY = GROUND - Hgt * 4 * k * (1 - k);   // a clean parabola, start to landing
+        const offY = hh * (Math.cos(ang) - 1); p.x = c.x0 - hh * Math.sin(ang); p.y = Math.min(GROUND - 0.5, baseY + offY); p.vx = 0; p.vy = -Hgt * 4 * (1 - 2 * k) / c.T; p.grounded = false; c.offY = offY;   // spin round the hips, not the feet
         syncPts(p);
-        if (k >= 1) { c.fl = 0; p.a = 0; p.y -= c.offY || 0; c.offY = 0; p.x = c.x0; p.squash = Math.max(p.squash, 0.35); syncPts(p); for (let i = 0; i < 16; i++) spark(p.Hd.x, p.Hd.y - 10, pick([MUSTARD, teams[p.team].color, CREAM]), rand(-200, 200), rand(-280, -40), true); }
+        if (k >= 1) { c.fl = 0; c.H = 0; p.a = 0; p.y = GROUND; p.vy = 0; p.grounded = true; c.offY = 0; p.x = c.x0; p.squash = 0.35; p.sqV = 0; syncPts(p); for (let i = 0; i < 16; i++) spark(p.Hd.x, p.Hd.y - 10, pick([MUSTARD, teams[p.team].color, CREAM]), rand(-200, 200), rand(-280, -40), true); }
       }
       break;
     case 'SNOWBALL':
@@ -2463,10 +2464,10 @@ function celebTick(p, c, dt) {
       break; }
     case 'SNAKES': {
       if (!c.sn) { c.dir = p.x < W / 2 ? 1 : -1; c.sn = [0, 1, 2, 3, 4, 5].map(i => ({ x: p.x - c.dir * (330 + i * 60), d: c.dir, ph: i * 1.3 })); tone(900, 0.4, 'sawtooth', 0.02, 0.5); }
-      if (p.x > W - 80 && c.dir > 0) { c.dir = -1; if (p.grounded) { p.vy = -470; p.grounded = false; } }   // cornered: leap over them
-      if (p.x < 80 && c.dir < 0) { c.dir = 1; if (p.grounded) { p.vy = -470; p.grounded = false; } }
-      if (p.grounded) { p.vx = c.dir * (u < 0.3 ? 60 : 300); p.facing = c.dir; if (Math.random() < dt * 2.5) { p.vy = -230; p.grounded = false; } }
-      c.sn.forEach((s, i) => { const tx = p.x - c.dir * (58 + i * 44), mv = clamp(tx - s.x, -330 * dt, 330 * dt); if (Math.abs(mv) > 0.2) s.d = Math.sign(mv); s.x += mv; });
+      if (!c.away && u > 0.3) { c.away = true; c.dir = p.x < W / 2 ? -1 : 1; quip(p, ['Snakes?! Nope!', 'I\'m out!', 'Not today!'], true, 1.2); }   // run for the nearest exit
+      if (p.x < -120 || p.x > W + 120) { p.vx = 0; p.vy = 0; p.grounded = true; p.y = GROUND; }   // gone
+      if (p.grounded && p.x > -120 && p.x < W + 120) { p.vx = c.dir * (u < 0.3 ? 60 : 340); p.facing = c.dir; if (!c.away && Math.random() < dt * 2.5) { p.vy = -230; p.grounded = false; } }
+      c.sn.forEach((s, i) => { const tx = p.x - c.dir * (58 + i * 44), mv = clamp(tx - s.x, -370 * dt, 370 * dt); if (Math.abs(mv) > 0.2) s.d = Math.sign(mv); s.x += mv; });
       if (Math.random() < dt * 3) hiss(0.25, 0.05);
       break; }
     case 'DIAMOND':
@@ -2507,10 +2508,10 @@ function celebTick(p, c, dt) {
       break;
     case 'LAUREL':   // the crowd throws roses; two victory hops
       if (Math.random() < dt * 40) particles.push({ x: rand(40, W - 40), y: -10, vx: rand(-40, 40), vy: rand(40, 120), c: pick(['#dc283c', '#ff6f8a', '#ffd34d', '#ffffff']), life: 3, max: 3, g: 60, s: rand(3, 5) });
-      if (!c.lion && u > 0.55) { const from = p.x < W / 2 ? 1 : -1; c.lion = { x: from > 0 ? W + 90 : -90, d: -from, run: true }; tone(110, 0.5, 'sawtooth', 0.05, 0.6); hiss(0.4, 0.06); quip(p, ['Bring it!', 'Come on then!'], false, 1); }
-      if (c.lion && c.lion.run) { c.lion.x += c.lion.d * 520 * dt; const gap = (p.x - c.lion.x) * c.lion.d;
-        if (!c.vault && gap > 0 && gap < 120 && p.grounded) { c.vault = u; p.vy = -560 * Math.sqrt(g / 1400); p.grounded = false; p.y = GROUND - 1; tone(660, 0.12, 'triangle', 0.05); }
-        if (c.lion.x < -160 || c.lion.x > W + 160) c.lion.run = false; }
+      if (!c.lion && u > 0.55) { const from = p.x < W / 2 ? 1 : -1; c.lion = { x: from > 0 ? W + 140 : -140, d: -from, run: true }; tone(110, 0.5, 'sawtooth', 0.05, 0.6); hiss(0.4, 0.06); quip(p, ['Bring it!', 'Come on then!'], false, 1); }
+      if (c.lion && c.lion.run) { c.lion.x += c.lion.d * 480 * dt; const gap = (p.x - c.lion.x) * c.lion.d;
+        if (!c.vault && gap > 0 && gap < 150 && p.grounded) { c.vault = u; p.vy = -700 * Math.sqrt(g / 1400); p.grounded = false; p.y = GROUND - 1; tone(660, 0.12, 'triangle', 0.05); }
+        if (c.lion.x < -220 || c.lion.x > W + 220) c.lion.run = false; }
       if (c.vault && !p.grounded) { const k = clamp((u - c.vault) / 0.5, 0, 1); p.a = c.lion.d * Math.PI * 2 * ease(k) * 0 + Math.sin(k * Math.PI) * 0.25 * c.lion.d; p.w = 0; syncPts(p); }   // a clean vault, body tilted over the mane
       if (c.vault && p.grounded && !c.raise && u - c.vault > 0.45) { c.raise = u; quip(p, ['Are you not entertained?!', 'For Rome!'], true, 1.6); roar(1, 0.08); shake = Math.max(shake, 6);
         for (let i = 0; i < 30; i++) particles.push({ x: rand(60, W - 60), y: -10, vx: rand(-40, 40), vy: rand(60, 160), c: pick(['#ffd34d', '#e8b82a']), life: 3, max: 3, g: 120, s: rand(4, 6), shape: 'coin' }); }
@@ -2577,8 +2578,8 @@ function noteGlyph(x, y, s) { ctx.beginPath(); ctx.ellipse(x, y, 3.4 * s, 2.5 * 
 function gladFx(p, layer, sc) {
   const c = p.celeb, f = p.facing, u = c.t;
   if (layer === 'front' && c.lion && c.lion.run) {   // the lion: tawny body, big mane, running legs
-    const x = c.lion.x, y = GROUND - 34, d = c.lion.d, st = Math.sin(u * 26);
-    ctx.save(); ctx.translate(x, y); ctx.scale(d, 1);
+    const LS = 1.75, x = c.lion.x, y = GROUND - 34 * LS, d = c.lion.d, st = Math.sin(u * 26);
+    ctx.save(); ctx.translate(x, y); ctx.scale(d * LS, LS);
     ctx.fillStyle = '#c98a3a'; for (const [lx, ph] of [[-26, 0], [-14, Math.PI], [14, 0], [26, Math.PI]]) { const s2 = Math.sin(u * 26 + ph); ctx.save(); ctx.translate(lx, 10); ctx.rotate(s2 * 0.5); ctx.fillRect(-3.5, 0, 7, 24); ctx.restore(); }
     ctx.beginPath(); ctx.ellipse(0, 4, 38, 16, 0, 0, 7); ctx.fill();
     ctx.strokeStyle = '#c98a3a'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(-36, 0); ctx.quadraticCurveTo(-56, -10 + st * 6, -60, 6); ctx.stroke(); ctx.fillStyle = '#6a3a12'; ctx.beginPath(); ctx.arc(-60, 6, 5, 0, 7); ctx.fill();
@@ -3063,15 +3064,16 @@ function stepPlayers(dt) {
     if (p.a > MAXA) { p.a = MAXA; if (p.w > 0) p.w *= -0.25; }
     if (p.a < -MAXA) { p.a = -MAXA; if (p.w < 0) p.w *= -0.25; }
     // walls (feet and head)
-    if (p.x < 18) { p.x = 18; p.vx = Math.abs(p.vx) * 0.3; }
-    if (p.x > W - 18) { p.x = W - 18; p.vx = -Math.abs(p.vx) * 0.3; }
+    const runAway = p.celeb && p.celeb.kind === 'SNAKES';   // fleeing snakes: allowed off the edge
+    if (p.x < 18 && !runAway) { p.x = 18; p.vx = Math.abs(p.vx) * 0.3; }
+    if (p.x > W - 18 && !runAway) { p.x = W - 18; p.vx = -Math.abs(p.vx) * 0.3; }
     for (const h of hoops) {
       if (h.shattered) continue;
       const sg = Math.sign(h.boardX - W / 2), face = h.boardX - sg * 5;
       for (const tt of [0.3, 0.65, 1]) {
         const x = p.x + Math.sin(p.a) * p.L * tt, y = p.y - Math.cos(p.a) * p.L * tt, r = tt === 1 ? p.headR : 10 * p.scale;
         const over = (x + sg * r - face) * sg;
-        if (y > h.rimY - 122 && y < h.rimY + 16 && over > 0 && over < 40) { p.x -= sg * over; if (p.vx * sg > 0) p.vx = -p.vx * 0.2; }
+        if (!runAway && y > h.rimY - 122 && y < h.rimY + 16 && over > 0 && over < 40) { p.x -= sg * over; if (p.vx * sg > 0) p.vx = -p.vx * 0.2; }
       }
     }
     // heads bump the rim instead of passing through it
@@ -3086,8 +3088,8 @@ function stepPlayers(dt) {
       }
     }
     const hx = p.x + Math.sin(p.a) * p.L;
-    if (hx < 14) { p.a += (14 - hx) / p.L; p.w = Math.max(p.w, 0.5); }
-    if (hx > W - 14) { p.a -= (hx - W + 14) / p.L; p.w = Math.min(p.w, -0.5); }
+    if (hx < 14 && !runAway) { p.a += (14 - hx) / p.L; p.w = Math.max(p.w, 0.5); }
+    if (hx > W - 14 && !runAway) { p.a -= (hx - W + 14) / p.L; p.w = Math.min(p.w, -0.5); }
     syncPts(p);
   }
   // body vs body: shove, knock off balance, and flatten people on hard hits
@@ -3102,6 +3104,7 @@ function stepPlayers(dt) {
   for (let i = 0; i < players.length; i++) for (let j = i + 1; j < players.length; j++) {
     const A = players[i], B = players[j];
     if (A.iceShatter || B.iceShatter) continue;
+    if ((A.celeb && A.celeb.kind === 'SNAKES' && A.celeb.away) || (B.celeb && B.celeb.kind === 'SNAKES' && B.celeb.away)) continue;   // the runner squeezes past everyone
     if (state !== 'play' && ((A.react && A.react.to && !A.react.done) || (B.react && B.react.to && !B.react.done))) continue;   // the high-five run goes past everybody
     const fa = A.hang > 0 || !!A.dunkAnim, fb = B.hang > 0 || !!B.dunkAnim;   // a dunker is an immovable object
     if (fa && fb) continue;
@@ -7104,10 +7107,11 @@ function togglePause() {
   paused = !paused; $('pause').hidden = !paused;
   if (paused) {
     const inf = []; if (!practice()) { inf.push(tourney ? 'Tournament' : daily ? 'Daily challenge' : net && net.ready ? 'Online' : autoPlay ? 'CPU vs CPU' : mode === 2 ? '2 players' : contest ? 'Contest' : 'Vs the CPU'); inf.push('first to ' + WIN); if (rules().by2) inf.push('win by 2'); if (chaos && HAVOC[chaos]) inf.push('Havoc round: ' + HAVOC[chaos].name); if (goldenRound) inf.push('double points this point'); }
-    $('pauseInfo').textContent = inf.length ? inf.join(', ') + '.' : '';
+    $('pauseInfo').innerHTML = inf.filter(x => !/^first to/i.test(x)).map(x => `<span class="pchip">${x.replace(/^./, m => m.toUpperCase())}</span>`).join('');
     const key = (k, t) => `<span><kbd>${k}</kbd> ${t}</span>`;
     $('pauseKeys').innerHTML = isTouch ? '' : `<div><b style="color:${teams[0].color}">Left</b>${key('W', 'hop, hold to shoot')}${key('E', 'lob')}${key('Q', 'pass')}</div>` + (mode === 2 && !(net && net.ready) ? `<div><b style="color:${teams[1].color}">Right</b>${key('↑', 'hop, hold to shoot')}${key('↓', 'lob')}${key('←', 'pass')}</div>` : '');
-    $('pauseScore').textContent = practice() ? niceName(court.name) : `${niceName(teams[0].name)} ${teams[0].score} - ${teams[1].score} ${niceName(teams[1].name)}  |  ${niceName(court.name)}`; $('bResume').focus(); }
+    const tb = i => `<div class="pteam" style="--tc:${teams[i].color}"><span>${niceName(teams[i].name)}</span><b>${teams[i].score}</b></div>`;
+    $('pauseScore').innerHTML = practice() ? `<div class="pcourt">${niceName(court.name)}</div>` : `${tb(0)}<div class="pmid"><small>${niceName(court.name)}</small><small>First to ${WIN}</small></div>${tb(1)}`; $('bResume').focus(); }
 }
 function toggleMute() { muted = !muted; syncSettingsUI(); saveSettings(); }
 let lite = false;
@@ -7559,7 +7563,7 @@ function openPanel(title, html, buttons) {
   for (const [label, fn, cls] of buttons) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + (cls || 'alt'); b.innerHTML = `<b>${label}</b>`; b.onclick = fn; row.appendChild(b); }
   $('panel').hidden = false; if (row.firstChild) row.firstChild.focus();
 }
-function closePanel() { $('panel').hidden = true; if (!$('menu').hidden) { syncLevel(); syncMenuBtns(); } }
+function closePanel() { const P = $('panel'); if (!P.hidden && !P.classList.contains('hhout') && !matchMedia('(prefers-reduced-motion: reduce)').matches) { P.classList.add('hhout'); clearTimeout(P._ot); P._ot = setTimeout(() => { P.classList.remove('hhout'); closePanel(); }, 170); return; } P.classList.remove('hhout'); $('panel').hidden = true; if (!$('menu').hidden) { syncLevel(); syncMenuBtns(); } }
 function syncMenuBtns() {   // keep the icon, change only the words
   const setT = (id, t) => { const b = $(id), n = [...b.childNodes].filter(x => x.nodeType === 3); if (n.length) { n[0].nodeValue = t; n.slice(1).forEach(x => x.remove()); } else b.append(t); };
   const c = lockedCourt(); setT('bCourt', c ? 'Court ✓' : 'Court'); setT('bRules', Object.values(SV.rules).some(Boolean) ? 'Rules ✓' : 'Rules'); }
@@ -8301,8 +8305,52 @@ function pracShuffle() { const opts = COURTS.filter(c => c.deco !== court.deco);
 #pracBar .pbtn:focus-within,#pracBar .pbtn:focus-visible{outline:3px solid var(--cream,#fff0cf);outline-offset:2px}</style>`); }
 function syncPrac(force) { const b = $('pracBar'); if (!b) return; const on = mode === 3 && !attract && !paused && !contest && state !== 'replay' && $('menu').hidden && $('panel').hidden; if (b.hidden === on) b.hidden = !on;
   if (on || force) { const g = $('pGreen'), v = String(!!SV.pracGreen); if (g.getAttribute('aria-pressed') !== v) g.setAttribute('aria-pressed', v); const s = $('pCourt'); if (s && document.activeElement !== s && s.value !== court.deco) s.value = court.deco; } }
-const GAME_VERSION = 101;
+{ const sh = $('pause').querySelector('.sheet'), h2 = $('pauseTitle'), grid = document.createElement('div'), L = document.createElement('div'), R = document.createElement('div');
+  grid.className = 'pgrid2'; L.className = 'pcol'; R.className = 'pcol';
+  [$('pauseScore'), $('pauseInfo'), $('pauseKeys'), $('pauseHint')].forEach(e => e && L.appendChild(e));
+  const row = sh.querySelector('.row'), tg = sh.querySelector('.toggles'); if (row) R.appendChild(row);
+  const hd = document.createElement('div'); hd.className = 'h3'; hd.textContent = 'Settings'; R.appendChild(hd); if (tg) R.appendChild(tg);
+  grid.append(L, R); h2.after(grid);
+  $('pauseScore').removeAttribute('style'); $('pauseScore').className = 'pscore';
+  const ic = { pMusic: '<path d="M9 3.5 20 1v14.2a3.3 3.3 0 1 1-2.2-3.1V6.1L11.2 7.6v10.6A3.3 3.3 0 1 1 9 15.1z"/>', pSfx: '<path d="M3 9h4l5-4v14l-5-4H3z"/><path d="M15 8.5a4.5 4.5 0 0 1 0 7M17.5 6a8 8 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2"/>', pFx: '<path d="M10 2c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7z"/>', pVoice: '<path d="M3 5h18v11H9l-5 4v-4H3z"/>', pReplays: '<path d="M4 5h16v14H4zm2 2v10h12V7zm3 2 6 3-6 3z"/>' };
+  Object.entries(ic).forEach(([id, svg]) => { const b = $(id); if (b) b.insertAdjacentHTML('afterbegin', `<em class="tic" aria-hidden="true"><svg viewBox="0 0 24 24">${svg}</svg></em>`); });
+  document.head.insertAdjacentHTML('beforeend', `<style>
+body:not(.ingame) #pracBar{display:none!important}
+#menu .howto{display:none!important}
+#pause .sheet{width:min(94%,calc(var(--k)*820))!important}
+#pause .pgrid2{display:grid;grid-template-columns:1.15fr 1fr;gap:calc(var(--k)*18);align-items:start;text-align:left;width:100%}
+#pause .pcol{display:flex;flex-direction:column;gap:calc(var(--k)*10);min-width:0}
+#pause .pscore{display:grid;grid-template-columns:1fr auto 1fr;align-items:stretch;gap:6px;margin:0}
+#pause .pteam{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 6px;background:var(--tc);border:3px solid var(--edge,#0b0612);box-shadow:inset 0 -4px 0 rgba(0,0,0,.25);color:#fff;text-shadow:2px 2px 0 rgba(0,0,0,.4)}
+#pause .pteam span{font:700 calc(var(--k)*15)/1.1 var(--pixel,inherit);text-align:center}#pause .pteam b{font:700 calc(var(--k)*40)/1 var(--pixel,inherit)}
+#pause .pmid{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;padding:0 6px;color:var(--muted,#c9b8e0)}#pause .pmid small{font-size:calc(var(--k)*12);white-space:nowrap}
+#pause .pcourt{font:700 calc(var(--k)*22)/1.2 var(--pixel,inherit);color:var(--mustard)}
+#pause .pinfo{display:flex;flex-wrap:wrap;gap:6px;margin:0}#pause .pchip{padding:4px 10px;background:rgba(255,240,207,.1);border:2px solid rgba(255,240,207,.18);font-size:calc(var(--k)*12);font-weight:700}
+#pause .pkeys{display:flex;flex-direction:column;gap:6px;font-size:calc(var(--k)*12)}#pause .pkeys div{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#pause #pauseHint{margin:0;font-size:calc(var(--k)*12);opacity:.75}
+#pause .row{display:flex;flex-direction:column;gap:8px;margin:0}#pause .row .btn{width:100%;justify-content:center}
+#pause .toggles{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0}#pause .toggles .tog{width:100%;box-sizing:border-box;justify-content:space-between;padding:6px 8px;font-size:calc(var(--k)*12)}
+#pause .tog .tic{display:grid;width:16px;height:16px;flex:0 0 16px;font-style:normal}#pause .tog .tic svg{width:100%;height:100%;fill:currentColor}#pause .tog>span{flex:1 1 auto}
+#pause .h3{margin:4px 0 0}
+@media (max-height:520px){#pause .pkeys,#pause #pauseHint{display:none}#pause .pteam b{font-size:28px}}
+@media (max-width:600px){#pause .pgrid2{grid-template-columns:1fr}}
+</style>`); }
+document.head.insertAdjacentHTML('beforeend', `<style id="hhFluid">
+.btn,.pick,.door,.sw,.seg button,.tog,.ib,.pbtn,.verbtn{transition:transform .16s cubic-bezier(.2,.9,.25,1.2),filter .16s ease,background-color .2s ease,border-color .2s ease,box-shadow .2s ease,opacity .2s ease!important}
+.btn:hover,.pick:hover:not([disabled]),.pbtn:hover{transform:translateY(-2px)}
+.btn:active,.pick:active:not([disabled]),.pbtn:active,.ib:active{transform:translateY(2px) scale(.98)!important;transition-duration:.06s!important}
+.sw:hover:not([disabled]){transform:scale(1.08)}.sw[aria-pressed="true"]{transform:scale(1.06)}
+.tog i::after{transition:transform .22s cubic-bezier(.3,1.5,.5,1),background-color .2s!important}.tog i{transition:background-color .2s!important}
+#toast{transition:opacity .28s ease,transform .38s cubic-bezier(.2,1.4,.4,1)!important}
+.ov.hhout{animation:hhOutBg .17s ease forwards}.ov.hhout>.sheet{animation:hhOut .17s ease forwards}
+@keyframes hhOut{to{opacity:0;transform:translateY(14px) scale(.97)}}@keyframes hhOutBg{to{opacity:0}}
+.xpbar i{transition:width .5s cubic-bezier(.2,.9,.25,1)}
+#hudBtns{transition:opacity .25s ease,visibility .25s}
+@media (prefers-reduced-motion:reduce){.btn,.pick,.door,.sw,.tog,.ib,.pbtn{transition:none!important}}
+</style>`);
+const GAME_VERSION = 102;
 const UPDATES = [
+  [102, 'Cleaner screens', ['The practice toolbar only shows in practice, never on the home screen.', 'The How to play box is gone from the home screen. The tutorial and the pause menu still show the controls.', 'Jungle Temple greens: the shooter runs right off the screen, past the hoop, with the snakes still chasing.', 'Backflips follow a clean scripted arc, so they stay smooth every time.', 'Smoother everything: menus fade out when they close, buttons glide and press, switches spring, and toasts bounce in.', 'The Colosseum lion is much bigger, and you leap higher to clear it.', 'The pause menu is redesigned: a scoreboard with both teams, the game info as chips, big Resume, Restart and Quit buttons, and settings with icons.']],
   [101, 'Gladiator', ['Green in the Colosseum and you become a gladiator: sword and shield out, a lion charges, you vault right over it, then raise the sword to the crowd as gold rains down.']],
   [100, 'Practice tools', ['Bouncy Castle backflips are smooth and Speed-style: a quick dip, a tight tuck spinning round the hips, and a clean landing.', 'Practice has a toolbar: turn on Big green for a huge green window, pick any court from the list, or hit Shuffle (or R) for a random one.']],
   [99, 'Faster arenas', ['Hardwood Arena and Ice Rink run much smoother. The crowd is drawn in a smarter way, so slower computers and Chromebooks keep up.']],
