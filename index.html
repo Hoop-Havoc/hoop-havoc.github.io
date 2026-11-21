@@ -1778,7 +1778,10 @@ function cpuThink(ti, dt) {
   }
   const ours = h && h.team === ti;
   const lead = ours ? h : mine.reduce((m, p) => Math.abs(p.x - (h ? h.x : ball.x)) < Math.abs(m.x - (h ? h.x : ball.x)) ? p : m);
-  const tx = ours ? hoops[ti].cx : (h ? h.x : ball.x);
+  const sm = D.smart || 0;
+  let tx = ours ? hoops[ti].cx : (h ? h.x : ball.x);
+  if (!h && ball.shot && ball.vy < 0 && ball.shotTeam >= 0 && Math.random() < sm) tx = hoops[ball.shotTeam].cx + (Math.sign(W / 2 - hoops[ball.shotTeam].cx) || 1) * 40;   // shot in the air: crash the glass for the rebound
+  if (!ours && h && orb && Math.abs(lead.x - orb.x) < 170 && Math.abs(h.x - lead.x) > 220 && Math.random() < sm * 0.6) tx = orb.x;   // nobody to guard nearby: grab the power-up
   const dir = Math.sign(tx - lead.x) || 1;
   const leanOK = lead.grounded && Math.sin(lead.a) * dir > 0.14;
   if (ours && h.dunkAnim) { a.timer = 0.1; return; }
@@ -1802,6 +1805,9 @@ function cpuThink(ti, dt) {
     if (!mate && h.grounded && canSelfLob(h) && Math.random() < (attract ? 0.25 : solo() ? 0.2 : 0.1)) { press(0.19); a.timer = 0; return; }   // 1v1: the self-oop is your only lob
     const flyer = players.find(q => q.team !== ti && !q.grounded && !(q.down > 0) && Math.abs(q.x - h.x) < 120);
     if (flyer && h.grounded && Math.random() < (D.smart || 0)) { if (leanOK) press(0.07); a.timer = D.react * 0.5; return; }
+    const guard = players.find(q => q.team !== ti && !(q.down > 0) && Math.abs(q.x - h.x) < 75 && (hoops[ti].cx - h.x) * (q.x - h.x) > 0);
+    if (guard && h.grounded && !guard.grounded && Math.random() < sm * 0.9) { a.timer = D.react * 0.6; return; }   // the defender is already up: wait for them to come down
+    if (guard && h.grounded && guard.grounded && dx > 120 && Math.random() < sm * 0.5) { if (leanOK) press(0.07); a.timer = D.react * 0.5; return; }   // a hand in the face: drive past instead of shooting over it
     const drive = dx > 230 && Math.random() < 0.45;   // sometimes attack the rim instead of pulling up
     if (dx < D.range && !drive && h.grounded && Math.cos(h.a) > 0.7 && Math.random() < 0.8) {
       press(99); a.tol = D.tol * rand(0.5, 1.6);
@@ -1819,7 +1825,8 @@ function cpuThink(ti, dt) {
     if (shooting && Math.abs(lead.x - h.x) < 170 && lead.grounded) press(0.35);       // close out on the shooter
     else if (near && lead.grounded && !(h.grounded && !shooting && Math.random() < (D.smart || 0))) press(0.25); else if (leanOK) press(0.07);
   }
-  a.timer = a.press ? 0 : D.react * rand(0.15, 0.5);
+  const clutchK = !practice() && (teams[1 - ti].score >= WIN - 2 || t.score >= WIN - 2) ? 1 - 0.35 * sm : 1;   // close to the end, good CPUs lock in
+  a.timer = a.press ? 0 : D.react * rand(0.15, 0.5) * clutchK;
 }
 
 /* ---------- Physics ---------- */
@@ -8232,8 +8239,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhLocker">
 @media (prefers-reduced-motion:reduce){.room.from-r,.room.from-l{animation:none}.door{transition:none}}
 </style>`);
 document.head.insertAdjacentHTML('beforeend', '<style>.sw[disabled]{opacity:.9}.sw[disabled] small{border-radius:50%;background:rgba(18,11,28,.4);color:#fff;text-shadow:0 1px 0 #000}</style>');
-const GAME_VERSION = 97;
+const GAME_VERSION = 98;
 const UPDATES = [
+  [98, 'Smarter CPUs', ['Pro and Legend CPUs crash the glass for rebounds, grab nearby power-ups when nobody needs guarding, wait out a defender who is already in the air, drive past a hand in the face instead of forcing the shot, and react faster near the end of a game. Rookies stay relaxed.']],
   [97, 'Map moments', ['New green and hoop animations on ten courts: a lasso on the ranch, a bouncing star in the bouncy castle, an astronaut on the moon, floor cracks on Heavy Planet, a whale tail under the sea, lava pillars on Volcano Island, a snake coiling the rim in the jungle, golden scarabs in the desert, the Jolly Roger on the pirate ship and an equaliser in the disco.', 'Bouncy Castle winners now do four flips, finishing with a double backflip and three 10s from the crowd.', 'Dunks ease into their first move instead of snapping.', 'Blocks: a defender in the air only needs a firm touch to swat a shot, and a fingertip knocks a shot off line.', 'Dunk contest: taking off from way out and perfect lobs score more, judges agree on great dunks, and you earn a bronze, silver or gold medal.']],
   [96, 'Your team, your colours', ['Picking a team name or jersey colour in the Locker now means you wear it every game. Only the other team changes.', 'Two grey kits never face each other.', 'Fixed your jersey showing a colour you hadn\'t unlocked yet. New players start in red.', 'Jersey colours and headbands are in level order, and locked ones are easy to read.', 'Your Team and Style are now one locker room: Team & Style.', 'Wind is gone completely, including the wind arrows and the Wind storm Havoc round.', 'Give your player a name in the Locker. It shows over your player.', 'Online games use each person\'s own team name, jersey colour and player name. If both of you wear the same colour, the guest switches to an away kit.']],
   [95, 'Locker rooms', ['The Locker is now a row of colourful locker doors. Open one to walk into that room, and the room slides in from the side you came from.', 'Every mode has its own icon.']],
