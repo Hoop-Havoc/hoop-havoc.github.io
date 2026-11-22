@@ -341,7 +341,7 @@ canvas.fxprev{display:block;width:100%;height:130px;border:3px solid #0b0612;box
           <button type="button" data-d="auto" aria-pressed="false">Auto</button>
         </div>
       </div>
-      <div class="lvl" id="lvlStrip"><b id="lvlN">Level 1</b><span class="xpbar"><i id="lvlBar"></i></span><small id="lvlTxt">0 / 100 XP</small><button type="button" id="bVer" class="verbtn">v69 Updates</button></div>
+      <div class="lvl" id="lvlStrip"><b id="lvlN">Level 1</b><span class="xpbar"><i id="lvlBar"></i></span><small id="lvlTxt">0 / 100 XP</small><button type="button" id="bTour" class="verbtn tourbtn">Tour</button><button type="button" id="bVer" class="verbtn">v69 Updates</button></div>
     </div>
     <aside class="howto" aria-label="How to play">
       <h2>How to play</h2>
@@ -8299,6 +8299,7 @@ $('bSkip').addEventListener('click', () => tutSkip());
 $('bBack').addEventListener('click', () => tutBack());
 function tutBack() { if (tut && tut.step > 0) { tut.okT = 0; tutGoto(tut.step - 1); tone(392, 0.08, 'square', 0.03); } }
 $('bPause').addEventListener('click', togglePause);
+$('bTour') && $('bTour').addEventListener('click', () => { closePanel(true); openTour(); });
 $('bMute').addEventListener('click', toggleMute);
 $('bResume').addEventListener('click', togglePause);
 $('bQuit').addEventListener('click', toMenu);
@@ -9144,7 +9145,107 @@ function openWelcome() {
   $('wTeach').onclick = () => { SV.tourNext = true; persist(); closePanel(); startGame(4); };
   $('wSkip').onclick = () => openTour();
 }
-function openTour() {
+const TOUR = [
+  { el: '.mark', t: 'Welcome to Hoop Havoc', d: 'Quick tour, about a minute. Use the arrow keys, or tap Next.' },
+  { el: '#b1p', t: 'Singleplayer', d: 'You against the CPU. Random teams by default, or play as your own team (set it up in the Locker).' },
+  { el: '#b2p', t: 'Multiplayer', d: 'Two players on one keyboard or screen. Each side can pick a team name and look before the game.' },
+  { el: '#bFoe', t: 'Rival colour', d: 'Pick the colour the other team wears. Random is the default.' },
+  { el: '.seg[aria-label="Team size"]', t: 'Teams', d: '1v1 or 2v2. Two players per side means alley-oops and give-and-gos.' },
+  { el: '.seg[aria-label="CPU difficulty"]', t: 'How good is the CPU?', d: 'Rookie, Pro or Legend. Auto adjusts to how you are doing.' },
+  { el: '#bModes', t: 'Modes', d: 'Everything else lives in here. Let\'s look inside.' },
+  { el: () => { const h = [...document.querySelectorAll('#panelBody .h3')].find(x => /party/i.test(x.textContent)); return h && h.nextElementSibling; }, open: 'modes', t: 'Party modes', d: 'Power Party rains power-ups, Havoc Mode makes every point a Havoc round, and the Gauntlet keeps going until you lose.' },
+  { el: () => [...document.querySelectorAll('#panelBody .mpick')].find(b => /tournament/i.test(b.textContent)), open: 'modes', t: 'Tournament', d: 'Six rounds, each with a twist and a rival with its own style. The final is best of 3. Win to climb from Bronze to Diamond.' },
+  { el: () => [...document.querySelectorAll('#panelBody .mpick')].find(b => /online/i.test(b.textContent)), open: 'modes', t: 'Play Online', d: 'Send a friend a 4-letter code and play them on their own device. Your username shows up for them.' },
+  { el: '#bCourt', t: 'Court', d: 'There are 24 courts. Play one, a few, or a new one every point.' },
+  { el: '#bRules', t: 'Rules', d: 'House rules like big heads, low gravity, turbo or win by 2.' },
+  { el: '#bLocker', t: 'Locker', d: 'Your team, your look, your trophies, your stats and your settings.' },
+  { el: '.gtabs', open: 'locker', t: 'Team & style', d: 'Pick a tab, then hover or tap anything to try it on. Locked gear shows the level it unlocks at.' },
+  { el: '.gkits', open: 'locker', t: 'Saved kits', d: 'Save up to 3 looks, each with its own team name and player name, and swap in one tap.' },
+  { el: '#lvlStrip', t: 'Levels', d: 'Every game earns XP. Level up to unlock jerseys, sneakers, trails and more, all the way to level 100.' },
+  { el: '#bVer', t: 'Updates', d: 'See everything that\'s new in each update.' },
+  { el: null, t: 'You\'re ready', d: null },
+];
+let tourI = -1, tourRaf = 0, tourOpen = null;
+function tourCtl() {
+  return isTouch ? 'Tap or hold the court to hop and shoot. Use the Lob, Pass and Hype buttons on screen.' : '<kbd>W</kbd> or <kbd>↑</kbd> to hop, hold to shoot. <kbd>E</kbd> lob, <kbd>Q</kbd> pass, <kbd>A</kbd> <kbd>D</kbd> steer, <kbd>R</kbd> Hype Time.';
+}
+function tourEnsure(want) {
+  if (want === tourOpen) return;
+  if (tourOpen) closePanel(true);
+  tourOpen = want || null;
+  if (want === 'modes') openModes(); else if (want === 'locker') { openLocker('team'); }
+}
+function tourShow(i) {
+  if (i < 0) i = 0; if (i >= TOUR.length) { tourEnd(); return; }
+  tourI = i; const S = TOUR[i]; tourEnsure(S.open);
+  let el = $('tourUI'); if (!el) {
+    el = document.createElement('div'); el.id = 'tourUI'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-labelledby', 'tourT'); el.setAttribute('data-keep', '');
+    el.innerHTML = '<div class="tspot"></div><div class="tbub"><div class="tcount"></div><h3 id="tourT"></h3><p class="td"></p><div class="trow"><button type="button" class="tskip">Skip tour</button><span></span><button type="button" class="tback">Back</button><button type="button" class="tnext">Next</button></div></div>';
+    document.body.appendChild(el);
+    el.querySelector('.tnext').onclick = () => tourShow(tourI + 1); el.querySelector('.tback').onclick = () => tourShow(tourI - 1); el.querySelector('.tskip').onclick = tourEnd;
+    el.addEventListener('click', e => { if (e.target === el) tourShow(tourI + 1); });
+  }
+  el.hidden = false;
+  const last = i === TOUR.length - 1;
+  el.querySelector('.tcount').textContent = last ? 'Tour done' : `${i + 1} of ${TOUR.length - 1}`;
+  el.querySelector('#tourT').textContent = S.t;
+  el.querySelector('.td').innerHTML = last ? `Here are the controls: ${tourCtl()}<br>New to the game? The tutorial teaches every move in a few minutes.` : S.d;
+  const nx = el.querySelector('.tnext'); nx.textContent = last ? "Let's play" : i === TOUR.length - 2 ? 'Finish' : 'Next';
+  el.querySelector('.tback').hidden = i === 0;
+  const sk = el.querySelector('.tskip'); sk.textContent = last ? 'Play the tutorial' : 'Skip tour'; sk.onclick = last ? () => { tourEnd(); startGame(4); } : tourEnd;
+  el.classList.toggle('center', !S.el);
+  cancelAnimationFrame(tourRaf); const loop = () => { tourPlace(); tourRaf = requestAnimationFrame(loop); }; requestAnimationFrame(() => { tourPlace(); nx.focus({ preventScroll: true }); loop(); });
+}
+function tourPlace() {
+  const el = $('tourUI'); if (!el || el.hidden) return; const S = TOUR[tourI]; if (!S) return;
+  const sp = el.querySelector('.tspot'), bub = el.querySelector('.tbub');
+  let t = typeof S.el === 'function' ? S.el() : S.el ? document.querySelector(S.el) : null;
+  if (t && !t.getClientRects().length) t = null;
+  const vw = innerWidth, vh = innerHeight, bw = Math.min(360, vw - 24);
+  bub.style.width = bw + 'px';
+  if (!t) { sp.style.cssText = `left:${vw / 2}px;top:${vh / 2}px;width:0;height:0;opacity:1`; bub.style.left = (vw - bw) / 2 + 'px'; bub.style.top = Math.max(12, (vh - bub.offsetHeight) / 2) + 'px'; return; }
+  if (t.scrollIntoView && !t._tourScrolled) { t._tourScrolled = true; try { t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {} }
+  const r = t.getBoundingClientRect(), pad = 8, x = r.left - pad, y = r.top - pad, w = r.width + pad * 2, h = r.height + pad * 2;
+  sp.style.cssText = `left:${x}px;top:${y}px;width:${w}px;height:${h}px;opacity:1`;
+  const bh = bub.offsetHeight, below = y + h + 12 + bh < vh - 8, above = y - 12 - bh > 8;
+  let bx = clamp(r.left + r.width / 2 - bw / 2, 12, vw - bw - 12), by;
+  if (below) by = y + h + 12; else if (above) by = y - 12 - bh;
+  else { by = clamp(r.top + r.height / 2 - bh / 2, 12, vh - bh - 12); bx = r.right + 12 + bw < vw - 8 ? r.right + 12 : Math.max(12, r.left - 12 - bw); }
+  bub.style.left = bx + 'px'; bub.style.top = by + 'px'; bub.dataset.side = below ? 'below' : above ? 'above' : 'side';
+}
+function tourEnd() {
+  cancelAnimationFrame(tourRaf); const el = $('tourUI'); if (el) el.hidden = true;
+  if (tourOpen) { closePanel(true); tourOpen = null; } tourI = -1; SV.toured = true; SV.tourNext = false; persist();
+}
+addEventListener('keydown', e => {
+  if (tourI < 0) return; const el = $('tourUI'); if (!el || el.hidden) return;
+  if (['ArrowRight', 'ArrowLeft', 'Escape', 'Enter', ' '].includes(e.key)) { e.preventDefault(); e.stopImmediatePropagation(); }
+  if (e.key === 'ArrowRight' || e.key === 'Enter') { if (e.key === 'Enter' && document.activeElement && el.contains(document.activeElement)) { document.activeElement.click(); return; } tourShow(tourI + 1); }
+  else if (e.key === 'ArrowLeft') tourShow(tourI - 1); else if (e.key === 'Escape') tourEnd();
+}, true);
+addEventListener('resize', () => { document.querySelectorAll('[data-tsc]').forEach(x => x._tourScrolled = false); });
+document.head.insertAdjacentHTML('beforeend', `<style>
+#tourUI{position:fixed;inset:0;z-index:400}
+#tourUI[hidden]{display:none}
+#tourUI .tspot{position:fixed;border-radius:10px;box-shadow:0 0 0 3px #ffd34d,0 0 0 9999px rgba(8,4,16,.74);transition:left .35s cubic-bezier(.2,.9,.25,1),top .35s cubic-bezier(.2,.9,.25,1),width .35s cubic-bezier(.2,.9,.25,1),height .35s cubic-bezier(.2,.9,.25,1);pointer-events:none}
+#tourUI .tspot::after{content:"";position:absolute;inset:-3px;border-radius:12px;border:3px solid #ffd34d;animation:tpulse 1.4s ease-out infinite}
+@keyframes tpulse{from{opacity:.9;transform:scale(1)}to{opacity:0;transform:scale(1.08)}}
+#tourUI.center .tspot{box-shadow:0 0 0 9999px rgba(8,4,16,.8)}#tourUI.center .tspot::after{display:none}
+#tourUI .tbub{position:fixed;box-sizing:border-box;padding:14px 16px 12px;background:linear-gradient(180deg,#2a1d3d,#1a1228);border:3px solid #ffd34d;box-shadow:0 6px 0 #0b0612,0 0 0 3px #0b0612;color:#fff0cf;transition:left .35s cubic-bezier(.2,.9,.25,1),top .35s cubic-bezier(.2,.9,.25,1)}
+#tourUI .tcount{font-size:12px;color:#ffd34d;font-weight:700}
+#tourUI h3{margin:2px 0 6px;font:700 20px/1.15 var(--pixel,inherit);color:#fff0cf}
+#tourUI .td{margin:0 0 12px;font-size:14px;line-height:1.45}
+#tourUI .td kbd{display:inline-block;min-width:1.5em;padding:1px 6px;margin:1px;background:#fff0cf;color:#1a1026;border-bottom:3px solid #b9a98f;font-weight:700;text-align:center}
+#tourUI .trow{display:flex;align-items:center;gap:8px}#tourUI .trow span{flex:1}
+#tourUI .trow button{font:700 14px var(--pixel,inherit);cursor:pointer;padding:8px 14px;border:3px solid #0b0612;box-shadow:0 3px 0 #0b0612}
+#tourUI .tnext{background:#e8483b;color:#fff}#tourUI .tback{background:#3a2a52;color:#fff0cf}
+#tourUI .tskip{background:none!important;border:0!important;box-shadow:none!important;padding:8px 0!important;color:#c9b8e0;text-decoration:underline;font-weight:600!important}
+#tourUI button:focus-visible{outline:3px solid #fff0cf;outline-offset:2px}
+.tourbtn{margin-left:6px}
+@media (prefers-reduced-motion:reduce){#tourUI .tspot,#tourUI .tbub{transition:none}#tourUI .tspot::after{animation:none}}
+</style>`);
+function openTour() { tourShow(0); }
+function openTourOld() {
   SV.toured = true; SV.tourNext = false; persist();
   const row = (ic, t, d) => `<div class="tour"><i aria-hidden="true">${ic}</i><div><b>${t}</b><span>${d}</span></div></div>`;
   openPanel('Here is the menu', `<div class="tours">${[
@@ -9827,8 +9928,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 128;
+const GAME_VERSION = 129;
 const UPDATES = [
+  [129, 'Site tour', ['A new guided tour: a spotlight walks you through the menu, Modes and the Locker. Start it from the Tour button on the home screen.']],
   [128, 'Big One', ['Cleaner capitals everywhere: names like Power Party, Hype Time and Dunk Contest always look the same.', 'Rims always fit the ball, so giant balls and tiny rims are fair.', 'Accounts: pick a username (friends see it online), and set a password on a Google account so typing your email signs you in to the same account.', 'Online play retries when the server is slow and connects more reliably.', 'New cosmetics: 6 jerseys (Polka Dots, Tiger Stripes, Argyle, Big Wave, Slime Drip, Tie-Dye), 8 sneakers, 6 headbands, 8 ball trails and 6 score effects.', 'Loser animations: about half the time the winners now taunt the losers (laughing, waving bye, taking the L and more).', 'On Snow Day, Candy Land and Neon Arcade the celebration that pelts the losers is now the only loser animation.', '34 new trophies with a brand new trophy pop-up.', '3 new modes: Power Party, Havoc Mode and Gauntlet.', 'Tournaments have twists every round, rivals with their own style, a best-of-3 final, and Bronze to Diamond cups.', 'You earn XP 1.5x faster and levels need less XP.', 'Power-ups now drop from the sky as little balls. Grab one to use it.', '10 new power-ups: jetpack, lightning, tornado, shield, ghost, banana, big rim, storm cloud, swap and spring.', 'Pick the other team\'s colour from the little swatch on the home screen.', 'Every saved kit keeps its own player name.']],
   [127, 'The garage', ['The Blackout havoc round is gone.', '1 Player and 2 Players are now Singleplayer and Multiplayer.', 'The other team shows up in its own random gear every game: jersey designs, sneakers, headbands, trails and score effects.', 'Team & style is rebuilt like a garage: your player and a live trail preview on the left, one category at a time on the right (Team, Colour, Jersey, Sneakers, Headband, Ball trail, Score effect, Star player, On court).', 'Hover over a jersey, sneaker, headband or colour to try it on before you pick it. Locked gear shows the level it unlocks at.', 'Saved kits sit right under your player.']],
   [126, 'HYPE TIME', ['HYPE TIME lasts 12 seconds, gets its name in capitals, and has its own gold button next to Lob on phones. The tutorial teaches it.', 'Power-ups and status effects sit in the top corners: your team on the left, theirs on the right.', '2 players on one computer: both sides pick a team name, colour, jersey, sneakers and trail before the game, or skip.', 'Three saved kits in the locker: save a whole look and switch in one tap.', 'The CPU goes for alley-oops and self-oops now.', 'Auto Mode keeps your screen on.', 'Loser fates land with a shockwave and a flash.', 'The home screen tells you to tap for music, since browsers block sound until you do.']],
