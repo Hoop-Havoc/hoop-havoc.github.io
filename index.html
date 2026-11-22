@@ -207,6 +207,9 @@ body.gfx #hudBtns{opacity:0;pointer-events:none;transition:opacity .25s}
 @keyframes uFlip{from{transform:perspective(500px) rotateY(90deg) translateY(30px);opacity:0}to{transform:none;opacity:1}}
 @keyframes uShine{to{transform:translateX(120%)}}
 @media (prefers-reduced-motion:reduce){#unlockFx *{animation:none!important}}
+
+.tbtn{opacity:.6}
+.tbtn.on{opacity:.96}
 </style>
 
 <div id="wrap">
@@ -4340,7 +4343,7 @@ function drawCelebLight() {   // the scorer gets a spotlight in their court's co
   ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(x - 30, 0); ctx.lineTo(x + 30, 0); ctx.lineTo(x + 90, GROUND); ctx.lineTo(x - 90, GROUND); ctx.closePath(); ctx.fill();
   ctx.fillStyle = `rgba(255,240,200,${0.14 * a})`; ctx.beginPath(); ctx.ellipse(x, GROUND + 2, 90, 10, 0, 0, 7); ctx.fill(); ctx.restore();
 }
-function greenOn() { return !!(greenBurst || doom); }
+function greenOn() { return !!(greenBurst || doom || (state === 'scored' && ball && ball.green)); }
 function drawCrowdBubbles() {
   if (!crowdBubbles.length || greenOn()) return;
   ctx.font = `700 11px ${TEXT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -7680,6 +7683,7 @@ function startGame(m, target = 21, tour = false) {
   setTimeout(introCall, 650);
   audio(); mode = m; WIN = target; if (SV.rules && SV.rules.quick && target === 21 && (m === 1 || m === 2) && tour !== true && tour !== 'daily') WIN = 11; pstats = { shots: 0, greens: 0, makes: 0, dunks: 0 };
   tut = m === 4 ? { step: 0, ev: {}, base: {}, okT: 0, t: 0 } : null; $('bSkip').hidden = m !== 4; if (document.activeElement) document.activeElement.blur();
+  goalCount = 0; lastHavoc = -9; lastHavocKind = null;
   teams[0].cpu = false; teams[1].cpu = m === 1;   // mode 3 = practice: no opponents
   $('over').hidden = true; $('pause').hidden = true; paused = false;
   setGameUI(true); newMatch(false);
@@ -9099,8 +9103,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 118;
+const GAME_VERSION = 119;
 const UPDATES = [
+  [119, 'Fresh start', ['Every game starts fresh, so a Havoc round can no longer show up on the first point because of your last game.', 'Phone buttons are see-through until you press them, so you can see players behind them.', 'After a green, nobody talks until the next point starts, not just while the green show plays.']],
   [118, 'Fifteen fixes', ['New gear now flips in as cards with a rarity glow when you level up.', 'Each court has two or three different fates for the team that gets greened on.', 'At Jungle Temple the boulder the shooter hops is the one that squashes the losers.', 'The scorer gets a spotlight and confetti in the court\'s colours.', 'You can see who\'s squashed under the ice block.', 'Snatching is a bit fairer: a touch works most of the time, and pressing makes it sure. The tutorial has a snatch lesson now.', 'The corner buttons step aside during green shows, and the tags under the scoreboard fit on one line when they can.', 'Online: room codes stay in capitals, two teams can\'t share a name, and a short hiccup shows Reconnecting instead of ending the game.', 'Sounds have a bit of arena echo and baskets have a net swish.', 'Slow devices switch to Lite effects by themselves.', 'The Victory and Defeat screens come in faster, and the locker fits more on short phones.']],
   [117, 'Snatch', ['Touch the ball in the other player\'s hands and you snatch it, like Basket Random. If their body is in the way, it might not work.', 'Steals get a big swipe in your team colour, and the ball gets yanked into your hands.', 'No more chatter during a green: the players and the crowd stay quiet while the green show plays.', 'Online: if your friend closes the game or loses connection, you find out within a few seconds instead of waiting forever.', 'Jungle celebration: the shooter runs from the snakes, hops a rolling boulder, grabs a vine and swings away. The boulder squashes the snakes.']],
   [116, 'Polish', ['Every loser fate now lands with a big comic-book sound effect, like a shark chomp or a cannon kaboom.', 'Green shows are bigger and last a little longer, with a light column and a spray of the court colours.', 'Sneakers are real high-tops now: sole, collar, stripe and laces. Gold and diamond ones shine, neon, lava and galaxy ones glow.', 'Headbands have a sport stripe and knot tails that flutter when you run.', 'A better thumbs-down at the Colosseum and a proper fire-hydrant blast on the street.', 'Fixed a big slowdown when lightning fries the losers at Rainy Park.']],
