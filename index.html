@@ -1312,6 +1312,7 @@ const TUT = [
   { cast: 'solo', key: 'fake',     need: 1, title: "Pump fake", text: "Tap W two times fast with the ball. You trick the other player into jumping.", big: "Tap W two times fast" },
   { cast: 'solo', key: 'overfill', need: 1, title: "Don't hold too long", text: "If the bar gets to the top, it shoots by itself and misses. Try it once: hold W until it shoots.", big: "Hold W until it shoots" },
   { cast: 'solo', key: 'hype',     need: 1, title: "HYPE TIME", text: isTouch ? "Big plays fill your hype meter, the little bar next to your team's name. When it's full, the gold HYPE TIME button lights up above Lob. Tap it: for 12 seconds your green window gets much bigger!" : "Big plays fill your hype meter, the little bar next to your team's name. When it's full, press R for HYPE TIME. For 12 seconds your green window gets much bigger!", big: isTouch ? "Tap the HYPE TIME button" : "Press R for HYPE TIME" },
+  { cast: 'solo', key: 'power',    need: 2, title: "Power-ups", text: isTouch ? "Power-ups fall from the sky as little glowing balls. Hop into one to grab it. Its icon and a timer show up by your team name. Some help you, like the jetpack, rocket and shield. Others mess with the other team, like freeze, lightning and banana. Grab 2." : "Power-ups fall from the sky as little glowing balls. Hop into one to grab it. Its icon and a timer show up in the corner by your team name. Some help you, like the jetpack, rocket and shield. Others mess with the other team, like freeze, lightning and banana. Grab 2.", big: "Hop into the power-up" },
   { cast: 'team', key: 'pass',     need: 1, title: "Pass", text: "You have a teammate now! Tap Q to pass them the ball.", big: "Tap Q to pass" },
   { cast: 'team', key: 'cns',      need: 1, title: "Catch and shoot", text: "Pass with Q. Then hold W right away to shoot. It's easier to hit a green this way.", big: "Tap Q, then hold W" },
   { cast: 'team', key: 'alleyoop', need: 1, title: "Alley-oop", text: "Wait until your teammate is near the hoop. Tap E to throw it up to them. Tap W when the circle gets small.", big: "Tap E, then tap W" },
@@ -1328,7 +1329,8 @@ function tutSkip() { if (tut && !TUT[tut.step].final) { tut.okT = 0; tutAdvance(
 function tutTick(el) {
   if (!tut) return;
   if (TUT[tut.step].key === 'hype' && !teams[0].hypeReady && !(time < (teams[0].hypeUntil || 0)) && state === 'play') { teams[0].hype = 1; teams[0].hypeReady = true; }
-  if (tut.recast && state !== 'replay') { tut.recast = false; startRound(); return; }   // new lesson needs a teammate / an opponent
+  if (tut.recast && state !== 'replay') { tut.recast = false; startRound(); return; }
+  if (TUT[tut.step].key === 'power' && state === 'play' && !orb && !(tut.okT > 0)) { tut.pwT = (tut.pwT || 0) + el; if (tut.pwT > 0.8) { tut.pwT = 0; const me = players.find(q => q.team === 0), pw = POWERS.find(x => x.id === pick(['ROCKET', 'JETPACK', 'SPEED', 'GIANT', 'SHIELD', 'SPRING', 'FIRE', 'GLUE'])); if (me && pw) orb = { id: pw.id, c: pw.c, x: clamp(me.x + rand(-140, 140), 90, W - 90), y: -30, vx: 0, vy: 80, life: 14, t: 0, r: 15, landed: false }; } }   // new lesson needs a teammate / an opponent
   tut.t += el;
   const st = TUT[tut.step];
   if (st.key === 'snatch' && state === 'play' && !(tut.okT > 0)) { const bl = players.find(q => q.team === 1); if (bl && ball.holder !== bl && !(ball.holder && time - (ball.stolenAt || -9) < 0.3)) { tut.snT = (tut.snT || 0) + el; if (tut.snT > (ball.holder ? 1.6 : 1.0)) { ball.holder = null; catchBall(bl); ball.protectUntil = time + 0.8; tut.snT = 0; } } else tut.snT = 0; }
@@ -4258,7 +4260,7 @@ function updatePowers(dt) {
         if (ball.holder && ball.holder.team !== p.team) knockLoose(null); for (let i = 0; i < 40; i++) spark(p.x, p.y - 60, pick(['#ff4fd8', '#ffd34d', '#ffffff']), rand(-420, 420), rand(-420, 420), true); }
       else if (!newPower(p, orb.id)) t.power = { id: orb.id, t: PDUR[orb.id] || 8, max: PDUR[orb.id] || 8, c: orb.c };
       for (let i = 0; i < 24; i++) spark(orb.x, oy, orb.c, rand(-220, 220), rand(-220, 220), true);
-      rings.push({ x: orb.x, y: oy, t: 0, c: orb.c, big: 0.25 }); iconPops.push({ id: orb.id, c: orb.c, p, t: 0 }); if (humanTeam(p.team)) { carAdd('pows'); if (car('pows') >= 10) unlock('power10'); if (orb.id === 'LIGHTNING') unlock('lightning'); if (orb.id === 'SWAP' && ball.holder === p) unlock('swap'); }
+      if (p.team === 0) tutEv('power'); rings.push({ x: orb.x, y: oy, t: 0, c: orb.c, big: 0.25 }); iconPops.push({ id: orb.id, c: orb.c, p, t: 0 }); if (humanTeam(p.team)) { carAdd('pows'); if (car('pows') >= 10) unlock('power10'); if (orb.id === 'LIGHTNING') unlock('lightning'); if (orb.id === 'SWAP' && ball.holder === p) unlock('swap'); }
       tone(880, 0.18, 'triangle', 0.06, 1.5);
       orb = null; powerT = rand(4, 12) * (Math.random() < 0.2 ? 0.45 : 1); break;
     }
@@ -9928,8 +9930,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 130;
+const GAME_VERSION = 131;
 const UPDATES = [
+  [131, 'Power-up lesson', ['New tutorial lesson: how power-ups drop, how to grab them and what the good and bad ones do.']],
   [130, 'Tour moves', ['The site tour now lives in Locker, Settings, and runs on its own after your first tutorial.', 'Tournament text fixed: Bronze Cup to Diamond Cup.']],
   [129, 'Site tour', ['A new guided tour: a spotlight walks you through the menu, Modes and the Locker. It runs by itself after your first tutorial, and you can take it any time from Locker, Settings.']],
   [128, 'Big One', ['Cleaner capitals everywhere: names like Power Party, Hype Time and Dunk Contest always look the same.', 'Rims always fit the ball, so giant balls and tiny rims are fair.', 'Accounts: pick a username (friends see it online), and set a password on a Google account so typing your email signs you in to the same account.', 'Online play retries when the server is slow and connects more reliably.', 'New cosmetics: 6 jerseys (Polka Dots, Tiger Stripes, Argyle, Big Wave, Slime Drip, Tie-Dye), 8 sneakers, 6 headbands, 8 ball trails and 6 score effects.', 'Loser animations: about half the time the winners now taunt the losers (laughing, waving bye, taking the L and more).', 'On Snow Day, Candy Land and Neon Arcade the celebration that pelts the losers is now the only loser animation.', '34 new trophies with a brand new trophy pop-up.', '3 new modes: Power Party, Havoc Mode and Gauntlet.', 'Tournaments have twists every round, rivals with their own style, a best-of-3 final, and Bronze to Diamond cups.', 'You earn XP 1.5x faster and levels need less XP.', 'Power-ups now drop from the sky as little balls. Grab one to use it.', '10 new power-ups: jetpack, lightning, tornado, shield, ghost, banana, big rim, storm cloud, swap and spring.', 'Pick the other team\'s colour from the little swatch on the home screen.', 'Every saved kit keeps its own player name.']],
