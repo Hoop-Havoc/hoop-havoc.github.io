@@ -718,6 +718,7 @@ function newMatch(isAttract) {
 
 /* ---------- Audio ---------- */
 let ac = null, muted = false, lastBounceSfx = 0;
+for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { try { audio(); } catch (e) {} }, { capture: true, passive: true });   // the first touch anywhere wakes the sound up, so the lobby music starts
 function audio() {
   if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ac = null; } }
   if (ac && ac.state === 'suspended') ac.resume().catch(() => {});
@@ -812,8 +813,8 @@ function musicLevel() {   // 0 menu, 1 game, 2 hype
 function musicTick() {
   if (!ac || !music.bus) return;
   const on = music.on && !muted && ac.state === 'running';
-  const lvl = musicLevel(), cut = Math.min(SV.study ? 1300 : 1e5, mStyle().cut || 1e5, paused ? 500 : state === 'replay' ? 1100 : lvl === 0 ? 2300 : lvl === 2 ? 14000 : 7000);
-  const vol = !on ? 0 : paused ? 0.35 : lvl === 0 ? 0.75 : 1;
+  const lvl = musicLevel(), cut = Math.min(SV.study ? 1300 : 1e5, mStyle().cut || 1e5, paused ? 500 : state === 'replay' ? 1100 : lvl === 0 ? (inLobby() ? 5200 : 2300) : lvl === 2 ? 14000 : 7000);
+  const vol = !on ? 0 : paused ? 0.35 : lvl === 0 ? (inLobby() ? 0.85 : 0.75) : 1;
   if (cut !== music.cut) { music.filt.frequency.setTargetAtTime(cut, ac.currentTime, 0.25); music.cut = cut; }
   if (vol !== music.level) { music.bus.gain.setTargetAtTime(vol * 0.5, ac.currentTime, 0.3); music.level = vol; }
   if (music.next < ac.currentTime - 0.3) music.next = ac.currentTime + 0.05;   // tab was asleep: resync
@@ -849,7 +850,9 @@ const STYLES = {
   disco:   { bpm: 116, kit: 'disco',    bass: 'octave', chords: 'stab',      lead: 'strings',   swing: 0 },
   cave:    { bpm: 86,  kit: 'soft',     bass: 'sub',    chords: 'bell',      lead: 'musicbox',  echo: true, extra: 'drip', cut: 2600 },
 };
-const mStyle = () => STYLES[court && court.deco] || STYLES.arena;
+STYLES.lobby = { bpm: 86, kit: 'boombap', bass: 'round', chords: 'rhodes', lead: 'tri', extra: 'vinyl', swing: 0.24 };
+const inLobby = () => attract || (state === 'intro' && mode === 0);
+const mStyle = () => inLobby() ? STYLES.lobby : STYLES[court && court.deco] || STYLES.arena;
 function mVib(type, freq, t, dur, vol, rate, depth, cutoff) {   // a voice with vibrato (whistle, wobble)
   const o = ac.createOscillator(), g = ac.createGain(), l = ac.createOscillator(), lg = ac.createGain();
   o.type = type; o.frequency.setValueAtTime(freq, t); l.frequency.value = rate; lg.gain.value = freq * depth;
@@ -7854,7 +7857,7 @@ async function acctPull(first) {
 }
 const MAXED = ['morningfallcorp@gmail.com'];
 function acctGift() {   // these accounts are always level 100
-  if (!acct || !acct.email || !MAXED.includes(String(acct.email).toLowerCase())) return false;
+  if (!acct || !acct.email || !MAXED.includes(String(acct.email).trim().toLowerCase())) return false;
   let need = 0, L = 1, n = 100; while (L < 100) { need += n; L++; n = Math.min(100 + 60 * (L - 1), 2400); }
   if ((SV.xp || 0) >= need) return false;
   SV.xp = need; persist(); try { syncLevel(); syncSettingsUI(); } catch (e) {} toast('Level 100', 'Everything is unlocked on this account.'); return true;
@@ -9123,8 +9126,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 121;
+const GAME_VERSION = 122;
 const UPDATES = [
+  [122, 'Lobby music', ['The home screen and menus have their own laid-back lo-fi version of the theme. It starts as soon as you click or press a key, and the music button turns it off.']],
   [121, 'Wide and clear', ['The extra space on wide screens shows the court\'s own scenery, and wide computer and Chromebook windows fill edge to edge too.', 'The umbrella, lollipop and spyglass celebrations are bigger.', 'Green shows at the rim play longer.', 'The shot meter marks the green window with white notches and outlines it when you\'re in it, so you don\'t need to see green.', 'GAME OVER stays in capitals.']],
   [120, 'Edge to edge', ['On wide phones the game fills the whole screen. No more black bars on the sides.']],
   [119, 'Fresh start', ['Every game starts fresh, so a Havoc round can no longer show up on the first point because of your last game.', 'Phone buttons are see-through until you press them, so you can see players behind them.', 'After a green, nobody talks until the next point starts, not just while the green show plays.']],
