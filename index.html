@@ -2349,7 +2349,7 @@ function ballTrail(el) {
   const k = ball._pv || (SV.style || {}).trail; if (!k || k === 'none' || ball.holder || state === 'replay') { ball._rib = null; return; }
   if (!ball._pv) { const from = ball.shot ? ball.shotTeam : ball.thrower ? ball.thrower.team : -1; if (from < 0 || !myTeam(from)) return; }
   const sp = Math.hypot(ball.vx, ball.vy); if (sp < 120) { ball._rib = null; return; }
-  ball._rib = (ball._rib || []).filter(q => time - q.t < 0.22); ball._rib.push({ x: ball.x, y: ball.y, t: time });   // ribbon points
+  ball._rib = (ball._rib || []).filter(q => time - q.t < 0.3); ball._rib.push({ x: ball.x, y: ball.y, t: time });   // ribbon points
   ball._td = (ball._td || 0) + sp * el; if (ball._td < 16) return; ball._td %= 16;   // a particle every 16 px: an even, steady trail
   const x = ball.x, y = ball.y;
   const hue = (time * 1100) % 360;
@@ -2378,6 +2378,8 @@ function ballTrail(el) {
   }
 }
 
+const PAT_ACC = { stripes: '#ffffff', checker: '#ffffff', pin: '#ffffff', split: '#ffd34d', camo: '#9aa86a', sash: '#ffd34d', chevron: '#ffd34d', sunset: '#ff4f8b', stars: '#e0303f', bolt: '#ffd34d', graffiti: '#ff4fd8', flames: '#ff8a3d', circuit: '#3fe0ff', galaxy: '#ff6fd8', gold: '#ffd34d', royal: '#ffd34d' };
+const kitAcc = p => { const k = myStyle('pattern'); return k && k !== 'solid' && !attract && myTeam(p.team) && !outfit().coat ? PAT_ACC[k] || '#ffffff' : null; };
 const RARITY = L => L >= 60 ? ['Legendary', '#ffb020'] : L >= 30 ? ['Epic', '#b46bff'] : L >= 10 ? ['Rare', '#3fa0ff'] : ['Common', '#9aa0b0'];
 const PATTERNS = [['solid', 'Solid', 1], ['stripes', 'Racing Stripes', 3], ['checker', 'Finish Line', 6], ['pin', 'Pinstripe Panels', 8], ['split', 'Two-Tone Slash', 12], ['camo', 'Camo', 15], ['sash', 'Champion Sash', 18], ['chevron', 'Triple Chevron', 24], ['sunset', 'Retro Sunset', 28], ['stars', 'Star Spangled', 32], ['bolt', 'Lightning Bolt', 40], ['graffiti', 'Graffiti', 45], ['flames', 'Hot Rod Flames', 50], ['circuit', 'Neon Circuit', 58], ['galaxy', 'Galaxy', 65], ['gold', 'Gold Laurel', 80], ['royal', 'Royal Crest', 95]];
 const SHOES = [['classic', 'Classic', '#16171f', '#f6f0e4', 1], ['white', 'Clean White', '#f4f4f4', '#c8c8c8', 4], ['red', 'Fire Red', '#e8483b', '#ffffff', 10], ['ice', 'Ice Blue', '#7fd4ff', '#ffffff', 16], ['neon', 'Neon', '#5dff7a', '#16171f', 22],
@@ -5202,6 +5204,7 @@ function drawLeg(hip, foot, legL, fwx, fwy, p, t, back) {
   }
   else {   // court sneakers
     const SC2 = shoeCols(p), up = SC2 ? SC2[2] : '#16171f', so = SC2 ? SC2[3] : '#f6f0e4', ac = SC2 ? SC2[3] : t.color, sk = SC2 ? SC2[0] : 'classic';
+    { const ka = kitAcc(p); if (ka) { const [s0x, s0y] = at(0.7), [s1x, s1y] = at(0.86); seg(s0x, s0y, s1x, s1y, 6 * sc, '#f6f0e4'); const [m0x, m0y] = at(0.76), [m1x, m1y] = at(0.8); seg(m0x, m0y, m1x, m1y, 6.2 * sc, ka); } }   // socks with a stripe in your design's colour
     { const [bx, by] = at(0.86); seg(bx, by, ax, ay, 6.4 * sc, up); seg(bx, by, lerp(bx, ax, 0.22), lerp(by, ay, 0.22), 6.9 * sc, ac); }
     if (sk === 'neon' || sk === 'lava' || sk === 'galaxy' || sk === 'diamond') { const gc = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter'; ell(fx2, fy2 + 2 * sc, 11, 4, sk === 'lava' ? 'rgba(255,90,20,.35)' : sk === 'neon' ? 'rgba(93,255,122,.35)' : sk === 'galaxy' ? 'rgba(199,155,255,.35)' : 'rgba(191,239,255,.4)'); ctx.globalCompositeOperation = gc; }
     ell(fx2 + fwx * 0.6 * sc, fy2 + 1.4 * sc, 8.8, 3.1, so); ell(fx2, fy2 - 0.6 * sc, 7.8, 3.7, up);
@@ -5598,6 +5601,8 @@ function drawPlayerBody(p) {
 
   // ---- torso ----
   seg(hip.x, hip.y, lerp(hip.x, neck.x, 0.25), lerp(hip.y, neck.y, 0.25), 20 * sc, t.dark);
+  { const ka = kitAcc(p); if (ka) { const sx = lerp(hip.x, neck.x, 0.25), sy = lerp(hip.y, neck.y, 0.25); for (const sd of [-1, 1]) seg(hip.x + fwx * sd * 8.4 * sc, hip.y + fwy * sd * 8.4 * sc, sx + fwx * sd * 8.4 * sc, sy + fwy * sd * 8.4 * sc, 2.4 * sc, ka);   // shorts that match the jersey: side stripes
+    seg(hip.x - ux * 1.5 * sc, hip.y - uy * 1.5 * sc, hip.x - ux * 0.2 * sc, hip.y - uy * 0.2 * sc, 20.5 * sc, ka); } }
   seg(lerp(hip.x, neck.x, 0.22), lerp(hip.y, neck.y, 0.22), neck.x, neck.y, (20.5 + Math.sin(time * 3 + p.wob) * 0.6) * sc, '#ffffff'); // jersey piping
   seg(lerp(hip.x, neck.x, 0.22), lerp(hip.y, neck.y, 0.22), neck.x, neck.y, (18 + Math.sin(time * 3 + p.wob) * 0.6 + (p.grounded ? 0 : Math.sin(time * 26 + p.wob) * 1.1 * clamp(Math.hypot(p.vx, p.vy) / 500, 0, 1))) * sc, t.color);
   if (!O.coat) drawPattern(p, t, hip, neck, fwx, fwy, sc);
@@ -5609,7 +5614,7 @@ function drawPlayerBody(p) {
   seg(lerp(hip.x, neck.x, 0.95), lerp(hip.y, neck.y, 0.95), neck.x, neck.y, 9 * sc, p.skin); // neckline
   outfitTorso(p, t, O, hip, neck, ux, uy, fwx, fwy, sc);
   ctx.save(); ctx.translate(lerp(hip.x, neck.x, 0.58), lerp(hip.y, neck.y, 0.58)); ctx.rotate(Math.atan2(uy, ux) + Math.PI / 2);
-  ctx.fillStyle = '#fff'; ctx.font = `italic 800 ${11 * sc}px ${DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(p.num, 0, 0); ctx.restore();
+  ctx.font = `italic 800 ${11 * sc}px ${DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; if (kitAcc(p)) { ctx.lineWidth = 2.6 * sc; ctx.strokeStyle = t.dark; ctx.lineJoin = 'round'; ctx.strokeText(p.num, 0, 0); } ctx.fillStyle = '#fff'; ctx.fillText(p.num, 0, 0); ctx.restore();
   drawLeg(hip, feet[0], legL, fwx, fwy, p, t, false);
   if (O.coat) {   // the slicker hangs over the tops of both legs
     seg(hip.x + ux * 4 * sc, hip.y + uy * 4 * sc, hip.x - ux * legL * 0.72, hip.y - uy * legL * 0.72, 20 * sc, t.color);
@@ -8284,10 +8289,11 @@ function applyTeam() {
 // ---- panels ----
 function openPanel(title, html, buttons) {
   { const P = $('panel'); clearTimeout(P._ot); P.classList.remove('hhout'); }
-  $('panelTitle').textContent = title; $('panelBody').innerHTML = html; $('panelBody').scrollTop = 0;
+  const keep = !$('panel').hidden && $('panel').dataset.pt === title ? $('panelBody').scrollTop : 0;   // re-drawing the same panel: stay where you were
+  $('panel').dataset.pt = title; $('panelTitle').textContent = title; $('panelBody').innerHTML = html; $('panelBody').scrollTop = keep; if (keep) requestAnimationFrame(() => { $('panelBody').scrollTop = keep; });
   const row = $('panelBtns'); row.innerHTML = '';
   for (const [label, fn, cls] of buttons) { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn ' + (cls || 'alt'); b.innerHTML = `<b>${label}</b>`; b.onclick = fn; row.appendChild(b); }
-  $('panel').hidden = false; if (row.firstChild) row.firstChild.focus();
+  $('panel').hidden = false; if (row.firstChild && !keep) row.firstChild.focus({ preventScroll: true });
 }
 function closePanel(now) { const P = $('panel'); if (P.classList.contains('hhout') && now !== true) return; if (now !== true && !P.hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches) { P.classList.add('hhout'); clearTimeout(P._ot); P._ot = setTimeout(() => closePanel(true), 170); return; } clearTimeout(P._ot); P.classList.remove('hhout'); $('panel').hidden = true; if (!$('menu').hidden) { syncLevel(); syncMenuBtns(); } }
 function syncMenuBtns() {   // keep the icon, change only the words
@@ -9134,9 +9140,9 @@ const TRAIL_RIB = { sparkle: '#fff1a8', fire: '#ff8a3d', stars: '#ffd34d', bubbl
 function drawTrailRibbon() {   // a soft tapered streak behind the ball, like a Hive trail
   const r = ball._rib; if (!r || r.length < 2 || state === 'replay') return; const k = ball._pv || (SV.style || {}).trail; if (!k || k === 'none') return;
   ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; const gc = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter';
-  for (let i = 1; i < r.length; i++) { const a = r[i - 1], b = r[i], age = clamp((time - b.t) / 0.22, 0, 1), f = (1 - age) * (i / r.length);
+  for (let i = 1; i < r.length; i++) { const a = r[i - 1], b = r[i], age = clamp((time - b.t) / 0.3, 0, 1), f = (1 - age) * (i / r.length);
     ctx.strokeStyle = k === 'rainbow' || k === 'pixels' ? `hsla(${(b.t * 900) % 360},95%,62%,${0.55 * f})` : (TRAIL_RIB[k] || '#ffffff') + Math.round(150 * f).toString(16).padStart(2, '0');
-    ctx.lineWidth = ball.r * 1.3 * f + 1; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+    ctx.lineWidth = ball.r * 1.7 * f + 1.5; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
   ctx.globalCompositeOperation = gc; ctx.restore();
 }
 { const db0 = drawBall; drawBall = function () { drawTrailRibbon(); return db0.apply(this, arguments); }; }
@@ -9189,8 +9195,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 124;
+const GAME_VERSION = 125;
 const UPDATES = [
+  [125, 'Full kit', ['Your jersey design now comes with a full kit: shorts with side stripes and a waistband, and socks with a stripe, all in the design\'s colour.', 'Jersey numbers get an outline so they stand out on busy designs.', 'Ball trails are thicker and last a little longer, so you can see them in games.', 'The locker keeps your place when you pick a trail or headband instead of jumping back to the top.']],
   [124, 'Show room', ['The locker shows your look on a real basketball jersey with a number, trim and shading, not a box.', 'Jersey designs got more detail: wavy flags, zigzag seams, script logos, palm trees, stars on the sash and more.', 'A live preview in the locker shoots a ball with your trail and sets off your score effect, like Rocket League. Hover over a trail or effect to try it before you pick it.']],
   [123, 'Account fix', ['If your progress can\'t save to your account, the message now says why.', 'Practice: arrow buttons on each side of the court picker step to the previous or next court.']],
   [122, 'Lobby music', ['The home screen and menus have their own laid-back lo-fi version of the theme. It starts as soon as you click or press a key, and the music button turns it off.']],
