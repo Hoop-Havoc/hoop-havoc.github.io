@@ -442,7 +442,22 @@ const CUP_STYLE = { lobs: D => ({ lob: Math.min(0.9, D.lob * 1.8) }), shooters: 
 document.head.insertAdjacentHTML('beforeend', '<style>.cuptier{display:flex;align-items:center;gap:10px;padding:8px 12px;margin:0 0 10px;border:2px solid var(--ct);background:color-mix(in srgb,var(--ct) 14%,transparent)}.cuptier svg{width:28px;height:28px;fill:var(--ct)}.cuptier b{color:var(--ct);font-size:1.1em}.cuptier small{margin-left:auto;opacity:.75}.brk .bn{display:flex;flex-direction:column;flex:1;min-width:0}.brk .bn small{font-weight:600;opacity:.7;font-size:.78em}.brk .tw{color:var(--mustard,#ffbe2e)}</style>');
 function cupTier() { return Math.min(3, SV.cupTier || 0); }
 function cupDiff(d) { const L = ['rookie', 'pro', 'legend'], t = cupTier(); return L[Math.min(2, L.indexOf(d) + (t >= 2 ? 2 : t))]; }
-const STARS = [[20, "Z. Morningfall", 0], [40, "K. Havoc", 7], [60, "J. Skywalker", 23], [80, "M. Thunder", 33], [100, "The GOAT", 1]];
+const STARS = [
+  [10, "Z. Morningfall", 0, { green: 1.25 }, 'Bigger green', 'Green window 25% bigger.'],
+  [15, "D. Dimes", 11, { hands: 1.5 }, 'Sticky hands', 'Catches passes, lobs and loose balls from way farther away.'],
+  [20, "K. Havoc", 7, { jump: 1.1, speed: 1.1 }, 'Spring step', 'Jumps 10% higher and hops 10% farther.'],
+  [25, "R. Swipe", 4, { thief: 1 }, 'Pickpocket', 'Swipes for steals land about twice as often.'],
+  [30, "T. Hype", 9, { hype: 1.6 }, 'Hype man', 'Fills your team\'s Hype meter 60% faster.'],
+  [35, "B. Bounce", 14, { jump: 1.18 }, 'Big hops', 'Jumps 18% higher.'],
+  [40, "L. Lightning", 2, { speed: 1.25 }, 'Speedster', 'Hops 25% farther, so they get up the court fast.'],
+  [50, "J. Skywalker", 23, { jump: 1.12, dunk: 1 }, 'Sky dunker', 'Jumps higher and dunks from farther out.'],
+  [60, "S. Splash", 30, { green: 1.4 }, 'Splash', 'Green window 40% bigger.'],
+  [70, "P. Pickpocket", 3, { thief: 1, hands: 1.3 }, 'Magnet hands', 'Steals land way more often and catches come easy.'],
+  [80, "M. Thunder", 33, { jump: 1.15, speed: 1.15, dunk: 1 }, 'Thunder', 'Higher, farther, and dunks from farther out.'],
+  [90, "A. Ace", 8, { green: 1.3, hype: 1.4 }, 'Ace', 'Bigger green window and a faster Hype meter.'],
+  [100, "The GOAT", 1, { green: 1.35, jump: 1.15, speed: 1.1, hands: 1.3, thief: 1, dunk: 1, hype: 1.3 }, 'Does it all', 'Better at everything.'],
+];
+const starOf = p => p && p.starPerk || null;
 const TEAM_COLORS = [['#2c8cff', '#1a5aa8', 10, 'Sky'], ['#7ac74f', '#4c8a2c', 15, 'Lime'], ['#b3243b', '#741626', 21, 'Crimson'], ['#9aa3b5', '#5d6475', 27, 'Silver'], ['#00d1c1', '#00847a', 34, 'Aqua'], ['#ff6f3c', '#b23e15', 41, 'Sunset'], ['#d4af37', '#8f7420', 50, 'Champion Gold'], ['#5b2a86', '#371652', 60, 'Royal Purple'], ['#ff3fa4', '#b0236e', 70, 'Neon Pink'], ['#111827', '#000000', 80, 'Blackout'], ['#e8f3ff', '#9fb6d1', 90, 'Ice'], ['#ffd700', '#b8860b', 100, 'Legend'], ['#e8483b', '#9e2a20', 1, 'Red'], ['#f2802e', '#a8501a', 2, 'Orange'], ['#e8b52a', '#9c7712', 3, 'Gold'], ['#3fae4a', '#25702e', 4, 'Green'],
   ['#22b3b0', '#147371', 5, 'Teal'], ['#8e5ad8', '#5a3394', 6, 'Purple'], ['#e84d9c', '#9c2a63', 7, 'Pink'], ['#3b3f4f', '#1e2029', 8, 'Midnight']];
 const TEAM_NAMES = ['HOT DOGS', 'FIRE ANTS', 'SKY SHARKS', 'ROBO RHINOS', 'DISCO DUCKS', 'LAVA LIZARDS', 'NIGHT OWLS', 'TURBO TOADS'];
@@ -812,7 +827,7 @@ function newMatch(isAttract) {
   attract = isAttract;
   teams.forEach(t => { t.score = 0; t.streak = 0; t.onFire = false; t.stats = { baskets: 0, dunks: 0, oops: 0, deep: 0, blocks: 0, steals: 0, best: 0, greens: 0, lead: 0 }; t.run = 0; t.deficit = 0; t.cbDone = false; });
   const used = new Set(); teams.forEach(t => t.roster = makeRoster(used)); lastReplayRound = -9;
-  { const st = (SV.style || {}).star, S = STARS.find(x => x[1] === st); if (S && !attract && !(net && net.ready) && lvlInfo().L >= S[0]) Object.assign(teams[0].roster[0], { pname: S[1].toUpperCase(), num: S[2], band: true }); }
+  { const st = (SV.style || {}).star, S = STARS.find(x => x[1] === st), slot = teams[0].roster[1] ? 1 : -1; if (S && slot > 0 && !attract && !(net && net.ready) && !tutorial() && lvlInfo().L >= S[0]) Object.assign(teams[0].roster[slot], { pname: S[1].toUpperCase(), num: S[2], band: true, starPerk: S[3], starName: S[1] }); }
   if (SV.pname && !attract && !(net && net.ready) && !tutorial()) teams[0].roster[0].pname = SV.pname;
   mvpT = {}; halfDone = false; highlights = []; shots = []; teams.forEach(t => { t.hype = 0; t.hypeUntil = 0; t.hypeReady = false; });
   round = 0; startRound();
@@ -1215,7 +1230,8 @@ function contestOf(p) {
   }
   return c;
 }
-function greenWidth(p) {
+function greenWidth(p) { return greenWidth0(p) * ((starOf(p) || {}).green || 1); }
+function greenWidth0(p) {
   // deeper shots and contested shots have a tighter window
   const d = Math.abs(hoops[p.team].cx - ball.x);
   const hot = (1 + 0.12 * Math.min(teams[p.team].greenRun || 0, 3)) * (p.fakeBoost > 0 ? 1.4 : 1) * (clutch(p.team) ? 1.25 : 1) * (p.cns && ball.holder === p ? 1.35 : 1) * (tut && tut.assist && !teams[p.team].cpu ? 1.9 : 1) * (time < (teams[p.team].hypeUntil || 0) ? 1.45 : 1) * (teams[p.team].power && teams[p.team].power.id === 'SNIPER' ? 1.6 : 1);   // hot hand: greens in a row widen the window
@@ -1240,7 +1256,8 @@ function neededCharge(p) {
   const v = Math.sqrt(g * dx * dx / denom);
   return clamp((v / speedBase() - 480) / 820, 0, 1);
 }
-function jumpPower(p, rise) {
+function jumpPower(p, rise) { return jumpPower0(p, rise) * ((starOf(p) || {}).jump || 1); }
+function jumpPower0(p, rise) {
   const t = teams[p.team];
   // attacking the rim (ball in hand nearby) or going up for a lob: players elevate higher
   const contest = attack && attack.d === ball.holder && attack.d.team !== p.team && Math.abs(attack.hp.cx - p.x) < 240;   // going up to meet a dunk: rim-protector lift
@@ -1251,7 +1268,7 @@ function jumpPlayer(p) {
   p.rising = 0; p.phiBV = (p.phiBV || 0) + 9;   // arms swing up into the jump
   if (p.stun > 0) return;   // still recovering from biting on a fake
   const J = jumpPower(p);
-  const ja = jumpAngle(p); p.vx = Math.sin(ja) * J * 1.05 * (body.hop || 1) * (teams[p.team].power && teams[p.team].power.id === 'SPEED' ? 1.45 : 1) + p.vx * 0.2; p.vy = -Math.cos(ja) * J; p.w += p.a * 1.2;
+  const ja = jumpAngle(p); p.vx = Math.sin(ja) * J * 1.05 * (body.hop || 1) * ((starOf(p) || {}).speed || 1) * (teams[p.team].power && teams[p.team].power.id === 'SPEED' ? 1.45 : 1) + p.vx * 0.2; p.vy = -Math.cos(ja) * J; p.w += p.a * 1.2;
   p.grounded = false; p.y = GROUND - 1; p.jumpT = time;
   for (let i = 0; i < 4; i++) spark(p.x, GROUND, 'rgba(255,255,255,.6)', rand(-60, 60), rand(-60, -10));
   tone(200, 0.12, 'triangle', 0.05, 1.9);
@@ -1277,7 +1294,7 @@ function onPress(ti) {
     const J = jumpPower(p);
     // launch along the body's lean, like a spring in the legs
     const ja = jumpAngle(p);
-    p.vx = Math.sin(ja) * J * 1.05 * (body.hop || 1) * (teams[p.team].power && teams[p.team].power.id === 'SPEED' ? 1.45 : 1) + p.vx * 0.2;
+    p.vx = Math.sin(ja) * J * 1.05 * (body.hop || 1) * ((starOf(p) || {}).speed || 1) * (teams[p.team].power && teams[p.team].power.id === 'SPEED' ? 1.45 : 1) + p.vx * 0.2;
     p.vy = -Math.cos(ja) * J;
     p.w += p.a * 1.6;
     p.grounded = false; p.y = GROUND - 1; p.jumpT = time; p.rising = 0; p.phiBV = (p.phiBV || 0) + 9;
@@ -4038,7 +4055,7 @@ function interactions() {
   // catch / steal
   for (const p of players) {
     if (p.hang > 0) continue;
-    const t = teams[p.team], glue = (t.power && t.power.id === 'GLUE' ? 1.9 : 1) * (ball.lob === p && !p.grounded ? (ball.thrower === p ? 3.4 : 1.8) : 1);
+    const t = teams[p.team], glue = ((starOf(p) || {}).hands || 1) * (t.power && t.power.id === 'GLUE' ? 1.9 : 1) * (ball.lob === p && !p.grounded ? (ball.thrower === p ? 3.4 : 1.8) : 1);
     const d = Math.hypot(p.hand.x - ball.x, p.hand.y - ball.y);
     if (!ball.holder) {
       if (ball.frozen || ball.pin || time < (ball.slamUntil || 0) || p.cool > 0 || t.frozen > 0 || p.down > 0 || ball.glass || (p.stunBig && p.stun > 0)) continue;
@@ -4053,7 +4070,7 @@ function interactions() {
       if (d < ball.r + 14 * glue * p.scale || (slow && bd < ball.r + 14 * glue * p.scale)) { catchBall(p); break; }
     } else if (ball.holder.team !== p.team && !ball.holder.dunkAnim && !(attack && attack.d === ball.holder) && !(p.down > 0) && !(p.bitT > 0.2) && !(p.stun > 0) && !(p.stealCD > 0) && time > (ball.protectUntil || 0) && t.frozen <= 0 && !(teams[ball.holder.team].power && teams[ball.holder.team].power.id === 'GHOST') && d < ball.r + (t.pressed ? 16 : 11) * glue * p.scale) {
       const h = ball.holder, shielded = Math.sign(ball.x - h.x) !== Math.sign(p.x - h.x) && Math.abs(p.x - h.x) > 10;   // body between you and the ball
-      if (Math.random() > (shielded ? (t.pressed ? 0.3 : 0.12) : (t.pressed ? 1 : 0.7))) { p.stealCD = 0.45; continue; }   // a swipe that missed: a beat to recover
+      if (!((starOf(p) || {}).thief && Math.random() < 0.55) && Math.random() > (shielded ? (t.pressed ? 0.3 : 0.12) : (t.pressed ? 1 : 0.7))) { p.stealCD = 0.45; continue; }   // a swipe that missed: a beat to recover
       h.stealCD = 0.9; p.stealCD = 0.6;   // the player who got picked can't instantly grab it back
       p.swipeT = 0.22; const bx0 = ball.x, by0 = ball.y; fxSwipes.push({ x: ball.x, y: ball.y, d: Math.sign(p.x - h.x) * -1 || -p.facing, t: 0, c: t.color, fx: bx0, fy: by0, p }); tone(1400, 0.08, 'triangle', 0.04, 0.5); tone(700, 0.12, 'sine', 0.03, 1.8);
       for (let k = 0; k < 10; k++) spark(bx0, by0, pick([t.color, '#ffffff']), rand(-200, 200), rand(-220, 40), false);
@@ -4069,7 +4086,7 @@ function interactions() {
   if (ball.holder) {
     const p = ball.holder, hp = hoops[p.team];
     if (p.dunkAnim) { if (p.dunkAnim.t >= 1) finishDunk(p); }
-    else if (!p.grounded && !p.noDunk && !(p.hang > 0) && !behindRim(p, hp) && Math.abs(p.hand.x - hp.cx) < (teams[p.team].cpu ? 72 : 86) && p.hand.y < hp.rimY + (teams[p.team].cpu ? 22 : 32) && p.hand.y > hp.rimY - 115) startDunk(p, hp);
+    else if (!p.grounded && !p.noDunk && !(p.hang > 0) && !behindRim(p, hp) && Math.abs(p.hand.x - hp.cx) < (teams[p.team].cpu ? 72 : 86) + ((starOf(p) || {}).dunk ? 22 : 0) && p.hand.y < hp.rimY + (teams[p.team].cpu ? 22 : 32) + ((starOf(p) || {}).dunk ? 10 : 0) && p.hand.y > hp.rimY - 115) startDunk(p, hp);
   }
   if (ball.glass && time > ball.glassBy) ball.glass = null;
   if (ball.pass) {
@@ -9401,7 +9418,7 @@ function garItems(tab) {   // [value, name, level, iconHTML, selected]
     case 'band': return BANDS.map((b, i) => [String(i), b[1], b[2] || 1, `<i class="gband" style="--bc:${b[0] || 'transparent'}">${b[0] ? '' : '⊘'}</i>`, (st.band || 0) === i]);
     case 'trail': return TRAILS.map(([k, n, L]) => [k, n, L, `<i class="gemo">${TRAIL_EMO[k] || '✨'}</i>`, (st.trail || 'none') === k]);
     case 'scorefx': return SCOREFX.map(([k, n, L]) => [k, n, L, `<i class="gemo">${FX_EMO[k] || '★'}</i>`, (st.scorefx || 'none') === k]);
-    case 'star': return [[0, 'None', 1, 0], ...STARS].map(([L, n, num]) => [L ? n : '', n === 'None' ? 'None' : n, L || 1, `<i class="gnum">${L ? '#' + num : '⊘'}</i>`, (st.star || '') === (L ? n : '')]);
+    case 'star': return [[0, 'None', 1, 0, null, 'No star'], ...STARS].map(([L, n, num, pk, short]) => [L ? n : '', n === 'None' ? 'None' : n, L || 1, `<i class="gnum">${L ? '#' + num : '⊘'}</i>`, (st.star || '') === (L ? n : ''), short]);
     case 'colour': return TEAM_COLORS.map((c, i) => [String(i), c[3] || 'Colour', c[2] || 1, `<i class="gsw" style="background:linear-gradient(135deg,${c[0]} 0 58%,${c[1]} 58%)"></i>`, myColorIdx() === i]).sort((a, b) => a[2] - b[2]);
     case 'outfit': return [['map', 'Court outfits', 1, '<i class="gemo">🗺️</i>', (SV.outfit || 'map') === 'map', 'Dress for each court: cowboy hats on the ranch, helmets on the ice.'], ['custom', 'My custom jersey', 1, '<i class="gemo">👕</i>', SV.outfit === 'custom', 'Your design, sneakers and headband on every court.'], ['plain', 'Plain jersey', 1, '<i class="gemo">⬜</i>', SV.outfit === 'plain', 'Just team colours, no extras.']];
   }
@@ -9415,7 +9432,7 @@ function garPane() {
       <div class="gsec"><b class="glab">Username</b><div class="gin"><input class="namein" id="gPnameIn" maxlength="12" placeholder="Your username" value="${SV.pname ? niceName(SV.pname) : ''}" aria-label="Your username"></div><small class="gsm">Online, both your players use it.</small></div>
       <div class="gsec rlist"><button class="tog" type="button" role="switch" data-gsw="rollTeams" aria-checked="${SV.rollTeams !== false}"><span>Random matchups<small>Every normal game rolls two new teams.</small></span><i></i></button>
       <button class="tog" type="button" role="switch" data-gsw="useMine" aria-checked="${!!SV.useMine}"><span>Always play as my team<small>Keep your name and colours; only the opponent changes.</small></span><i></i></button></div>`; }
-  const items = garItems(garTab), desc = { jersey: 'Printed across your jerseys, with matching shorts and socks.', shoes: 'High-tops for your players. The best ones shine and glow.', band: 'Headbands with knot tails that flutter when you run.', trail: 'Follows your shots and passes. Hover to preview it above.', scorefx: 'Goes off at the rim when your team scores. Hover to preview it above.', star: 'A named player who joins you in 1-player games, with a slightly better jump and shot.', colour: 'Your team colour, used on jerseys and the scoreboard.', outfit: 'What your players wear in games.' }[garTab] || '';
+  const items = garItems(garTab), desc = { jersey: 'Printed across your jerseys, with matching shorts and socks.', shoes: 'High-tops for your players. The best ones shine and glow.', band: 'Headbands with knot tails that flutter when you run.', trail: 'Follows your shots and passes. Hover to preview it above.', scorefx: 'Goes off at the rim when your team scores. Hover to preview it above.', star: (() => { const S = STARS.find(x => x[1] === (SV.style || {}).star); return 'A named star joins your named player in 2v2 games, and each one has a real perk.' + (S ? ` ${S[1]}: ${S[5]}` : ' Pick one below.'); })(), colour: 'Your team colour, used on jerseys and the scoreboard.', outfit: 'What your players wear in games.' }[garTab] || '';
   const owned = items.filter(it => it[2] <= L).length;
   return `<p class="gdesc">${desc}<span class="gcount">${owned} / ${items.length} unlocked</span></p><div class="ggrid${garTab === 'outfit' ? ' gwide' : ''}">${items.map(([v, n, lv, ic, sel, sub]) => { const [rn, rc] = RARITY(lv), lk = lv > L;
     return `<button type="button" class="gt${lk ? ' lk' : ''}" data-g="${garTab}" data-v="${v}" data-lv="${lv}" aria-pressed="${String(!!sel)}" ${lk ? 'aria-disabled="true"' : ''} style="--rc:${rc}">${ic}<b>${n}</b><small>${lk ? '🔒 Level ' + lv : sub || rn}</small></button>`; }).join('')}</div>`;
@@ -9977,8 +9994,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 132;
+const GAME_VERSION = 133;
 const UPDATES = [
+  [133, 'Star players', ['13 star players now, each with a real perk: bigger green window, higher jumps, sticky hands, steals, faster Hype and more.', 'In 2v2 your star plays next to your named player instead of replacing them.']],
   [132, 'Trophy look', ['Practice no longer gives trophies.', 'New Reset trophies button in Locker, Settings.', 'Status effects (power-ups, Hype Time, frozen, on fire, match point) now show as trophy-style cards with a timer bar.', 'Trophies give XP by difficulty: Bronze 25, Silver 50, Gold 100, Diamond 200.']],
   [131, 'Power-up lesson', ['New tutorial lesson: how power-ups drop, how to grab them and what the good and bad ones do.']],
   [130, 'Tour moves', ['The site tour now lives in Locker, Settings, and runs on its own after your first tutorial.', 'Tournament text fixed: Bronze Cup to Diamond Cup.']],
@@ -10164,6 +10182,7 @@ function placeHypeBtn(b) {   // sit just above the Lob button, whatever size the
 function syncHypeBtn() { const b = $('hypeBtn'); if (!b) return; if (!b.hidden && isTouch) placeHypeBtn(b); const me = netGuest() ? 1 : 0, on = isTouch && !attract && !paused && (state === 'play' || state === 'intro') && teams[me] && teams[me].hypeReady && !teams[me].cpu && !autoPlay; if (b.hidden === on) b.hidden = !on; }
 function hypeAdd(i, v) {
   if (attract || practice() || i < 0) return;
+  { const sp = players.find(q => q.team === i && starOf(q) && starOf(q).hype); if (sp) v *= starOf(sp).hype; }
   const t = teams[i]; if (time < (t.hypeUntil || 0) || t.hypeReady) return;
   t.hype = Math.min(1, (t.hype || 0) + v * 0.45);
   if (t.hype >= 1 && !t.hypeReady) { t.hype = 1; t.hypeReady = true; t.readyAt = time;
