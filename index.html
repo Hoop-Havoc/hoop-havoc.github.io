@@ -1264,7 +1264,7 @@ function tutWords(t) {
 function drawTutBig() {
   // one big, simple instruction near the bottom of the court
   if (!tut || attract || state === 'replay') return; const st = TUT[tut.step]; if (!st.big || tut.okT > 0) return;
-  const txt = tutWords(st.big); ctx.save(); ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  const txt = tutWords(st.big); ctx.save(); ctx.setTransform(scale, 0, 0, scale, OXP, 0);
   const pulse = 1 + Math.sin(time * 4) * 0.03; ctx.font = `24px ${DISPLAY}`; const tw = ctx.measureText(txt).width + 44, y = H - 84;
   ctx.translate(W / 2, y); ctx.scale(pulse, pulse);
   ctx.fillStyle = 'rgba(18,11,28,.9)'; rr(-tw / 2, -22, tw, 44, 22); ctx.fill(); ctx.strokeStyle = MUSTARD; ctx.lineWidth = 3; rr(-tw / 2, -22, tw, 44, 22); ctx.stroke();
@@ -4216,7 +4216,7 @@ function drawPregame() {
   const P = pregame; if (!P || attract) return;
   const t = P.t, out = clamp((P.dur - t) / 0.45, 0, 1), a = out;
   const sk = t > 0.95 && t < 1.25 ? (1.25 - t) * 30 : 0;   // the VS slam shakes the screen
-  ctx.save(); ctx.setTransform(scale, 0, 0, scale, 0, 0); ctx.translate(rand(-sk, sk), rand(-sk, sk)); ctx.globalAlpha = a;
+  ctx.save(); ctx.setTransform(scale, 0, 0, scale, OXP, 0); ctx.translate(rand(-sk, sk), rand(-sk, sk)); ctx.globalAlpha = a;
   const kL = ease(clamp(t / 0.45, 0, 1)), kR = ease(clamp((t - 0.08) / 0.45, 0, 1)), mid = W / 2, tilt = 70;
   for (let i = 0; i < 2; i++) {   // the two halves sweep in from their sides
     const T = teams[i], L = i === 0, off = L ? -(1 - kL) * W * 0.6 : (1 - kR) * W * 0.6;
@@ -4266,7 +4266,7 @@ function drawPregame() {
 function drawPregameOld() {
   const P = pregame; if (!P || attract) return;
   const t = P.t, out = clamp((P.dur - t) / 0.5, 0, 1), inA = clamp(t / 0.35, 0, 1), a = Math.min(out, inA);
-  ctx.save(); ctx.setTransform(scale, 0, 0, scale, 0, 0); ctx.globalAlpha = a;
+  ctx.save(); ctx.setTransform(scale, 0, 0, scale, OXP, 0); ctx.globalAlpha = a;
   ctx.fillStyle = 'rgba(10,6,20,.86)'; ctx.fillRect(0, 0, W, H);
   // two team slabs slide in from the sides
   const k = ease(clamp((t - 0.15) / 0.55, 0, 1)), sw = W * 0.42;
@@ -4307,13 +4307,13 @@ function drawHavoc(dt) {
   const c = havocCard; if (!c || attract) return;
   c.t += dt; if (c.t > 2.2) { havocCard = null; return; }
   const a = c.t < 0.25 ? c.t / 0.25 : c.t > 1.8 ? (2.2 - c.t) / 0.4 : 1, slide = (1 - Math.min(1, c.t / 0.3)) ** 3 * W;
-  ctx.save(); ctx.setTransform(scale, 0, 0, scale, 0, 0); ctx.globalAlpha = a;
+  ctx.save(); ctx.setTransform(scale, 0, 0, scale, OXP, 0); ctx.globalAlpha = a;
   ctx.fillStyle = 'rgba(10,6,20,.72)'; ctx.fillRect(0, H * 0.34, W, 112);
   ctx.fillStyle = c.c; ctx.fillRect(0, H * 0.34, W, 5); ctx.fillRect(0, H * 0.34 + 107, W, 5);
   ctx.translate(W / 2 - slide, H * 0.34 + 50); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = `700 15px ${TEXT}`; ctx.fillStyle = CREAM; ctx.fillText(c.tag || 'Havoc round', 0, c.tag ? -28 : -18);
   ctx.font = `44px ${HYPE}`; const fit = Math.min(1, (W - 90) / Math.max(1, ctx.measureText(c.name).width)), s = (1 + Math.max(0, 0.25 - c.t) * 1.6) * fit; if (!c.tag) ctx.translate(0, 14); ctx.scale(s, s); twill(c.name, 0, 4, 44, c.c, INK, 0.9);
-  ctx.setTransform(scale, 0, 0, scale, 0, 0); ctx.translate(W / 2 - slide, H * 0.34 + 92); ctx.font = `600 15px ${TEXT}`; ctx.fillStyle = CREAM; if (c.tag && c.desc) ctx.fillText(c.desc, 0, 0);
+  ctx.setTransform(scale, 0, 0, scale, OXP, 0); ctx.translate(W / 2 - slide, H * 0.34 + 92); ctx.font = `600 15px ${TEXT}`; ctx.fillStyle = CREAM; if (c.tag && c.desc) ctx.fillText(c.desc, 0, 0);
   ctx.restore();
 }
 const CROWD_LINES = {"dunk": ["OHHHH!", "He took off!", "Posterize him!", "Get up!", "What a slam!", "Rim is shaking!", "Did you see that?!"], "green": ["Splash!", "Cash money!", "Wet!", "From way out!", "Too easy!", "Bang!", "Ice in his veins!"], "miss": ["Brick!", "Airball!", "Nooo!", "So close!", "Ouch.", "Come on!"], "block": ["Rejected!", "Get it out!", "Not today!", "Swat!", "Denied!"], "steal": ["Pickpocket!", "Stolen!", "Too slow!", "Snatched!"], "chant": ["De-fense!", "Let's go!", "MVP! MVP!", "Ref, you blind?", "Hot dogs here!", "I love this game!", "Shoot it!", "Pass it!", "Dunk it!", "Wave! Wave!", "Clap clap!", "Go team go!", "We want a dunk!", "Who are you?", "Let's go, let's go!"], "close": ["Tie game!", "This is close!", "I can't watch!", "Clutch time!", "One more!", "Win it!"]};
@@ -7430,7 +7430,8 @@ function draw() {
   ctx.fillStyle = '#12131b'; ctx.fillRect(0, 0, cv.width, cv.height);
   const hh = RM ? 0 : 1, sx = (Math.random() - 0.5) * shake * vol('shake') + hh * (Math.sin(time * 0.71) * 1.3 + Math.sin(time * 1.93) * 0.5), sy = (Math.random() - 0.5) * shake * vol('shake') + hh * (Math.sin(time * 0.53 + 1) * 1.0 + Math.sin(time * 2.3) * 0.4);
   const z = cam.z, ccx = clamp(cam.x, W / (2 * z), W - W / (2 * z)), ccy = clamp(cam.y, H / (2 * z), H - H / (2 * z));
-  ctx.setTransform(scale * z, 0, 0, scale * z, scale * (W / 2 - ccx * z + sx), scale * (H / 2 - ccy * z + sy));
+  if (OXP > 0) drawWideSides();
+  ctx.setTransform(scale * z, 0, 0, scale * z, OXP + scale * (W / 2 - ccx * z + sx), scale * (H / 2 - ccy * z + sy));
   const restore = state === 'replay' && replay && rec.length ? applySnap(replayFrame()) : null;
   ctx.save(); ctx.translate((ccx - W / 2) * 0.28, 0); drawBackground(); ctx.restore(); drawLights(); drawFloor(); drawFloorFx(); if (tutorial() && !restore) drawTutorialWorld(); if (!restore && !attract) drawLandingSpots();
   if (restore) drawReplaySpot();   // no afterimage ghosts trailing the scorer: clean motion only
@@ -7476,7 +7477,7 @@ function draw() {
   ctx.globalAlpha = 1;
   if (!restore) { drawMeter(); drawOopCues(); drawNameTag(); }
   if (restore) restore();
-  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.setTransform(scale, 0, 0, scale, OXP, 0);
   const vg = ctx.createRadialGradient(W / 2, H * 0.55, H * 0.35, W / 2, H * 0.55, W * 0.72);   // broadcast vignette
   vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.42)');
   ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
@@ -7552,16 +7553,28 @@ function drawGrade(ccx, ccy, z) {
 
 /* ---------- Loop & UI ---------- */
 let scale = 1, last = performance.now(), acc = 0;
+let OXP = 0, edgeCv = null;
+function drawWideSides() {   // fill the extra width with the court's own edges, stretched and gently shaded
+  if (!edgeCv) return; const h = cv.height; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(edgeCv, 0, 0, 1, h, 0, 0, Math.ceil(OXP) + 1, h); ctx.drawImage(edgeCv, 1, 0, 1, h, cv.width - Math.ceil(OXP) - 1, 0, Math.ceil(OXP) + 1, h);
+  for (const [x0, x1] of [[0, OXP], [cv.width, cv.width - OXP]]) { const g = ctx.createLinearGradient(x0, 0, x1, 0); g.addColorStop(0, 'rgba(0,0,0,.45)'); g.addColorStop(1, 'rgba(0,0,0,.12)'); ctx.fillStyle = g; ctx.fillRect(Math.min(x0, x1), 0, Math.abs(x1 - x0) + 1, h); }
+}
+function grabWideEdges() {   // after each frame: remember the court's two outer pixel columns
+  if (OXP <= 0) return; if (!edgeCv) edgeCv = document.createElement('canvas'); if (edgeCv.height !== cv.height) { edgeCv.width = 2; edgeCv.height = cv.height; }
+  const g = edgeCv.getContext('2d'); g.drawImage(cv, Math.round(OXP) + 2, 0, 1, cv.height, 0, 0, 1, cv.height); g.drawImage(cv, Math.round(cv.width - OXP) - 3, 0, 1, cv.height, 1, 0, 1, cv.height);
+}
 function resize() {
   const cs = getComputedStyle(document.body);
   const aw = document.body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   const ah = document.body.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
   let w = aw, h = w * 9 / 16; if (h > ah) { h = ah; w = h * 16 / 9; }
   w = Math.max(200, w); h = w * 9 / 16;
+  const wide = isTouch && aw / ah > 16 / 9 + 0.03 && ah > 150;   // a wide phone: fill it edge to edge
+  const fw = wide ? Math.min(aw, h * 2.4) : w;
   $('rotate').hidden = !(isTouch && innerHeight > innerWidth * 1.1);   // phones play sideways
-  wrap.style.width = w + 'px'; wrap.style.height = h + 'px'; wrap.style.setProperty('--u', (w / 960) + 'px'); wrap.classList.toggle('small', w < 760); uiS = clamp(800 / w, 1, 1.3);   // small screens get a bigger scoreboard
+  wrap.style.width = fw + 'px'; wrap.style.height = h + 'px'; wrap.classList.toggle('wide', fw > w + 1); wrap.style.setProperty('--u', (w / 960) + 'px'); wrap.classList.toggle('small', w < 760); uiS = clamp(800 / w, 1, 1.3);   // small screens get a bigger scoreboard
   const dpr = Math.min(2, window.devicePixelRatio || 1, (lite ? 1280 : 1600) / w);   // cap the pixel count: hi-dpi screens don't need 4x the work
-  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); scale = cv.width / W;
+  cv.width = Math.round(fw * dpr); cv.height = Math.round(h * dpr); scale = cv.height / H; OXP = (cv.width - W * scale) / 2; edgeCv = null;
 }
 addEventListener('resize', resize);
 let el = 0.016, hudDim = false, slowAvg = 1 / 60, slowFor = 0, autoLited = false;
@@ -8225,7 +8238,7 @@ function netPingTick(now) {
 }
 function drawPing() {
   if (!net || !net.ready || !netPing) return;
-  ctx.save(); ctx.setTransform(scale, 0, 0, scale, 0, 0); ctx.font = `700 12px ${TEXT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  ctx.save(); ctx.setTransform(scale, 0, 0, scale, OXP, 0); ctx.font = `700 12px ${TEXT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   const t = `Ping ${Math.round(netPing)} ms`, w = ctx.measureText(t).width + 18, c = netPing < 80 ? '#5dff7a' : netPing < 160 ? '#ffd34d' : '#ff4f6d';
   ctx.fillStyle = 'rgba(18,11,28,.78)'; rr(12, 12, w, 22, 11); ctx.fill(); ctx.fillStyle = c; ctx.beginPath(); ctx.arc(22, 23, 3.5, 0, 7); ctx.fill(); ctx.fillStyle = CREAM; ctx.fillText(t, 30, 24);
   ctx.restore();
@@ -9103,8 +9116,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 119;
+const GAME_VERSION = 120;
 const UPDATES = [
+  [120, 'Edge to edge', ['On wide phones the game fills the whole screen. No more black bars on the sides.']],
   [119, 'Fresh start', ['Every game starts fresh, so a Havoc round can no longer show up on the first point because of your last game.', 'Phone buttons are see-through until you press them, so you can see players behind them.', 'After a green, nobody talks until the next point starts, not just while the green show plays.']],
   [118, 'Fifteen fixes', ['New gear now flips in as cards with a rarity glow when you level up.', 'Each court has two or three different fates for the team that gets greened on.', 'At Jungle Temple the boulder the shooter hops is the one that squashes the losers.', 'The scorer gets a spotlight and confetti in the court\'s colours.', 'You can see who\'s squashed under the ice block.', 'Snatching is a bit fairer: a touch works most of the time, and pressing makes it sure. The tutorial has a snatch lesson now.', 'The corner buttons step aside during green shows, and the tags under the scoreboard fit on one line when they can.', 'Online: room codes stay in capitals, two teams can\'t share a name, and a short hiccup shows Reconnecting instead of ending the game.', 'Sounds have a bit of arena echo and baskets have a net swish.', 'Slow devices switch to Lite effects by themselves.', 'The Victory and Defeat screens come in faster, and the locker fits more on short phones.']],
   [117, 'Snatch', ['Touch the ball in the other player\'s hands and you snatch it, like Basket Random. If their body is in the way, it might not work.', 'Steals get a big swipe in your team colour, and the ball gets yanked into your hands.', 'No more chatter during a green: the players and the crowd stay quiet while the green show plays.', 'Online: if your friend closes the game or loses connection, you find out within a few seconds instead of waiting forever.', 'Jungle celebration: the shooter runs from the snakes, hops a rolling boulder, grabs a vine and swings away. The boulder squashes the snakes.']],
@@ -9258,10 +9272,10 @@ function drawHypeScreen(dt) {
   // the screen edge glows in the team colour while hype time runs; a big burst when it starts
   for (let i = 0; i < 2; i++) { const t = teams[i]; if (!t || !(time < (t.hypeUntil || 0))) continue;
     const left = (t.hypeUntil - time) / 30, a = 0.18 + Math.sin(time * 6) * 0.06, side = i ? W : 0;
-    ctx.save(); ctx.setTransform(scale, 0, 0, scale, 0, 0); const g = ctx.createLinearGradient(side, 0, i ? W - 140 : 140, 0); g.addColorStop(0, t.color); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalAlpha = a * Math.min(1, left * 4); ctx.fillStyle = g; ctx.fillRect(i ? W - 140 : 0, 0, 140, H); ctx.restore();
+    ctx.save(); ctx.setTransform(scale, 0, 0, scale, OXP, 0); const g = ctx.createLinearGradient(side, 0, i ? W - 140 : 140, 0); g.addColorStop(0, t.color); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalAlpha = a * Math.min(1, left * 4); ctx.fillStyle = g; ctx.fillRect(i ? W - 140 : 0, 0, 140, H); ctx.restore();
     if (state === 'play' && Math.random() < dt * 30) for (const p of players) if (p.team === i) particles.push({ x: p.x + rand(-14, 14), y: GROUND - 4, vx: rand(-20, 20), vy: rand(-180, -90), c: Math.random() < 0.5 ? t.color : '#ffd34d', life: 0.6, max: 0.6, g: -60, s: rand(3, 5), shape: Math.random() < 0.3 ? 'star' : undefined }); }
   const f = hypeFlash; if (!f) return; f.t += dt; if (f.t > 1.4) { hypeFlash = null; return; }
-  ctx.save(); ctx.setTransform(scale, 0, 0, scale, 0, 0); const a = f.t < 0.2 ? f.t / 0.2 : Math.max(0, 1 - (f.t - 0.9) / 0.5), s = 1 + Math.max(0, 0.3 - f.t) * 2;
+  ctx.save(); ctx.setTransform(scale, 0, 0, scale, OXP, 0); const a = f.t < 0.2 ? f.t / 0.2 : Math.max(0, 1 - (f.t - 0.9) / 0.5), s = 1 + Math.max(0, 0.3 - f.t) * 2;
   ctx.globalAlpha = a; ctx.fillStyle = 'rgba(10,6,20,.55)'; ctx.fillRect(0, H * 0.36, W, 96); ctx.fillStyle = f.c; ctx.fillRect(0, H * 0.36, W, 5); ctx.fillRect(0, H * 0.36 + 91, W, 5);
   ctx.translate(W / 2, H * 0.36 + 48); ctx.scale(s, s); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `48px ${HYPE}`; twill('Hype time!', 0, -4, 48, f.c, INK, 0.9);
   ctx.font = `700 15px ${TEXT}`; ctx.fillStyle = CREAM; ctx.fillText('Bigger greens for 12 seconds', 0, 32); ctx.restore();
@@ -9372,7 +9386,7 @@ function drawReelCard(dt) {
   const c = reelCard; if (!c || !reel) { reelCard = null; return; }
   c.t += dt; if (c.t > 1.25) { reelCard = null; return; }
   const a = c.t < 0.15 ? c.t / 0.15 : c.t > 0.95 ? (1.25 - c.t) / 0.3 : 1, k = 1 - Math.min(1, c.t / 0.22) ** 2;
-  ctx.save(); ctx.setTransform(scale, 0, 0, scale, 0, 0); ctx.globalAlpha = a;
+  ctx.save(); ctx.setTransform(scale, 0, 0, scale, OXP, 0); ctx.globalAlpha = a;
   ctx.fillStyle = 'rgba(10,6,20,.55)'; ctx.fillRect(0, 0, W, H);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = `700 16px ${TEXT}`; ctx.fillStyle = CREAM; ctx.fillText(c.last ? 'Play of the game' : 'Top plays', W / 2, H / 2 - 92);
@@ -9425,6 +9439,7 @@ function drawChart() {
   }
 }
 applyTeam(); syncLevel(); syncVoice(); syncMenuBtns();
+draw = (d0 => () => { d0(); try { grabWideEdges(); } catch (e) {} })(draw);
 requestAnimationFrame(frame);
 if (document.fonts && document.fonts.load) for (const f of [`20px ${DISPLAY}`, `italic 20px ${DISPLAY}`, `20px ${HYPE}`, `500 20px ${TEXT}`, `600 20px ${TEXT}`, `700 20px ${TEXT}`]) document.fonts.load(f).catch(() => {});
 })();
