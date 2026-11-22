@@ -7853,9 +7853,9 @@ async function acctPull(first) {
     } else { await acctPush(true); if (first) toast('Signed in', lx > cx ? 'This device was further along, so your account got updated.' : 'Your progress is saved to your account.'); }
     if (acctGift()) await acctPush(true);
     acctSyncT = Date.now(); acctUI();
-  } catch (e) { acctState = "Couldn't reach your account. Progress is still saved on this device."; acctUI(); }
+  } catch (e) { acctState = `Couldn't reach your account (${String(e.message || e.status || 'unknown').slice(0, 120)}). Progress is still saved on this device.`; acctUI(); }
 }
-const MAXED = ['morningfallcorp@gmail.com'];
+const MAXED = ['themorningfallcorp@gmail.com'];
 function acctGift() {   // these accounts are always level 100
   if (!acct || !acct.email || !MAXED.includes(String(acct.email).trim().toLowerCase())) return false;
   let need = 0, L = 1, n = 100; while (L < 100) { need += n; L++; n = Math.min(100 + 60 * (L - 1), 2400); }
@@ -7868,7 +7868,7 @@ async function acctPush(now) {
   if (!now) { clearTimeout(acctPushTimer); acctPushTimer = setTimeout(() => acctPush(true), 4000); return; }
   if (!(await acctFresh())) return;
   try { await sb('/rest/v1/saves?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ user_id: acct.id, data: SV, updated_at: new Date().toISOString() }) }); acctSyncT = Date.now(); acctState = ''; acctUI(); }
-  catch (e) { acctState = "Couldn't save to your account just now. It'll try again."; acctUI(); }
+  catch (e) { acctState = `Couldn't save to your account just now (${String(e.message || e.status || 'unknown').slice(0, 120)}). It'll try again.`; acctUI(); }
 }
 // every local save also goes up to the cloud (a few seconds later, batched)
 { const _p = persist; persist = function () { _p(); if (acct && acct.id) acctPush(); }; }
@@ -8995,7 +8995,7 @@ let pracCourt = null;
 function pracShuffle() { const opts = COURTS.filter(c => c.deco !== court.deco); pracCourt = pick(opts).deco; startRound(); syncPrac(true); }
 { const bar = document.createElement('div'); bar.id = 'pracBar'; bar.hidden = true;
   bar.innerHTML = `<button type="button" id="pGreen" class="pbtn" aria-pressed="false"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="12" cy="12" r="4"/></svg><span>Big green</span></button>
-    <label class="pbtn psel"><svg viewBox="0 0 24 24"><rect x="5" y="2.5" width="14" height="9" rx="1.5"/><path d="M9 11.5h6l-1 9h-4z" fill="none" stroke="currentColor" stroke-width="2"/></svg><select id="pCourt" aria-label="Practice court"></select></label>
+    <div class="prow"><button type="button" id="pPrev" class="pbtn parr" aria-label="Previous court"><svg viewBox="0 0 24 24"><path d="M15.5 4 7.5 12l8 8" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button><label class="pbtn psel"><svg viewBox="0 0 24 24"><rect x="5" y="2.5" width="14" height="9" rx="1.5"/><path d="M9 11.5h6l-1 9h-4z" fill="none" stroke="currentColor" stroke-width="2"/></svg><select id="pCourt" aria-label="Practice court"></select></label><button type="button" id="pNext" class="pbtn parr" aria-label="Next court"><svg viewBox="0 0 24 24"><path d="M8.5 4l8 8-8 8" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
     <label class="pbtn psel"><svg viewBox="0 0 24 24"><circle cx="12" cy="6" r="4"/><path d="M6 22v-8a6 6 0 0 1 12 0v8z"/></svg><select id="pDummy" aria-label="Practice dummy"><option value="off">No dummy</option><option value="stand">Dummy: dunk on me</option><option value="defend">Dummy: defender</option></select></label>
     <button type="button" id="pShuffle" class="pbtn"><svg viewBox="0 0 24 24"><path d="M3 7h4l9 10h3v-2l3 3-3 3v-2h-4L6 9H3zm0 10h3l3-3.3 1.4 1.6L7 19H3zM19 5V3l3 3-3 3V7h-3l-2.6 2.9L12 8.3 15 5z"/></svg><span>Shuffle</span></button>`;
   bar.addEventListener('pointerdown', e => e.stopPropagation()); bar.addEventListener('touchstart', e => e.stopPropagation(), { passive: true }); bar.addEventListener('keydown', e => e.stopPropagation());
@@ -9004,10 +9004,11 @@ function pracShuffle() { const opts = COURTS.filter(c => c.deco !== court.deco);
   sel.addEventListener('change', () => { pracCourt = sel.value; startRound(); sel.blur(); });
   { const dm = bar.querySelector('#pDummy'); dm.value = SV.pracDummy || 'off'; dm.addEventListener('change', () => { SV.pracDummy = dm.value; persist(); startRound(); dm.blur(); toast(dm.value === 'off' ? 'Dummy gone' : dm.value === 'stand' ? 'Dunk on the dummy' : 'The dummy defends', dm.value === 'off' ? 'Just you and the hoop.' : dm.value === 'stand' ? 'He stands under the rim. Go posterize him.' : 'He guards you and jumps to block your shots. He always gives the ball back.'); }); }
   bar.querySelector('#pShuffle').addEventListener('click', e => { pracShuffle(); e.currentTarget.blur(); });
+  for (const [id, dd] of [['#pPrev', -1], ['#pNext', 1]]) bar.querySelector(id).addEventListener('click', e => { const n = COURTS.length, i = COURTS.findIndex(c => c.deco === court.deco); pracCourt = COURTS[((i < 0 ? 0 : i) + dd + n) % n].deco; startRound(); syncPrac(true); e.currentTarget.blur(); });
   bar.querySelector('#pGreen').addEventListener('click', e => { SV.pracGreen = !SV.pracGreen; persist(); syncPrac(true); toast(SV.pracGreen ? 'Big green on' : 'Big green off', SV.pracGreen ? 'The green window is huge. Great for learning the timing.' : 'Back to the normal green window.'); e.currentTarget.blur(); });
   document.head.insertAdjacentHTML('beforeend', `<style>#pracBar{position:absolute;z-index:6;left:calc(var(--u,1px)*10);top:calc(var(--u,1px)*10);display:flex;flex-direction:column;align-items:flex-start;gap:calc(var(--u,1px)*6)}
 #pracBar .pbtn{display:inline-flex;align-items:center;gap:.4em;height:calc(var(--u,1px)*34);padding:0 .7em;font:600 calc(var(--u,1px)*13)/1 var(--pixel,inherit);color:var(--cream,#fff0cf);background:linear-gradient(180deg,#3a2a52,#2a1d3d);border:3px solid #0b0612;box-shadow:inset 0 -3px 0 rgba(0,0,0,.35),0 3px 0 #0b0612;cursor:pointer}
-#pracBar svg{width:1.2em;height:1.2em;fill:currentColor;flex:0 0 auto}#pracBar .pbtn[aria-pressed="true"]{background:linear-gradient(180deg,#4cd964,#2e9e45);color:#0b0612}
+#pracBar svg{width:1.2em;height:1.2em;fill:currentColor;flex:0 0 auto}#pracBar .prow{display:flex;gap:calc(var(--u,1px)*4)}#pracBar .parr{padding:0 .45em}#pracBar .parr svg{fill:none}#pracBar .pbtn[aria-pressed="true"]{background:linear-gradient(180deg,#4cd964,#2e9e45);color:#0b0612}
 #pracBar select{font:inherit;color:inherit;background:transparent;border:0;outline:0;max-width:11em;cursor:pointer}#pracBar select option{color:#111}
 #pracBar .pbtn:focus-within,#pracBar .pbtn:focus-visible{outline:3px solid var(--cream,#fff0cf);outline-offset:2px}</style>`); }
 function syncPrac(force) { const b = $('pracBar'); if (!b) return; const on = mode === 3 && !attract && !paused && !contest && state !== 'replay' && $('menu').hidden && $('panel').hidden; if (b.hidden === on) b.hidden = !on; { const dm = b.querySelector('#pDummy'); if (dm && document.activeElement !== dm && dm.value !== (SV.pracDummy || 'off')) dm.value = SV.pracDummy || 'off'; }
@@ -9126,8 +9127,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 122;
+const GAME_VERSION = 123;
 const UPDATES = [
+  [123, 'Account fix', ['If your progress can\'t save to your account, the message now says why.', 'Practice: arrow buttons on each side of the court picker step to the previous or next court.']],
   [122, 'Lobby music', ['The home screen and menus have their own laid-back lo-fi version of the theme. It starts as soon as you click or press a key, and the music button turns it off.']],
   [121, 'Wide and clear', ['The extra space on wide screens shows the court\'s own scenery, and wide computer and Chromebook windows fill edge to edge too.', 'The umbrella, lollipop and spyglass celebrations are bigger.', 'Green shows at the rim play longer.', 'The shot meter marks the green window with white notches and outlines it when you\'re in it, so you don\'t need to see green.', 'GAME OVER stays in capitals.']],
   [120, 'Edge to edge', ['On wide phones the game fills the whole screen. No more black bars on the sides.']],
