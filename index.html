@@ -6122,6 +6122,45 @@ function drawOrb() {
   inkTag(orb.x - w / 2, y - 50, w, 21, 10.5, INK); ctx.fillStyle = CREAM; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(lbl, orb.x, y - 39);
   ctx.textBaseline = 'alphabetic';
 }
+const statSeen = {};
+function statusList(i) {
+  const T = teams[i], out = [], key = i && mode === 2 && !(net && net.ready) ? '→' : 'R';
+  if (isMatchPoint(i) && state !== 'over' && !practice()) out.push({ k: 'mp', label: 'Heads up', main: 'Match point', c: MUSTARD, icon: 'BALL', pulse: true });
+  if (T.hypeReady && !hypeAuto(i)) out.push({ k: 'hr', label: 'HYPE TIME ready', main: isTouch ? 'Tap the button' : `Press ${key}`, c: '#ffd34d', icon: 'FIRE', pulse: Math.sin(time * 8) > 0 });
+  else if (time < (T.hypeUntil || 0)) out.push({ k: 'ht', label: 'HYPE TIME', main: `${Math.ceil(T.hypeUntil - time)}s left`, c: '#ffd34d', icon: 'LIGHTNING', frac: clamp((T.hypeUntil - time) / 12, 0, 1) });
+  if (T.frozen > 0) out.push({ k: 'fz', label: 'Frozen', main: `${T.frozen.toFixed(1)}s`, c: '#7fd4ff', icon: 'FREEZE', frac: clamp(T.frozen / 2.6, 0, 1) });
+  else if (T.power) out.push({ k: 'pw' + T.power.id, label: 'Power-up', main: `${Math.ceil(T.power.t)}s`, c: T.power.c, icon: T.power.id, frac: clamp(T.power.t / (T.power.max || 9), 0, 1) });
+  else if (T.onFire) out.push({ k: 'of', label: 'Status', main: 'On fire', c: '#ff4f6d', icon: 'FIRE' });
+  return out;
+}
+function drawStatusCards(i, L, yy) {
+  const list = statusList(i), CW = 168, CH = 44, now = time;
+  for (const k in statSeen) if (k[0] === String(i) && !list.some(s => i + s.k === k)) delete statSeen[k];
+  for (const S of list) {
+    const id = i + S.k; if (statSeen[id] === undefined || statSeen[id] > now) statSeen[id] = now;
+    const k = ease(clamp((now - statSeen[id]) / 0.32, 0, 1)), x = (L ? 40 : W - 40 - CW) + (1 - k) * (L ? -70 : 70);
+    ctx.save(); ctx.globalAlpha = k * (S.pulse ? 0.85 + 0.15 * Math.sin(now * 7) : 1);
+    ctx.fillStyle = INKD; ctx.fillRect(x - 3, yy - 3, CW + 6, CH + 9);
+    const bg = ctx.createLinearGradient(0, yy, 0, yy + CH); bg.addColorStop(0, '#2a1d3d'); bg.addColorStop(1, '#1a1228'); ctx.fillStyle = bg; ctx.fillRect(x, yy, CW, CH);
+    ctx.strokeStyle = S.c; ctx.lineWidth = 2.5; ctx.strokeRect(x + 1.25, yy + 1.25, CW - 2.5, CH - 2.5);
+    ctx.shadowColor = S.c; ctx.shadowBlur = 10; ctx.strokeRect(x + 1.25, yy + 1.25, CW - 2.5, CH - 2.5); ctx.shadowBlur = 0;
+    // icon tile with spinning rays, like the trophy pop-up
+    const tx = L ? x + 6 : x + CW - 6 - 32, ty = yy + 6;
+    ctx.fillStyle = '#21160a'; ctx.fillRect(tx, ty, 32, 32); ctx.save(); ctx.beginPath(); ctx.rect(tx, ty, 32, 32); ctx.clip();
+    ctx.translate(tx + 16, ty + 16); ctx.rotate(now * 1.4); ctx.fillStyle = S.c; ctx.globalAlpha *= 0.3; for (let r = 0; r < 8; r++) { ctx.rotate(Math.PI / 4); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(30, -6); ctx.lineTo(30, 6); ctx.closePath(); ctx.fill(); } ctx.restore();
+    ctx.strokeStyle = INKD; ctx.lineWidth = 2; ctx.strokeRect(tx, ty, 32, 32);
+    if (S.icon === 'BALL') { ctx.fillStyle = '#e8732f'; ctx.beginPath(); ctx.arc(tx + 16, ty + 16, 10, 0, 7); ctx.fill(); ctx.strokeStyle = INKD; ctx.lineWidth = 1.6; ctx.stroke(); ctx.beginPath(); ctx.moveTo(tx + 6, ty + 16); ctx.lineTo(tx + 26, ty + 16); ctx.moveTo(tx + 16, ty + 6); ctx.lineTo(tx + 16, ty + 26); ctx.stroke(); }
+    else powerIcon(S.icon, tx + 16, ty + 16, 0.95);
+    // words
+    const cx0 = L ? tx + 40 : x + 10, wmax = CW - 50;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+    ctx.font = `700 11px ${TEXT}`; ctx.fillStyle = S.c; noCase = /HYPE TIME/.test(S.label); ctx.fillText(S.label, cx0, yy + 17, wmax); noCase = false;
+    ctx.font = `16px ${DISPLAY}`; ctx.fillStyle = CREAM; ctx.fillText(S.main, cx0, yy + 35, wmax);
+    if (S.frac != null) { ctx.fillStyle = 'rgba(255,240,207,.12)'; ctx.fillRect(x + 4, yy + CH - 6, CW - 8, 3); ctx.fillStyle = S.c; ctx.fillRect(L ? x + 4 : x + 4 + (CW - 8) * (1 - S.frac), yy + CH - 6, (CW - 8) * S.frac, 3); }
+    ctx.restore(); yy += CH + 12;
+  }
+  return yy;
+}
 function shadeHex(h, k) { const n = parseInt(h.slice(1), 16), f = c => Math.round(clamp(k < 0 ? c * (1 + k) : c + (255 - c) * k, 0, 255)); return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`; }
 function drawPowerFx() {
   const has = (ti, id) => teams[ti].power && teams[ti].power.id === id;
@@ -6396,7 +6435,8 @@ function drawHUD() {
     else if (T.power) chips.push([`${Math.ceil(T.power.t)}s`, T.power.c, INK, false, T.power]);
     else if (T.onFire) chips.push(['On Fire', '#ff4f6d', CREAM]);
     let yy = L ? (practice() ? 190 : 14) : 58;
-    for (const [txt, bg, fg, pulse, pw] of chips) {
+    try { yy = drawStatusCards(i, L, yy); } catch (e) {}
+    for (const [txt, bg, fg, pulse, pw] of []) {
       if (pw) { const x = L ? 40 : W - 40 - 64, r = 15, cx2 = L ? x + 18 : x + 64 - 18, cy2 = yy + 15; ctx.fillStyle = 'rgba(18,11,28,.82)'; rr(x, yy, 64, 30, 15); ctx.fill(); ctx.fillStyle = INKD; ctx.beginPath(); ctx.arc(cx2, cy2, r + 2, 0, 7); ctx.fill(); ctx.fillStyle = pw.c; ctx.beginPath(); ctx.arc(cx2, cy2, r, 0, 7); ctx.fill(); powerIcon(pw.id, cx2, cy2, 0.78); ctx.strokeStyle = CREAM; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(cx2, cy2, r + 1, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(pw.t / (pw.max || 9), 0, 1)); ctx.stroke(); ctx.fillStyle = CREAM; ctx.font = `14px ${DISPLAY}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, L ? x + 46 : x + 20, cy2 + 1); yy += 36; continue; }
       ctx.font = `15px ${DISPLAY}`; const w = ctx.measureText(txt).width + 22, x = L ? 40 : W - 40 - w;
       ctx.globalAlpha = pulse ? 0.8 + 0.2 * Math.sin(time * 7) : 1;
@@ -8365,6 +8405,7 @@ async function acctPull(first) {
 const MAXED = ['themorningfallcorp@gmail.com'];
 function acctGift() {   // these accounts are always level 100
   if (!acct || !acct.email || !MAXED.includes(String(acct.email).trim().toLowerCase())) return false;
+  if (!SV.achReset1) { SV.ach = {}; SV.achReset1 = true; persist(); toast('Trophies reset', 'Your trophy case is empty again. Practice no longer gives trophies.'); }
   let need = 0, L = 1, n = 100; while (L < 100) { need += n; L++; n = Math.min(100 + 50 * (L - 1), 2000); }
   if ((SV.xp || 0) >= need) return false;
   SV.xp = need; persist(); try { syncLevel(); syncSettingsUI(); } catch (e) {} toast('Level 100', 'Everything is unlocked on this account.'); return true;
@@ -8537,6 +8578,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 .stat b{display:block;font:400 calc(var(--k)*26)/1 var(--display);color:var(--mustard)}
 .stat span{font:600 calc(var(--k)*12)/1.2 var(--text);color:var(--muted)}
 .agrid{display:grid;grid-template-columns:repeat(3,1fr);gap:calc(var(--k)*8)}
+.atier{display:block;font-style:normal;font-size:.78em;font-weight:700;color:var(--tc,#ffd34d);margin-top:2px}.ach.off .atier{opacity:.75}
 .ach{text-align:left;display:flex;gap:calc(var(--k)*9);align-items:center;background:var(--deep);border-radius:calc(var(--k)*10);padding:calc(var(--k)*8) calc(var(--k)*10)}
 .ach i{flex:none;width:calc(var(--k)*30);height:calc(var(--k)*30);border-radius:50%;background:var(--mustard);color:var(--ink);display:grid;place-items:center;font:400 calc(var(--k)*17)/1 var(--display);font-style:normal}
 .ach b{display:block;font:400 calc(var(--k)*15)/1.1 var(--display);color:var(--cream)}
@@ -8689,13 +8731,17 @@ function nextToast() {
   setTimeout(() => { el.classList.remove('on'); setTimeout(nextToast, 380); }, 2600);
 }
 // ---- trophies, XP, levels ----
+const TROPHY_TIER = { silver: 'streak5 fire poster golden sig three3 pro blowout nailbiter blocks3 steals3 max5 lightning swap perfect chaos greens10 lvl10 maps daily3 party chaoswin power10 comeback', gold: 'dunks15 legend champ cup100 dunk100 three20 fullcourt oop5 dunk5g green5g lockdown gaunt5 cupb cups lvl25 wins25 games50 shatter', diamond: 'gaunt10 cupg cupd lvl50' };
+const TIERS = { bronze: ['Bronze', '#d08a4a', 25], silver: ['Silver', '#cfd6e4', 50], gold: ['Gold', '#ffd34d', 100], diamond: ['Diamond', '#7fe8ff', 200] };
+function trophyTier(id) { for (const k of ['diamond', 'gold', 'silver']) if (TROPHY_TIER[k].split(' ').includes(id)) return TIERS[k]; return TIERS.bronze; }
 const trophyQ = []; let trophyBusy = false;
 function trophyPop(a) { trophyQ.push(a); if (!trophyBusy) nextTrophy(); }
 function nextTrophy() {
   const a = trophyQ.shift(); if (!a) { trophyBusy = false; return; } trophyBusy = true;
   let el = $('trophy'); if (!el) { el = document.createElement('div'); el.id = 'trophy'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite'); document.body.appendChild(el); }
   const n = Object.keys(SV.ach || {}).length;
-  el.innerHTML = `<div class="trc"><div class="trg" aria-hidden="true"><i class="trr"></i><svg viewBox="0 0 24 24"><path d="M6 3h12v3h3v3a5 5 0 0 1-5 5 6 6 0 0 1-3 2.6V19h4v2H7v-2h4v-2.4A6 6 0 0 1 8 14a5 5 0 0 1-5-5V6h3zm0 5H5v1a3 3 0 0 0 1.6 2.6A9 9 0 0 1 6 8zm12 0a9 9 0 0 1-.6 3.6A3 3 0 0 0 19 9V8z"/></svg></div><div class="trt"><small>Trophy unlocked</small><b>${a[1]}</b><span>${a[2]}.</span></div><div class="trx"><b>+25</b><small>XP</small><em>${n}/${ACH.length}</em></div></div>`;
+  const TT = trophyTier(a[0]); el.style.setProperty('--tc', TT[1]);
+  el.innerHTML = `<div class="trc"><div class="trg" aria-hidden="true"><i class="trr"></i><svg viewBox="0 0 24 24"><path d="M6 3h12v3h3v3a5 5 0 0 1-5 5 6 6 0 0 1-3 2.6V19h4v2H7v-2h4v-2.4A6 6 0 0 1 8 14a5 5 0 0 1-5-5V6h3zm0 5H5v1a3 3 0 0 0 1.6 2.6A9 9 0 0 1 6 8zm12 0a9 9 0 0 1-.6 3.6A3 3 0 0 0 19 9V8z"/></svg></div><div class="trt"><small>${TT[0]} trophy unlocked</small><b>${a[1]}</b><span>${a[2]}.</span></div><div class="trx"><b>+${TT[2]}</b><small>XP</small><em>${n}/${ACH.length}</em></div></div>`;
   el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
   if (!muted) [784, 988, 1175, 1568].forEach((f, i) => setTimeout(() => tone(f, 0.18, 'triangle', 0.05), i * 90));
   setTimeout(() => { el.classList.remove('go'); setTimeout(nextTrophy, 420); }, 3600);
@@ -8703,19 +8749,19 @@ function nextTrophy() {
 document.head.insertAdjacentHTML('beforeend', `<style>
 #trophy{position:fixed;left:50%;top:0;z-index:300;transform:translate(-50%,-130%);pointer-events:none;transition:transform .45s cubic-bezier(.2,1.4,.35,1)}
 #trophy.go{transform:translate(-50%,14px)}
-#trophy .trc{display:flex;align-items:center;gap:14px;padding:10px 16px 10px 10px;min-width:min(92vw,380px);background:linear-gradient(180deg,#2a1d3d,#1a1228);border:3px solid #ffd34d;box-shadow:0 6px 0 #0b0612,0 0 0 3px #0b0612,0 0 30px rgba(255,211,77,.35);color:#fff0cf;font-family:var(--pixel,inherit)}
+#trophy{--tc:#ffd34d}#trophy .trc{display:flex;align-items:center;gap:14px;padding:10px 16px 10px 10px;min-width:min(92vw,380px);background:linear-gradient(180deg,#2a1d3d,#1a1228);border:3px solid var(--tc);box-shadow:0 6px 0 #0b0612,0 0 0 3px #0b0612,0 0 30px color-mix(in srgb,var(--tc) 40%,transparent);color:#fff0cf;font-family:var(--pixel,inherit)}
 #trophy .trg{position:relative;width:58px;height:58px;flex:0 0 58px;display:grid;place-items:center;background:radial-gradient(circle,#4a3416,#21160a);border:3px solid #0b0612;overflow:hidden}
-#trophy .trg svg{position:relative;width:38px;height:38px;fill:#ffd34d;filter:drop-shadow(0 2px 0 #8f7420);animation:trb 1s ease-in-out infinite alternate}
-#trophy .trr{position:absolute;inset:-40%;background:repeating-conic-gradient(rgba(255,211,77,.35) 0 12deg,transparent 12deg 30deg);animation:trs 4s linear infinite}
-#trophy .trt{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}#trophy .trt small{color:#ffd34d;font-size:12px}#trophy .trt b{font-size:19px;line-height:1.1}#trophy .trt span{font-size:12.5px;opacity:.8}
+#trophy .trg svg{position:relative;width:38px;height:38px;fill:var(--tc);filter:drop-shadow(0 2px 0 #8f7420);animation:trb 1s ease-in-out infinite alternate}
+#trophy .trr{position:absolute;inset:-40%;background:repeating-conic-gradient(color-mix(in srgb,var(--tc) 40%,transparent) 0 12deg,transparent 12deg 30deg);animation:trs 4s linear infinite}
+#trophy .trt{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}#trophy .trt small{color:var(--tc);font-size:12px}#trophy .trt b{font-size:19px;line-height:1.1}#trophy .trt span{font-size:12.5px;opacity:.8}
 #trophy .trx{display:flex;flex-direction:column;align-items:center;line-height:1}#trophy .trx b{font-size:20px;color:#5dff7a}#trophy .trx small{font-size:11px;color:#5dff7a}#trophy .trx em{font-style:normal;font-size:11px;opacity:.6;margin-top:6px}
 @keyframes trs{to{transform:rotate(360deg)}}@keyframes trb{from{transform:translateY(1px) scale(1)}to{transform:translateY(-2px) scale(1.06)}}
 @media (prefers-reduced-motion:reduce){#trophy{transition:none}#trophy .trr,#trophy .trg svg{animation:none}}
 </style>`);
 function unlock(id) {
-  if (attract || autoPlay || mode === 4 || SV.ach[id]) return;
+  if (attract || autoPlay || mode === 4 || mode === 3 || SV.ach[id]) return;   // never in Practice or the Tutorial
   const a = ACH.find(x => x[0] === id); if (!a) return;
-  SV.ach[id] = Date.now(); persist(); trophyPop(a); gainXP(25);
+  SV.ach[id] = Date.now(); persist(); trophyPop(a); gainXP(trophyTier(id)[2] / 1.125);
 }
 function rewardsAt(L) { const r = []; PATTERNS.forEach(p => p[2] === L && L > 1 && r.push(p[1] + ' jersey')); SHOES.forEach(z => z[4] === L && L > 1 && r.push(z[1] + ' sneakers')); SCOREFX.forEach(f => f[2] === L && L > 1 && r.push(f[1] + ' score effect')); TRAILS.forEach(t => t[2] === L && L > 1 && r.push(t[1] + ' ball trail')); BANDS.forEach(b => b[2] === L && L > 1 && r.push(b[1] + ' headband')); TEAM_COLORS.forEach(c => c[2] === L && L > 1 && r.push(c[3] + ' jerseys')); STARS.forEach(s => s[0] === L && r.push('Star player ' + s[1])); return r.length ? r : [L % 5 === 0 ? 'A big XP milestone' : 'Bragging rights']; }
 function lvlInfo(xp = SV.xp) { let L = 1, need = 100; while (xp >= need && L < 100) { xp -= need; L++; need = Math.min(100 + 50 * (L - 1), 2000); } return L >= 100 ? { L: 100, cur: need, need, max: true } : { L, cur: xp, need }; }
@@ -9448,16 +9494,17 @@ function openLocker0(tab) {
       <div class="h3">Star player</div><p style="margin:0 0 8px">A named player who joins your team in 1-player games, with their own number and a slightly better jump and shot. Unlock legends by levelling up.</p><div class="pgrid">${[[0, 'None', 1, 0], ...STARS].map(([L, n, num]) => `<button class="pick" type="button" data-star="${L ? n : ''}" aria-pressed="${String((st.star || '') === (L ? n : ''))}" ${lock(L || 1) ? 'disabled' : ''}>${L ? n + ` <small>#${num}${lock(L) ? ', level ' + L : ''}</small>` : 'None'}</button>`).join('')}</div>
       <div class="h3" style="margin-top:14px">Headband</div><div class="swrow">${BANDS.map((b, i) => [b, i]).sort((a, b) => (a[0][2] || 0) - (b[0][2] || 0) || a[1] - b[1]).map(([[c, n, L], i]) => `<button class="sw" type="button" data-hb="${i}" style="background:${c || 'repeating-linear-gradient(45deg,#33244a 0 6px,#21162f 6px 12px)'}" aria-label="${n}${lock(L) ? ', unlocks at level ' + L : ''}" aria-pressed="${String((st.band || 0) === i)}" ${lock(L) ? 'disabled' : ''}>${lock(L) ? `<small>Lv ${L}</small>` : ''}</button>`).join('')}</div>`;
   } if (lockerTab === 'settings') {
-    body = `<div class="h3">Help</div><div class="seg2" style="margin-bottom:12px"><button type="button" class="pick" id="lkTour">Take the site tour<small>A quick spotlight walk-through of the menu</small></button><button type="button" class="pick" id="lkTut">Play the tutorial<small>Learn every move</small></button></div>` + acctHTML() + '<div class="credit"><b>Hoop Havoc</b><span>A Morningfall Corp game</span><small>Beta v' + GAME_VERSION + '</small></div>' + `<div class="rlist" style="margin-bottom:12px"><button class="tog" type="button" role="switch" data-sw="replays" aria-checked="${SV.replays !== false}"><span>Instant replays<small>On: big plays and blocks get a slow-motion replay. Off: no replays during games (highlights still save).</small></span><i></i></button>
+    body = `<div class="h3">Help</div><div class="seg2" style="margin-bottom:12px"><button type="button" class="pick" id="lkTour">Take the site tour<small>A quick spotlight walk-through of the menu</small></button><button type="button" class="pick" id="lkTut">Play the tutorial<small>Learn every move</small></button><button type="button" class="pick" id="lkTrReset">Reset trophies<small>Start your trophy hunt over</small></button></div>` + acctHTML() + '<div class="credit"><b>Hoop Havoc</b><span>A Morningfall Corp game</span><small>Beta v' + GAME_VERSION + '</small></div>' + `<div class="rlist" style="margin-bottom:12px"><button class="tog" type="button" role="switch" data-sw="replays" aria-checked="${SV.replays !== false}"><span>Instant replays<small>On: big plays and blocks get a slow-motion replay. Off: no replays during games (highlights still save).</small></span><i></i></button>
       <button class="tog" type="button" role="switch" data-sw="study" aria-checked="${!!SV.study}"><span>Study mix<small>A calmer crowd, softer sound effects and mellow music. Great with Auto Mode.</small></span><i></i></button>
       ${isTouch ? `<button class="tog" type="button" role="switch" data-sw="noVib" aria-checked="${!!SV.noVib}"><span>No vibration<small>Turn off the buzz on blocks and dunks.</small></span><i></i></button>` : ''}</div>
       ${isTouch ? `<div class="h3">Button size</div><div class="seg2">${['Small', 'Medium', 'Large'].map(n => `<button type="button" class="pick" data-bs="${n[0].toLowerCase()}" aria-pressed="${String((SV.btn || 'm') === n[0].toLowerCase())}">${n}</button>`).join('')}</div>` : ''}` + [['music', 'Music'], ['crowd', 'Crowd'], ['sfx', 'Sound Effects'], ['shake', 'Screen Shake']].map(([k, l]) => `<div class="vrow"><label for="v_${k}">${l}</label><input type="range" id="v_${k}" data-v="${k}" min="0" max="100" step="5" value="${Math.round(vol(k) * 100)}"><span>${Math.round(vol(k) * 100)}%</span></div>`).join('');
   } if (lockerTab === 'trophies') {
     const n = ACH.filter(a => SV.ach[a[0]]).length;
-    body = `<p style="margin:0 0 10px">${n} of ${ACH.length} unlocked.</p><div class="agrid">${ACH.map(a => `<div class="ach${SV.ach[a[0]] ? '' : ' off'}"><i>${SV.ach[a[0]] ? '★' : '?'}</i><div><b>${a[1]}</b><span>${a[2]}</span></div></div>`).join('')}</div>`;
+    body = `<p style="margin:0 0 10px">${n} of ${ACH.length} unlocked.</p><div class="agrid">${ACH.map(a => { const TT = trophyTier(a[0]); return `<div class="ach${SV.ach[a[0]] ? '' : ' off'}" style="--tc:${TT[1]}"><i>${SV.ach[a[0]] ? '★' : '?'}</i><div><b>${a[1]}</b><span>${a[2]}</span><em class="atier">${TT[0]}, +${TT[2]} XP</em></div></div>`; }).join('')}</div>`;
   }
   openPanel('Locker Room', tabs + lvl + body, [['Done', closePanel, 'red']]);
-  { const a = $('lkTour'), b = $('lkTut'); if (a) a.onclick = () => { closePanel(true); openTour(); }; if (b) b.onclick = () => { closePanel(true); startGame(4); }; }
+  { const a = $('lkTour'), b = $('lkTut'); if (a) a.onclick = () => { closePanel(true); openTour(); }; if (b) b.onclick = () => { closePanel(true); startGame(4); };
+    const c = $('lkTrReset'); if (c) c.onclick = () => openPanel('Reset trophies?', `<p style="margin:0">This clears ${(n => n === 1 ? "your 1 trophy" : `all ${n} of your trophies`)(Object.keys(SV.ach || {}).length)} so you can earn them again. Your level and XP stay.</p>`, [['Reset trophies', () => { SV.ach = {}; persist(); closePanel(true); toast('Trophies reset', 'Go earn them all again.'); }, 'red'], ['Cancel', () => openLocker('settings')]]); }
   setTimeout(() => { try { fxPreviewStart(); const pb = $('panelBody'); if (pb && !pb.dataset.fxpv) { pb.dataset.fxpv = 1; pb.addEventListener('pointerover', e => { const b = e.target.closest && e.target.closest('[data-tr],[data-cos="scorefx"]'); if (!b) return; if (b.dataset.tr) fxPv.tr = b.dataset.tr; else fxPv.fx = b.dataset.val; }); pb.addEventListener('pointerout', e => { const b = e.target.closest && e.target.closest('[data-tr],[data-cos="scorefx"]'); if (!b) return; if (b.dataset.tr) fxPv.tr = null; else fxPv.fx = null; }); } } catch (e) {} }, 60);
   { const bc = $('svCopy'), bl = $('svLoad'), box = $('svBox');
     if (bc) bc.onclick = () => { const code = 'HH1-' + btoa(unescape(encodeURIComponent(JSON.stringify(SV)))); box.style.display = 'block'; box.value = code; box.dataset.mode = 'copy'; box.select(); const ok = () => toast('Save code copied', 'Paste it into Load a save code on your other device.'), no = () => toast('Save code', 'Select the text and copy it.'); try { navigator.clipboard.writeText(code).then(ok, no); } catch (e) { no(); } };
@@ -9930,8 +9977,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 131;
+const GAME_VERSION = 132;
 const UPDATES = [
+  [132, 'Trophy look', ['Practice no longer gives trophies.', 'New Reset trophies button in Locker, Settings.', 'Status effects (power-ups, Hype Time, frozen, on fire, match point) now show as trophy-style cards with a timer bar.', 'Trophies give XP by difficulty: Bronze 25, Silver 50, Gold 100, Diamond 200.']],
   [131, 'Power-up lesson', ['New tutorial lesson: how power-ups drop, how to grab them and what the good and bad ones do.']],
   [130, 'Tour moves', ['The site tour now lives in Locker, Settings, and runs on its own after your first tutorial.', 'Tournament text fixed: Bronze Cup to Diamond Cup.']],
   [129, 'Site tour', ['A new guided tour: a spotlight walks you through the menu, Modes and the Locker. It runs by itself after your first tutorial, and you can take it any time from Locker, Settings.']],
