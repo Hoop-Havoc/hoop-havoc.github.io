@@ -341,7 +341,7 @@ canvas.fxprev{display:block;width:100%;height:130px;border:3px solid #0b0612;box
           <button type="button" data-d="auto" aria-pressed="false">Auto</button>
         </div>
       </div>
-      <div class="lvl" id="lvlStrip"><b id="lvlN">Level 1</b><span class="xpbar"><i id="lvlBar"></i></span><small id="lvlTxt">0 / 100 XP</small><button type="button" id="bTour" class="verbtn tourbtn">Tour</button><button type="button" id="bVer" class="verbtn">v69 Updates</button></div>
+      <div class="lvl" id="lvlStrip"><b id="lvlN">Level 1</b><span class="xpbar"><i id="lvlBar"></i></span><small id="lvlTxt">0 / 100 XP</small><button type="button" id="bVer" class="verbtn">v69 Updates</button></div>
     </div>
     <aside class="howto" aria-label="How to play">
       <h2>How to play</h2>
@@ -8141,7 +8141,7 @@ function startAuto() {
   if (autoGames === 1) toast('Auto Mode', 'The CPU plays forever. Press Esc to stop.');
 }
 function toMenu() {
-  if (SV.tourNext && !SV.toured) setTimeout(openTour, 500);
+  if ((SV.tourNext || (mode === 4 && !attract)) && !SV.toured) setTimeout(() => { if ($('panel').hidden && !$('menu').hidden) openTour(); else setTimeout(() => { closePanel(true); openTour(); }, 600); }, 900);
   pregame = null;
   if (net) netClose();
   autoPlay = false; autoGames = 0; document.body.classList.remove('auto');
@@ -8299,7 +8299,6 @@ $('bSkip').addEventListener('click', () => tutSkip());
 $('bBack').addEventListener('click', () => tutBack());
 function tutBack() { if (tut && tut.step > 0) { tut.okT = 0; tutGoto(tut.step - 1); tone(392, 0.08, 'square', 0.03); } }
 $('bPause').addEventListener('click', togglePause);
-$('bTour') && $('bTour').addEventListener('click', () => { closePanel(true); openTour(); });
 $('bMute').addEventListener('click', toggleMute);
 $('bResume').addEventListener('click', togglePause);
 $('bQuit').addEventListener('click', toMenu);
@@ -9093,7 +9092,7 @@ const MODES = [
   ['Tutorial', 'Learn every move in a few minutes, or drill one lesson on repeat.', () => openLessons(false)],
   ['First To 100', 'The long one. Take on the CPU, a friend, or watch two CPUs battle it out.', () => openHundred()],
   ['Challenges', () => { const C = chState(), n = [...C.day.map(c => SV.ch.dd[c[0]]), ...C.week.map(c => SV.ch.wd[c[0]])].filter(Boolean).length; return `Daily and weekly goals for bonus XP. ${n} of 6 done.`; }, () => openChallenges()],
-  ['Tournament', () => SV.cup ? `Pick up where you left off: ${TOURNEY_LBL(SV.cup.round)}.` : 'Six rounds, a twist every round, and a best-of-3 final. Climb from Bronze to Diamond.', () => { if (!loadCup()) newCup(); openBracket(); }],
+  ['Tournament', () => SV.cup ? `Pick up where you left off: ${TOURNEY_LBL(SV.cup.round)}.` : 'Six rounds, a twist every round, and a best-of-3 final. Climb from the Bronze Cup to the Diamond Cup.', () => { if (!loadCup()) newCup(); openBracket(); }],
 ];
 let modeX = null, modeXNext = null, gaunt = { n: 0 };
 const GAUNT = ['rookie', 'rookie', 'pro', 'pro', 'pro', 'legend', 'legend', 'legend'];
@@ -9447,7 +9446,7 @@ function openLocker0(tab) {
       <div class="h3">Star player</div><p style="margin:0 0 8px">A named player who joins your team in 1-player games, with their own number and a slightly better jump and shot. Unlock legends by levelling up.</p><div class="pgrid">${[[0, 'None', 1, 0], ...STARS].map(([L, n, num]) => `<button class="pick" type="button" data-star="${L ? n : ''}" aria-pressed="${String((st.star || '') === (L ? n : ''))}" ${lock(L || 1) ? 'disabled' : ''}>${L ? n + ` <small>#${num}${lock(L) ? ', level ' + L : ''}</small>` : 'None'}</button>`).join('')}</div>
       <div class="h3" style="margin-top:14px">Headband</div><div class="swrow">${BANDS.map((b, i) => [b, i]).sort((a, b) => (a[0][2] || 0) - (b[0][2] || 0) || a[1] - b[1]).map(([[c, n, L], i]) => `<button class="sw" type="button" data-hb="${i}" style="background:${c || 'repeating-linear-gradient(45deg,#33244a 0 6px,#21162f 6px 12px)'}" aria-label="${n}${lock(L) ? ', unlocks at level ' + L : ''}" aria-pressed="${String((st.band || 0) === i)}" ${lock(L) ? 'disabled' : ''}>${lock(L) ? `<small>Lv ${L}</small>` : ''}</button>`).join('')}</div>`;
   } if (lockerTab === 'settings') {
-    body = acctHTML() + '<div class="credit"><b>Hoop Havoc</b><span>A Morningfall Corp game</span><small>Beta v' + GAME_VERSION + '</small></div>' + `<div class="rlist" style="margin-bottom:12px"><button class="tog" type="button" role="switch" data-sw="replays" aria-checked="${SV.replays !== false}"><span>Instant replays<small>On: big plays and blocks get a slow-motion replay. Off: no replays during games (highlights still save).</small></span><i></i></button>
+    body = `<div class="h3">Help</div><div class="seg2" style="margin-bottom:12px"><button type="button" class="pick" id="lkTour">Take the site tour<small>A quick spotlight walk-through of the menu</small></button><button type="button" class="pick" id="lkTut">Play the tutorial<small>Learn every move</small></button></div>` + acctHTML() + '<div class="credit"><b>Hoop Havoc</b><span>A Morningfall Corp game</span><small>Beta v' + GAME_VERSION + '</small></div>' + `<div class="rlist" style="margin-bottom:12px"><button class="tog" type="button" role="switch" data-sw="replays" aria-checked="${SV.replays !== false}"><span>Instant replays<small>On: big plays and blocks get a slow-motion replay. Off: no replays during games (highlights still save).</small></span><i></i></button>
       <button class="tog" type="button" role="switch" data-sw="study" aria-checked="${!!SV.study}"><span>Study mix<small>A calmer crowd, softer sound effects and mellow music. Great with Auto Mode.</small></span><i></i></button>
       ${isTouch ? `<button class="tog" type="button" role="switch" data-sw="noVib" aria-checked="${!!SV.noVib}"><span>No vibration<small>Turn off the buzz on blocks and dunks.</small></span><i></i></button>` : ''}</div>
       ${isTouch ? `<div class="h3">Button size</div><div class="seg2">${['Small', 'Medium', 'Large'].map(n => `<button type="button" class="pick" data-bs="${n[0].toLowerCase()}" aria-pressed="${String((SV.btn || 'm') === n[0].toLowerCase())}">${n}</button>`).join('')}</div>` : ''}` + [['music', 'Music'], ['crowd', 'Crowd'], ['sfx', 'Sound Effects'], ['shake', 'Screen Shake']].map(([k, l]) => `<div class="vrow"><label for="v_${k}">${l}</label><input type="range" id="v_${k}" data-v="${k}" min="0" max="100" step="5" value="${Math.round(vol(k) * 100)}"><span>${Math.round(vol(k) * 100)}%</span></div>`).join('');
@@ -9456,6 +9455,7 @@ function openLocker0(tab) {
     body = `<p style="margin:0 0 10px">${n} of ${ACH.length} unlocked.</p><div class="agrid">${ACH.map(a => `<div class="ach${SV.ach[a[0]] ? '' : ' off'}"><i>${SV.ach[a[0]] ? '★' : '?'}</i><div><b>${a[1]}</b><span>${a[2]}</span></div></div>`).join('')}</div>`;
   }
   openPanel('Locker Room', tabs + lvl + body, [['Done', closePanel, 'red']]);
+  { const a = $('lkTour'), b = $('lkTut'); if (a) a.onclick = () => { closePanel(true); openTour(); }; if (b) b.onclick = () => { closePanel(true); startGame(4); }; }
   setTimeout(() => { try { fxPreviewStart(); const pb = $('panelBody'); if (pb && !pb.dataset.fxpv) { pb.dataset.fxpv = 1; pb.addEventListener('pointerover', e => { const b = e.target.closest && e.target.closest('[data-tr],[data-cos="scorefx"]'); if (!b) return; if (b.dataset.tr) fxPv.tr = b.dataset.tr; else fxPv.fx = b.dataset.val; }); pb.addEventListener('pointerout', e => { const b = e.target.closest && e.target.closest('[data-tr],[data-cos="scorefx"]'); if (!b) return; if (b.dataset.tr) fxPv.tr = null; else fxPv.fx = null; }); } } catch (e) {} }, 60);
   { const bc = $('svCopy'), bl = $('svLoad'), box = $('svBox');
     if (bc) bc.onclick = () => { const code = 'HH1-' + btoa(unescape(encodeURIComponent(JSON.stringify(SV)))); box.style.display = 'block'; box.value = code; box.dataset.mode = 'copy'; box.select(); const ok = () => toast('Save code copied', 'Paste it into Load a save code on your other device.'), no = () => toast('Save code', 'Select the text and copy it.'); try { navigator.clipboard.writeText(code).then(ok, no); } catch (e) { no(); } };
@@ -9928,9 +9928,10 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 129;
+const GAME_VERSION = 130;
 const UPDATES = [
-  [129, 'Site tour', ['A new guided tour: a spotlight walks you through the menu, Modes and the Locker. Start it from the Tour button on the home screen.']],
+  [130, 'Tour moves', ['The site tour now lives in Locker, Settings, and runs on its own after your first tutorial.', 'Tournament text fixed: Bronze Cup to Diamond Cup.']],
+  [129, 'Site tour', ['A new guided tour: a spotlight walks you through the menu, Modes and the Locker. It runs by itself after your first tutorial, and you can take it any time from Locker, Settings.']],
   [128, 'Big One', ['Cleaner capitals everywhere: names like Power Party, Hype Time and Dunk Contest always look the same.', 'Rims always fit the ball, so giant balls and tiny rims are fair.', 'Accounts: pick a username (friends see it online), and set a password on a Google account so typing your email signs you in to the same account.', 'Online play retries when the server is slow and connects more reliably.', 'New cosmetics: 6 jerseys (Polka Dots, Tiger Stripes, Argyle, Big Wave, Slime Drip, Tie-Dye), 8 sneakers, 6 headbands, 8 ball trails and 6 score effects.', 'Loser animations: about half the time the winners now taunt the losers (laughing, waving bye, taking the L and more).', 'On Snow Day, Candy Land and Neon Arcade the celebration that pelts the losers is now the only loser animation.', '34 new trophies with a brand new trophy pop-up.', '3 new modes: Power Party, Havoc Mode and Gauntlet.', 'Tournaments have twists every round, rivals with their own style, a best-of-3 final, and Bronze to Diamond cups.', 'You earn XP 1.5x faster and levels need less XP.', 'Power-ups now drop from the sky as little balls. Grab one to use it.', '10 new power-ups: jetpack, lightning, tornado, shield, ghost, banana, big rim, storm cloud, swap and spring.', 'Pick the other team\'s colour from the little swatch on the home screen.', 'Every saved kit keeps its own player name.']],
   [127, 'The garage', ['The Blackout havoc round is gone.', '1 Player and 2 Players are now Singleplayer and Multiplayer.', 'The other team shows up in its own random gear every game: jersey designs, sneakers, headbands, trails and score effects.', 'Team & style is rebuilt like a garage: your player and a live trail preview on the left, one category at a time on the right (Team, Colour, Jersey, Sneakers, Headband, Ball trail, Score effect, Star player, On court).', 'Hover over a jersey, sneaker, headband or colour to try it on before you pick it. Locked gear shows the level it unlocks at.', 'Saved kits sit right under your player.']],
   [126, 'HYPE TIME', ['HYPE TIME lasts 12 seconds, gets its name in capitals, and has its own gold button next to Lob on phones. The tutorial teaches it.', 'Power-ups and status effects sit in the top corners: your team on the left, theirs on the right.', '2 players on one computer: both sides pick a team name, colour, jersey, sneakers and trail before the game, or skip.', 'Three saved kits in the locker: save a whole look and switch in one tap.', 'The CPU goes for alley-oops and self-oops now.', 'Auto Mode keeps your screen on.', 'Loser fates land with a shockwave and a flash.', 'The home screen tells you to tap for music, since browsers block sound until you do.']],
