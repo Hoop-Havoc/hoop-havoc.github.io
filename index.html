@@ -213,6 +213,15 @@ body.gfx #hudBtns{opacity:0;pointer-events:none;transition:opacity .25s}
 
 canvas.fxprev{display:block;width:100%;height:130px;border:3px solid #0b0612;box-shadow:0 4px 0 #0b0612;margin:10px 0 12px;background:#1c1430}
 @media (max-height:430px){canvas.fxprev{height:110px}}
+
+#sndHint{position:absolute;z-index:7;right:calc(var(--u,1px)*14);bottom:calc(var(--u,1px)*14);font:700 calc(var(--u,1px)*13)/1 var(--pixel,inherit);color:var(--cream,#fff0cf);background:rgba(18,11,28,.85);border:2px solid #0b0612;padding:.55em .8em;pointer-events:none;animation:sndP 1.6s ease-in-out infinite}
+#sndHint[hidden]{display:none}
+@keyframes sndP{50%{opacity:.55}}
+#hypeBtn.tbtnh{left:calc(var(--tg) + var(--tb) - var(--ts) * .2)!important;bottom:calc(var(--tg) + var(--tb) * .62 + var(--ts) + 12px)!important;transform:none!important;width:calc(var(--ts) * 1.25)!important;height:var(--ts)!important;padding:0!important;font-size:max(11px,calc(var(--u)*13))!important;line-height:1.05!important;border-radius:14%!important;white-space:normal!important;animation:hypeGlow 0.9s ease-in-out infinite}
+@keyframes hypeGlow{50%{box-shadow:0 0 22px #ffd34d,0 5px 0 #0b0612}}
+.kitrow{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:6px 0 14px}.kit{border:3px solid #0b0612;background:linear-gradient(180deg,#3a2a52,#21162f);padding:8px;display:flex;flex-direction:column;gap:6px;align-items:center;text-align:center}.kit .kp{width:56px;height:56px;border:2px solid #0b0612;background:#222 center/cover}.kit b{font-size:13px}.kit small{font-size:11px;opacity:.75}.kit .kb{display:flex;gap:5px;width:100%}.kit .kb button{flex:1;padding:5px 4px;font:700 12px var(--pixel,inherit)}
+.p2grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.p2grid h3{margin:0 0 6px}.p2grid label{display:block;font-size:12px;margin:8px 0 3px;opacity:.85}.p2grid input,.p2grid select{width:100%;padding:7px 8px;font:600 14px var(--pixel,inherit);background:#1b1226;color:var(--cream,#fff0cf);border:2px solid #0b0612}
+@media (max-width:560px){.p2grid{grid-template-columns:1fr}}
 </style>
 
 <div id="wrap">
@@ -721,11 +730,12 @@ function newMatch(isAttract) {
 
 /* ---------- Audio ---------- */
 let ac = null, muted = false, lastBounceSfx = 0;
-for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { try { audio(); } catch (e) {} }, { capture: true, passive: true });   // the first touch anywhere wakes the sound up, so the lobby music starts
+for (const ev of ['pointerdown', 'keydown', 'touchend', 'click', 'mousedown']) addEventListener(ev, () => { try { audio(); } catch (e) {} }, { capture: true, passive: true });   // the first touch anywhere wakes the sound up, so the lobby music starts
 function audio() {
   if (!ac) { try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ac = null; } }
   if (ac && ac.state === 'suspended') ac.resume().catch(() => {});
   if (ac) musicInit();
+  try { if (ac && !ac._unlocked) { ac._unlocked = true; const sb2 = ac.createBuffer(1, 1, 22050), src = ac.createBufferSource(); src.buffer = sb2; src.connect(ac.destination); src.start(0); } } catch (e) {}   // iPhones need a sound played inside the tap
 }
 function tone(f, d, type = 'square', v = 0.06, slide = 0) {
   if (!ac || muted || attract) return;
@@ -1199,7 +1209,7 @@ const TUT = [
   { cast: 'solo', key: 'putback',  need: 1, title: "Catch the miss", text: "The ball will bounce off the rim. Jump and catch it before it hits the floor.", big: "Jump and catch it", zone: 'dunk' },
   { cast: 'solo', key: 'fake',     need: 1, title: "Pump fake", text: "Tap W two times fast with the ball. You trick the other player into jumping.", big: "Tap W two times fast" },
   { cast: 'solo', key: 'overfill', need: 1, title: "Don't hold too long", text: "If the bar gets to the top, it shoots by itself and misses. Try it once: hold W until it shoots.", big: "Hold W until it shoots" },
-  { cast: 'solo', key: 'hype',     need: 1, title: "Hype time", text: "Big plays fill your hype meter, the little bar next to your team's name. When it's full, press R to start hype time. For 12 seconds your green line gets much bigger!", big: "Press R for hype time" },
+  { cast: 'solo', key: 'hype',     need: 1, title: "HYPE TIME", text: isTouch ? "Big plays fill your hype meter, the little bar next to your team's name. When it's full, the gold HYPE TIME button lights up above Lob. Tap it: for 12 seconds your green window gets much bigger!" : "Big plays fill your hype meter, the little bar next to your team's name. When it's full, press R for HYPE TIME. For 12 seconds your green window gets much bigger!", big: isTouch ? "Tap the HYPE TIME button" : "Press R for HYPE TIME" },
   { cast: 'team', key: 'pass',     need: 1, title: "Pass", text: "You have a teammate now! Tap Q to pass them the ball.", big: "Tap Q to pass" },
   { cast: 'team', key: 'cns',      need: 1, title: "Catch and shoot", text: "Pass with Q. Then hold W right away to shoot. It's easier to hit a green this way.", big: "Tap Q, then hold W" },
   { cast: 'team', key: 'alleyoop', need: 1, title: "Alley-oop", text: "Wait until your teammate is near the hoop. Tap E to throw it up to them. Tap W when the circle gets small.", big: "Tap E, then tap W" },
@@ -1865,10 +1875,10 @@ function cpuThink(ti, dt) {
   }
   if (ours) {
     const dx = Math.abs(hoops[ti].cx - h.x), mate = lobTarget(h);
-    if (mate && mate.grounded && h.grounded && Math.random() < (attract ? 0.5 : D.lob ?? 0.32)) { press(0.19); a.timer = 0; return; }
+    if (mate && mate.grounded && h.grounded && !(mate.down > 0) && Math.random() < (attract ? 0.6 : Math.max(0.5, D.lob ?? 0.32))) { lobFor(ti); a.timer = D.react; return; }   // a teammate near the rim: throw it up for the oop
     const tm = mine.find(p => p !== h && !(p.down > 0));
     if (tm && Math.abs(hoops[ti].cx - tm.x) < dx - 120 && Math.random() < (D.pass ?? 0.12) && !players.some(q => q.team !== ti && Math.abs(q.x - (h.x + tm.x) / 2) < 30)) { passBall(h); a.timer = D.react; return; }
-    if (!mate && h.grounded && canSelfLob(h) && Math.random() < (attract ? 0.25 : solo() ? 0.2 : 0.1)) { press(0.19); a.timer = 0; return; }   // 1v1: the self-oop is your only lob
+    if (h.grounded && canSelfLob(h) && dx > 80 && !players.some(q => q.team !== ti && !(q.down > 0) && Math.abs(q.x - h.x) < 35 && q.grounded) && Math.random() < (attract ? 0.5 : solo() ? 0.5 : 0.35)) { lobFor(ti); a.timer = D.react; return; }   // open lane: toss it up to yourself
     const flyer = players.find(q => q.team !== ti && !q.grounded && !(q.down > 0) && Math.abs(q.x - h.x) < 120);
     if (flyer && h.grounded && Math.random() < (D.smart || 0)) { if (leanOK) press(0.07); a.timer = D.react * 0.5; return; }
     const guard = players.find(q => q.team !== ti && !(q.down > 0) && Math.abs(q.x - h.x) < 75 && (hoops[ti].cx - h.x) * (q.x - h.x) > 0);
@@ -2327,7 +2337,8 @@ function drawEmotesOld() {
 // ---- cosmetics ----
 const TRAILS = [['none', 'None', 1], ['sparkle', 'Sparkle', 1], ['fire', 'Fire', 2], ['rainbow', 'Rainbow', 3], ['stars', 'Stardust', 4], ['bubbles', 'Bubbles', 5], ['lightning', 'Lightning', 6], ['love', 'Love', 7], ['gold', 'Gold Rush', 9], ['notes', 'Music Notes', 12], ['snow', 'Snowflakes', 16], ['leaves', 'Leaves', 20], ['coins', 'Coins', 25], ['pixels', 'Pixels', 30], ['bats', 'Bats', 36], ['comet', 'Comet', 42], ['petals', 'Petals', 48], ['galaxy', 'Galaxy', 55], ['crowns', 'Crowns', 65], ['diamonds', 'Diamonds', 75], ['dragon', 'Dragon Fire', 85], ['legend', 'Legend', 100]];
 const BANDS = [[null, 'None', 1], ['#ffffff', 'White', 1], ['#ffd34d', 'Gold', 2], ['#5dff7a', 'Lime', 3], ['#00f0ff', 'Cyan', 4], ['#ff4fd8', 'Pink', 5], ['#21162f', 'Black', 6], ['#ff4f6d', 'Red', 7], ['#8e5ad8', 'Purple', 14], ['#ff8a3d', 'Orange', 18], ['#3b7bff', 'Royal', 22], ['#c0c6d4', 'Silver', 28], ['#7a4a2a', 'Brown', 33], ['#00c896', 'Mint', 40], ['#ff2d55', 'Crimson', 46], ['#b6ff00', 'Volt', 52], ['#f7d6a0', 'Sand', 58], ['#6a00ff', 'Ultra', 68], ['#ffe066', 'Glow', 78], ['#ffffff', 'Champion', 95]];
-function myTeam(i) { return mode === 2 ? i === 0 : i === 0; }
+function myTeam(i) { return i === 0 || (i === 1 && p2On()); }
+function p2On() { return mode === 2 && !attract && !autoPlay && !(typeof net !== 'undefined' && net) && !!(SV.p2 && SV.p2.on); }
 function drawShape(k, x, y, s, r) {
   ctx.save(); ctx.translate(x, y);
   switch (k) {
@@ -2346,7 +2357,7 @@ function drawShape(k, x, y, s, r) {
   ctx.restore();
 }
 function ballTrail(el) {
-  const k = ball._pv || (SV.style || {}).trail; if (!k || k === 'none' || ball.holder || state === 'replay') { ball._rib = null; return; }
+  const from0 = ball.shot ? ball.shotTeam : ball.thrower ? ball.thrower.team : 0; const k = ball._tk = ball._pv || myStyle('trail', from0); if (!k || k === 'none' || ball.holder || state === 'replay') { ball._rib = null; return; }
   if (!ball._pv) { const from = ball.shot ? ball.shotTeam : ball.thrower ? ball.thrower.team : -1; if (from < 0 || !myTeam(from)) return; }
   const sp = Math.hypot(ball.vx, ball.vy); if (sp < 120) { ball._rib = null; return; }
   ball._rib = (ball._rib || []).filter(q => time - q.t < 0.3); ball._rib.push({ x: ball.x, y: ball.y, t: time });   // ribbon points
@@ -2379,13 +2390,13 @@ function ballTrail(el) {
 }
 
 const PAT_ACC = { stripes: '#ffffff', checker: '#ffffff', pin: '#ffffff', split: '#ffd34d', camo: '#9aa86a', sash: '#ffd34d', chevron: '#ffd34d', sunset: '#ff4f8b', stars: '#e0303f', bolt: '#ffd34d', graffiti: '#ff4fd8', flames: '#ff8a3d', circuit: '#3fe0ff', galaxy: '#ff6fd8', gold: '#ffd34d', royal: '#ffd34d' };
-const kitAcc = p => { const k = myStyle('pattern'); return k && k !== 'solid' && !attract && myTeam(p.team) && !outfit().coat ? PAT_ACC[k] || '#ffffff' : null; };
+const kitAcc = p => { const k = myStyle('pattern', p.team); return k && k !== 'solid' && !attract && myTeam(p.team) && !outfit().coat ? PAT_ACC[k] || '#ffffff' : null; };
 const RARITY = L => L >= 60 ? ['Legendary', '#ffb020'] : L >= 30 ? ['Epic', '#b46bff'] : L >= 10 ? ['Rare', '#3fa0ff'] : ['Common', '#9aa0b0'];
 const PATTERNS = [['solid', 'Solid', 1], ['stripes', 'Racing Stripes', 3], ['checker', 'Finish Line', 6], ['pin', 'Pinstripe Panels', 8], ['split', 'Two-Tone Slash', 12], ['camo', 'Camo', 15], ['sash', 'Champion Sash', 18], ['chevron', 'Triple Chevron', 24], ['sunset', 'Retro Sunset', 28], ['stars', 'Star Spangled', 32], ['bolt', 'Lightning Bolt', 40], ['graffiti', 'Graffiti', 45], ['flames', 'Hot Rod Flames', 50], ['circuit', 'Neon Circuit', 58], ['galaxy', 'Galaxy', 65], ['gold', 'Gold Laurel', 80], ['royal', 'Royal Crest', 95]];
 const SHOES = [['classic', 'Classic', '#16171f', '#f6f0e4', 1], ['white', 'Clean White', '#f4f4f4', '#c8c8c8', 4], ['red', 'Fire Red', '#e8483b', '#ffffff', 10], ['ice', 'Ice Blue', '#7fd4ff', '#ffffff', 16], ['neon', 'Neon', '#5dff7a', '#16171f', 22],
   ['pink', 'Bubblegum', '#ff6fd8', '#ffffff', 28], ['gold', 'Gold', '#ffd34d', '#7a5a12', 45], ['galaxy', 'Galaxy', '#5a3a9a', '#c79bff', 60], ['lava', 'Lava', '#ff5a1f', '#ffd34d', 75], ['diamond', 'Diamond', '#bfefff', '#ffffff', 90]];
 const SCOREFX = [['none', 'None', 1], ['confetti', 'Confetti Pop', 2], ['hearts', 'Heart Burst', 6], ['lightning', 'Thunderclap', 14], ['coins', 'Jackpot', 20], ['ink', 'Ink Splash', 27], ['fireworks', 'Fireworks', 35], ['pixels', 'Pixel Blast', 42], ['shock', 'Shockwave', 55], ['galaxy', 'Supernova', 70], ['crown', 'Crowned', 85], ['goat', 'GOAT Mode', 100]];
-function myStyle(k) { if (SV.outfit === 'plain' && (k === 'pattern' || k === 'shoes')) return undefined; return (SV.style || {})[k]; }
+function myStyle(k, ti = 0) { if (SV.outfit === 'plain' && (k === 'pattern' || k === 'shoes' || k === 'band')) return undefined; return ((ti === 1 && p2On() ? SV.p2.style : SV.style) || {})[k]; }
 function patArt(g, k, Lt, R, col, dark, tm) {   // a jersey design in the torso's own frame: x runs hem to collar, y across the chest
   const u = R / 9, X0 = -R, X1 = Lt + R, W = '#ffffff', GOLD = '#ffd34d', PI = Math.PI;
   const rect = (x0, y0, x1, y1, c) => { g.fillStyle = c; g.fillRect(x0, y0, x1 - x0, y1 - y0); };
@@ -2429,7 +2440,7 @@ function patExtra(g, k, Lt, R, col, dark, tm) {   // finishing touches drawn ove
   if (k === 'gold') { g.fillStyle = 'rgba(255,233,163,.18)'; for (let x = 2 * u; x < Lt - 2 * u; x += 3 * u) for (let y = -4.5 * u; y <= 4.5 * u; y += 3 * u) { g.beginPath(); g.moveTo(x, y - 1.1 * u); g.lineTo(x + 1.1 * u, y); g.lineTo(x, y + 1.1 * u); g.lineTo(x - 1.1 * u, y); g.closePath(); g.fill(); } }
 }
 function drawPattern(p, t, hip, neck, fwx, fwy, sc) {
-  const k = myStyle('pattern'); if (!k || k === 'solid' || attract || !myTeam(p.team)) return;
+  const k = myStyle('pattern', p.team); if (!k || k === 'solid' || attract || !myTeam(p.team)) return;
   const A = { x: lerp(hip.x, neck.x, 0.22), y: lerp(hip.y, neck.y, 0.22) }, dx = neck.x - A.x, dy = neck.y - A.y, Lt = Math.hypot(dx, dy) || 1, R = 9 * sc;
   ctx.save(); ctx.translate(A.x, A.y); ctx.rotate(Math.atan2(dy, dx)); if ((-dy * fwx + dx * fwy) / Lt < 0) ctx.scale(1, -1);
   ctx.beginPath(); ctx.moveTo(0, -R); ctx.lineTo(Lt, -R); ctx.arc(Lt, 0, R, -Math.PI / 2, Math.PI / 2); ctx.lineTo(0, R); ctx.arc(0, 0, R, Math.PI / 2, Math.PI * 1.5); ctx.clip();
@@ -2443,9 +2454,9 @@ function patPNG(k, col, dark, w, h) {   // the same design, flat, for the locker
   if (k && k !== 'solid') { g.translate(w / 2, h); g.rotate(-Math.PI / 2); try { patArt(g, k, h * 0.86, w / 2, col, dark, 0.6); } catch (e) {} }
   return patCache[id] = c.toDataURL();
 }
-function shoeCols(p) { const k = myStyle('shoes'); if (!k || k === 'classic' || attract || !myTeam(p.team)) return null; return SHOES.find(s => s[0] === k) || null; }
+function shoeCols(p) { const k = myStyle('shoes', p.team); if (!k || k === 'classic' || attract || !myTeam(p.team)) return null; return SHOES.find(s => s[0] === k) || null; }
 function scoreFx(ti, hp, force) {
-  const k = force || myStyle('scorefx'); if (!k || k === 'none' || (!force && (attract || !myTeam(ti) || (typeof tutorial === 'function' && tutorial())))) return;
+  const k = force || myStyle('scorefx', ti); if (!k || k === 'none' || (!force && (attract || !myTeam(ti) || (typeof tutorial === 'function' && tutorial())))) return;
   const PP = particles;
   const x = hp.cx, y = hp.rimY, T = teams[ti], burst = (n, f) => { for (let i = 0; i < n; i++) PP.push(f(i)); };
   const ring = (n, sp, c, sh, s) => burst(n, i => { const a = i / n * Math.PI * 2; return { x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, c: typeof c === 'function' ? c(i) : c, life: 1, max: 1, g: 0, s, shape: sh }; });
@@ -2518,7 +2529,7 @@ function lookPreview() {   // a little player in a proper tank-top jersey, weari
     <circle cx="60" cy="36" r="22" fill="${sk}"/>${band && band[0] ? `<rect x="38" y="24" width="44" height="8" fill="${band[0]}"/><rect x="38" y="26.5" width="44" height="1.6" fill="rgba(255,255,255,.55)"/>` : ''}<circle cx="52" cy="38" r="2.6" fill="#1a1026"/><circle cx="68" cy="38" r="2.6" fill="#1a1026"/><path d="M52 46 Q60 52 68 46" stroke="#1a1026" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>`;
 }
 function drawHeadband(p, R) {
-  const b = BANDS[SV.outfit === 'plain' ? 0 : (SV.style || {}).band || 0]; if (!b || !b[0] || attract || !myTeam(p.team)) return;
+  const b = BANDS[myStyle('band', p.team) || 0]; if (!b || !b[0] || attract || !myTeam(p.team)) return;
   ctx.save(); ctx.beginPath(); ctx.arc(0, 0, R, 0, 7); ctx.clip();
   ctx.fillStyle = b[0]; ctx.fillRect(-R * 1.1, -R * 0.66, R * 2.2, R * 0.36);
   ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(-R * 1.1, -R * 0.52, R * 2.2, R * 0.07);
@@ -6091,17 +6102,17 @@ function drawHUD() {
   for (let i = 0; i < 2; i++) {
     const T = teams[i], L = i === 0, chips = [];
     if (isMatchPoint(i) && state !== 'over' && !practice()) chips.push(['Match point', MUSTARD, INK, true]);
-    if (T.hypeReady && !hypeAuto(i)) chips.push([isTouch ? 'Hype ready! Tap Hype' : `Hype ready! Press ${i && mode === 2 && !(net && net.ready) ? '→' : 'R'}`, '#ffd34d', INK, Math.sin(time * 8) > 0]);
-    else if (time < (T.hypeUntil || 0)) chips.push([`Hype time ${Math.ceil(T.hypeUntil - time)}s`, T.color, CREAM, true]);
+    if (T.hypeReady && !hypeAuto(i)) chips.push([isTouch ? 'HYPE TIME ready: tap it!' : `HYPE TIME ready: press ${i && mode === 2 && !(net && net.ready) ? '→' : 'R'}`, '#ffd34d', INK, Math.sin(time * 8) > 0]);
+    else if (time < (T.hypeUntil || 0)) chips.push([`HYPE TIME ${Math.ceil(T.hypeUntil - time)}s`, T.color, CREAM, true]);
     if (T.frozen > 0) chips.push([`Frozen ${T.frozen.toFixed(1)}s`, '#7fd4ff', INK]);
     else if (T.power) chips.push([`${niceName(T.power.id)} ${Math.ceil(T.power.t)}s`, T.power.c, INK]);
     else if (T.onFire) chips.push(['On Fire', '#ff4f6d', CREAM]);
-    let yy = by + bh + 12;
+    let yy = L ? (practice() ? 190 : 14) : 58;
     for (const [txt, bg, fg, pulse] of chips) {
-      ctx.font = `15px ${DISPLAY}`; const w = ctx.measureText(txt).width + 22, x = L ? x0 + 4 : x0 + bw - w - 4;
+      ctx.font = `15px ${DISPLAY}`; const w = ctx.measureText(txt).width + 22, x = L ? 40 : W - 40 - w;
       ctx.globalAlpha = pulse ? 0.8 + 0.2 * Math.sin(time * 7) : 1;
-      inkTag(x, yy, w, 24, 12, bg); ctx.fillStyle = fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, x + w / 2, yy + 12.5);
-      ctx.globalAlpha = 1; yy += 30; side = Math.max(side, w);
+      inkTag(x, yy, w, 24, 12, bg); ctx.fillStyle = T.color; ctx.fillRect(L ? x + 3 : x + w - 7, yy + 4, 4, 16); ctx.fillStyle = fg; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; noCase = /HYPE TIME/.test(txt); ctx.fillText(txt, x + w / 2, yy + 12.5); noCase = false;
+      ctx.globalAlpha = 1; yy += 30;
     }
   }
   // what this point rolled: shown for a few seconds, then only what you can't see (wind, golden ball) stays
@@ -6912,7 +6923,7 @@ function stepDoom(el) {
   const d = doom; if (!d) return; const k = d.kind;
   const K2 = DOOM2[k]; if (K2) {
     if (state !== 'scored' && d.t > 0.3) { d.losers.forEach(p => { p.dfx = null; p.doomRun = 0; }); doom = null; return; }
-    d.t += el; if (!d.hit && d.t >= K2.at) { d.hit = true; try { K2.hit && K2.hit(d); } catch (e) {} d.losers.forEach(p => { p.mood = 'sad'; p.moodT = 3; }); }
+    d.t += el; if (!d.hit && d.t >= K2.at) { d.hit = true; hitstop = Math.max(hitstop, 0.06); try { K2.hit && K2.hit(d); } catch (e) {} d.losers.forEach(p => { p.mood = 'sad'; p.moodT = 3; }); }
     d.losers.forEach((p, i) => { try { K2.step(d, p, el, i); } catch (e) {} }); return; }
   if (state !== 'scored' && d.t > 0.3) { d.losers.forEach(p => { p.frozenT = 0; p.buriedT = 0; p.gooT = 0; p.glitchT = 0; }); doom = null; return; }   // the next point wipes it all away
   d.t = Math.min(d.t + el, 2.0);   // then it holds: they stay frozen, buried, stuck or flattened until the next point
@@ -6939,7 +6950,7 @@ function stepDoom(el) {
 }
 function drawDoom() {
   const d = doom; if (!d || attract) return; const k = d.kind, t = d.t, hitAt = d.hit ? 1 : 0;
-  if (DOOM2[k]) { ctx.save(); try { DOOM2[k].draw(d); } catch (e) {} ctx.restore(); ctx.save(); try { drawDoomWord(d); } catch (e) {} ctx.restore(); return; }
+  if (DOOM2[k]) { ctx.save(); try { DOOM2[k].draw(d); } catch (e) {} ctx.restore(); ctx.save(); try { drawDoomImpact(d); drawDoomWord(d); } catch (e) {} ctx.restore(); return; }
   ctx.save();
   if (k === 'lava' && t < 0.85) { ctx.fillStyle = `rgba(255,60,10,${0.12 + Math.sin(time * 20) * 0.05})`; ctx.fillRect(-60, -60, W + 120, H + 120); if (Math.random() < 0.5) shake = Math.max(shake, 3); }   // the rumble before it blows
   if (d.flash > 0) { ctx.fillStyle = `rgba(255,120,40,${0.45 * d.flash})`; ctx.fillRect(-60, -60, W + 120, H + 120); d.flash = Math.max(0, d.flash - 0.04); }
@@ -7182,6 +7193,14 @@ const DOOM2 = {
       ctx.strokeStyle = '#c8a060'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(ex, GROUND - 120); ctx.quadraticCurveTo((ex + lx) / 2, GROUND - 160 + (d.t > 0.85 ? 60 : 0), lx, ty); ctx.stroke(); ctx.beginPath(); ctx.ellipse(lx, ty, 22, 8, d.t < 0.5 ? d.t * 12 : 0, 0, 7); ctx.stroke(); }); } },
 };
 const DOOM_WORD = { lava: ['ERUPTION!', '#ff7a3d'], cry: ['WAAAH!', '#8fd8ff'], iceblock: ['CRUNCH!', '#bfe6ff'], abduct: ['ZWOOP!', '#7dff9a'], deaddragon: ['THOOM!', '#ff7a3d'], dragunder: ['GOTCHA!', '#9fe06a'], snowman: ['BRRR!', '#d8f0ff'], chomp: ['CHOMP!', '#ff4f6d'], washaway: ['SPLOOSH!', '#6fc4ff'], boulder: ['BONK!', '#e0b070'], mummy: ['WRAPPED!', '#f0e2b8'], cannonblast: ['KABOOM!', '#ffb02e'], fall: ['WHOOPS!', '#9fd0ff'], weight: ['SPLAT!', '#ff4f6d'], bubblegum: ['BLOOP!', '#ff6fd8'], pigeons: ['COO COO!', '#c8ccd8'], skyrocket: ['BOING!', '#ff6fd8'], fried: ['ZZZAP!', '#ffe14d'], thumbsdown: ['DENIED!', '#ffd34d'], ballcrush: ["DISCO'D!", '#ff4fd8'], cavein: ['CRASH!', '#b49cff'], hydrant: ['SPLASH!', '#6fc4ff'], lasso: ['YEEHAW!', '#ffb02e'] };
+function drawDoomImpact(d) {
+  const K = DOOM2[d.kind], at = K ? K.at : 0.85; if (!d.hit) return; const th = d.t - (d.kind === 'boulder' ? 9 : at); if (th < 0 || th > 0.6) return;
+  const k = th / 0.6, pal = MAP_PAL[court.deco] || MAP_PAL.arena;
+  ctx.save(); for (const p of d.losers) { const x = p.x; ctx.strokeStyle = `rgba(255,255,255,${0.7 * (1 - k)})`; ctx.lineWidth = 6 * (1 - k) + 1; ctx.beginPath(); ctx.ellipse(x, GROUND + 2, 20 + k * 130, 4 + k * 16, 0, 0, 7); ctx.stroke();
+    ctx.strokeStyle = pal[0] + Math.round(180 * (1 - k)).toString(16).padStart(2, '0'); ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(x, GROUND + 2, 10 + k * 90, 2 + k * 10, 0, 0, 7); ctx.stroke();
+    if (th < 0.12) { ctx.globalCompositeOperation = 'lighter'; const g = ctx.createRadialGradient(x, GROUND - 40, 0, x, GROUND - 40, 120); g.addColorStop(0, `rgba(255,255,240,${0.45 * (1 - th / 0.12)})`); g.addColorStop(1, 'rgba(255,255,240,0)'); ctx.fillStyle = g; ctx.fillRect(x - 130, GROUND - 170, 260, 260); ctx.globalCompositeOperation = 'source-over'; } }
+  ctx.restore();
+}
 function drawDoomWord(d) {
   const w = DOOM_WORD[d.kind], K = DOOM2[d.kind]; if (!w || !d.hit) return; const th = d.t - (K ? K.at : 0.85); if (th < 0) return; if (th > 1.6) return;
   const a = th < 1.1 ? 1 : 1 - (th - 1.1) / 0.5, s = (th < 0.14 ? 0.3 + ease(th / 0.14) * 0.95 : 1.25 - Math.min(0.2, (th - 0.14) * 0.4)) * 0.82, x = clamp(d.cx - d.side * 40, 130, W - 130), y = GROUND - 128;
@@ -7769,6 +7788,7 @@ function startGame(m, target = 21, tour = false) {
   if (tour !== true) { tourney = null; Object.assign(teams[1], DEF1); }
   applyTeam(); htOpen = false; $('panel').hidden = true; pendingStory = null;
   if ((m === 1 || m === 2) && tour !== true) rollTeams();
+  if (m === 2 && !tour && SV.p2 && SV.p2.on) { const c2 = TEAM_COLORS[SV.p2.c] || TEAM_COLORS[0]; if (SV.p2.name) teams[1].name = SV.p2.name.toUpperCase(); if (farApart(teams[0].color, c2[0])) { teams[1].color = c2[0]; teams[1].dark = c2[1]; } }
   setTimeout(introCall, 650);
   audio(); mode = m; WIN = target; if (SV.rules && SV.rules.quick && target === 21 && (m === 1 || m === 2) && tour !== true && tour !== 'daily') WIN = 11; pstats = { shots: 0, greens: 0, makes: 0, dunks: 0 };
   tut = m === 4 ? { step: 0, ev: {}, base: {}, okT: 0, t: 0 } : null; $('bSkip').hidden = m !== 4; if (document.activeElement) document.activeElement.blur();
@@ -7777,6 +7797,8 @@ function startGame(m, target = 21, tour = false) {
   $('over').hidden = true; $('pause').hidden = true; paused = false;
   setGameUI(true); newMatch(false);
 }
+let wakeL = null;
+setInterval(() => { try { const want = autoPlay && !document.hidden; if (want && !wakeL && navigator.wakeLock) { wakeL = 'pending'; navigator.wakeLock.request('screen').then(l => { wakeL = l; l.addEventListener('release', () => { wakeL = null; }); }).catch(() => { wakeL = null; }); } else if (!want && wakeL && wakeL !== 'pending') { wakeL.release().catch(() => {}); wakeL = null; } } catch (e) {} }, 1500);   // Auto Mode: keep the screen on while it plays
 function startAuto() {
   startGame(2, 21, 'auto'); autoGames++; teams[0].cpu = teams[1].cpu = true; document.body.classList.add('auto');
   if (autoGames === 1) toast('Auto Mode', 'The CPU plays forever. Press Esc to stop.');
@@ -7852,7 +7874,20 @@ function showOver(w) {
   tone(523, 0.15, 'square', 0.05); setTimeout(() => tone(659, 0.15, 'square', 0.05), 150); setTimeout(() => tone(784, 0.3, 'square', 0.05), 300);
 }
 $('b1p').addEventListener('click', () => startGame(1));
-$('b2p').addEventListener('click', () => startGame(2));
+$('b2p').addEventListener('click', () => openP2Setup());
+function openP2Setup() {
+  const L = lvlInfo().L, ok = lv => (lv || 0) <= L, T = SV.team || {}, st = SV.style || {}, p2 = SV.p2 || {}, s2 = p2.style || {};
+  const opt = (list, cur, f) => list.filter(x => ok(f(x).lv)).map(x => { const o = f(x); return `<option value="${o.v}"${o.v === cur ? ' selected' : ''}>${o.n}</option>`; }).join('');
+  const pats = (cur) => opt(PATTERNS, cur || 'solid', x => ({ v: x[0], n: x[1], lv: x[2] })), shoes = cur => opt(SHOES, cur || 'classic', x => ({ v: x[0], n: x[1], lv: x[4] })), trails = cur => opt(TRAILS, cur || 'none', x => ({ v: x[0], n: x[1], lv: x[2] })), cols = cur => TEAM_COLORS.map((c, i) => [c, i]).filter(([c]) => ok(c[2])).map(([c, i]) => `<option value="${i}"${i === cur ? ' selected' : ''}>${c[3] || 'Colour ' + (i + 1)}</option>`).join('');
+  openPanel('2 players', `<p style="margin:0 0 10px">Pick a team name and look for each side, or skip and play with random teams.</p><div class="p2grid">
+    <div><h3 class="h3" style="color:${TEAM_COLORS[myColorIdx()][0]}">Player 1 (left)</h3><label>Team name</label><input id="p1n" maxlength="14" value="${(T.name || 'Hot Dogs').replace(/"/g, '')}"><label>Jersey colour</label><select id="p1c">${cols(myColorIdx())}</select><label>Jersey design</label><select id="p1p">${pats(st.pattern)}</select><label>Sneakers</label><select id="p1s">${shoes(st.shoes)}</select><label>Ball trail</label><select id="p1t">${trails(st.trail)}</select></div>
+    <div><h3 class="h3" style="color:var(--blue,#3f8cff)">Player 2 (right)</h3><label>Team name</label><input id="p2n" maxlength="14" value="${(p2.name || 'Ice Pops').replace(/"/g, '')}"><label>Jersey colour</label><select id="p2c">${cols(p2.c ?? 1)}</select><label>Jersey design</label><select id="p2p">${pats(s2.pattern)}</select><label>Sneakers</label><select id="p2s">${shoes(s2.shoes)}</select><label>Ball trail</label><select id="p2t">${trails(s2.trail)}</select></div></div>`,
+    [['Play', () => { const v = id => ($(id) || {}).value || '';
+      SV.team = { ...(SV.team || {}), name: v('#p1n'.slice(1)) ? v('p1n').trim() || 'Hot Dogs' : 'Hot Dogs', c: +v('p1c') || 0 }; SV.useMine = true;
+      SV.style = { ...(SV.style || {}), pattern: v('p1p'), shoes: v('p1s'), trail: v('p1t') };
+      SV.p2 = { on: true, name: v('p2n').trim() || 'Ice Pops', c: +v('p2c') || 0, style: { pattern: v('p2p'), shoes: v('p2s'), trail: v('p2t') } }; persist(); applyTeam(); closePanel(true); startGame(2); }, 'red'],
+     ['Skip', () => { SV.p2 = { ...(SV.p2 || {}), on: false }; persist(); closePanel(true); startGame(2); }], ['Back', closePanel]]);
+}
 $('bPr').addEventListener('click', () => startGame(3));
 $('bTut').addEventListener('click', () => startGame(4));
 $('bInf').addEventListener('click', () => startGame(1, 100));
@@ -8142,6 +8177,7 @@ function say(txt, force) {
   sub = { t, at: n, dur: clamp(1500 + t.length * 45, 1900, 4600) };
 }
 function drawSubs() {
+  if (sub && sub.text && /hype time/i.test(sub.text)) sub.text = sub.text.replace(/hype time/ig, 'HYPE TIME');
   if (!sub || state === 'over' || greenOn()) return;
   noCase = true; try { drawSubs0(); } finally { noCase = false; }
 }
@@ -8708,12 +8744,15 @@ function lockerCosmetics(room) {
   const myc = TEAM_COLORS[myColorIdx()] || TEAM_COLORS[0], patIcon = k => `<i class="cico" aria-hidden="true" style="background:url(${patPNG(k, myc[0], myc[1], 68, 68)}) center/cover"></i>`, shoeIcon = s => `<i class="cico" aria-hidden="true" style="background:linear-gradient(180deg,${s[2]} 65%,${s[3]} 65%)"></i>`;
   const fxIcon = { none: '–', confetti: '🎉', hearts: '♥', lightning: '⚡', coins: '¢', ink: '●', fireworks: '✸', pixels: '▦', shock: '◎', galaxy: '✦', crown: '♛', goat: '★' };
   const html = `<div class="lookwrap"><div class="lookcard"><div class="lookstage">${lookPreview()}</div><b>Your look</b><small>Everything you pick here shows up on your players in every game and online.</small></div>
+    <div class="h3">Saved kits</div><p class="cosp">Save your current team name, colour and gear to a slot, then switch looks in one tap.</p><div class="kitrow">${[0, 1, 2].map(i => { const k = (SV.kits || [])[i]; const c = k ? (TEAM_COLORS[k.c] || TEAM_COLORS[0]) : null; return `<div class="kit"><div class="kp" style="${k ? `background-image:url(${patPNG((k.style || {}).pattern || 'solid', c[0], c[1], 112, 112)})` : 'background:repeating-linear-gradient(45deg,#2a1d3d 0 6px,#33244a 6px 12px)'}"></div><b>${k ? String(k.name || 'Kit ' + (i + 1)).replace(/[<>&]/g, '') : 'Kit ' + (i + 1)}</b><small>${k ? (PATTERNS.find(p => p[0] === (k.style || {}).pattern) || PATTERNS[0])[1] : 'Empty'}</small><div class="kb">${k ? `<button type="button" class="btn red" data-kitwear="${i}">Wear</button>` : ''}<button type="button" class="btn alt" data-kitsave="${i}">${k ? 'Replace' : 'Save'}</button></div></div>`; }).join('')}</div>
     <div class="lookcols"><div class="h3">On court, wear</div><p class="cosp">Pick what your players wear in games.</p><div class="pgrid cosgrid">${[['map', 'Court outfits', 'Dress for each court: cowboy hats on the ranch, helmets on the ice.', '🗺'], ['custom', 'My custom jersey', 'Your pattern, sneakers and headband on every court.', '👕'], ['plain', 'Plain jersey', 'Just your team colours. No outfits, no extras.', '▭']].map(([v, n, d, ic]) => `<button class="pick cos" type="button" data-outfit="${v}" aria-pressed="${String((SV.outfit || 'map') === v)}" style="--rc:#ffd34d"><i class="cico fx" aria-hidden="true">${ic}</i><b>${n}</b><small>${d}</small></button>`).join('')}</div>
     <div class="h3">Jersey pattern</div><p class="cosp">Printed on your jerseys over your team colour.</p><div class="pgrid cosgrid">${PATTERNS.map(([k, n, L]) => card('pattern', k, n, L, patIcon(k))).join('')}</div>
     <div class="h3">Sneakers</div><p class="cosp">The shoes your players wear. The best ones sparkle.</p><div class="pgrid cosgrid">${SHOES.map(s => card('shoes', s[0], s[1], s[4], shoeIcon(s))).join('')}</div>
     <canvas class="fxprev" aria-label="Preview of your score effect"></canvas><div class="h3">Score effect</div><p class="cosp">Goes off at the rim every time your team scores.</p><div class="pgrid cosgrid">${SCOREFX.map(([k, n, L]) => card('scorefx', k, n, L, `<i class="cico fx" aria-hidden="true">${fxIcon[k] || '★'}</i>`)).join('')}</div></div></div>`;
   const hs = [...room.querySelectorAll('.h3')], look = hs.find(h => /your look/i.test(h.textContent)); if (!look) return;
   const p = look.nextElementSibling; (p && p.tagName === 'P' ? p : look).insertAdjacentHTML('afterend', html);
+  room.querySelectorAll('[data-kitsave]').forEach(b => b.onclick = () => { const i = +b.dataset.kitsave; SV.kits = SV.kits || [null, null, null]; SV.kits[i] = { name: (SV.team || {}).name || 'Hot Dogs', c: myColorIdx(), style: { ...(SV.style || {}) }, outfit: SV.outfit || 'map' }; persist(); toast('Kit saved', `Slot ${i + 1} now holds this look.`); openLocker('team'); });
+  room.querySelectorAll('[data-kitwear]').forEach(b => b.onclick = () => { const k = (SV.kits || [])[+b.dataset.kitwear]; if (!k) return; SV.team = { ...(SV.team || {}), name: k.name, c: k.c }; SV.style = { ...(k.style || {}) }; SV.outfit = k.outfit || SV.outfit; SV.useMine = true; persist(); applyTeam(); toast('Kit on', `You're wearing ${niceName(String(k.name))}.`); openLocker('team'); });
   room.querySelectorAll('[data-outfit]').forEach(b => b.onclick = () => { SV.outfit = b.dataset.outfit; persist(); const y = $('panelBody').scrollTop; openLocker('team'); $('panelBody').scrollTop = y; tone(880, 0.06, 'triangle', 0.04); });
   room.querySelectorAll('[data-cos]').forEach(b => b.onclick = () => { SV.style = { ...(SV.style || {}), [b.dataset.cos]: b.dataset.val }; persist(); const y = $('panelBody').scrollTop; openLocker('team'); $('panelBody').scrollTop = y; tone(880, 0.06, 'triangle', 0.03); });
   // rarity colours on the older pickers too
@@ -9138,7 +9177,7 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhMobile">
 setInterval(() => { try { syncPrac(); } catch (e) {} }, 200);   // never stale: the practice toolbar follows the game, not the last practice session
 const TRAIL_RIB = { sparkle: '#fff1a8', fire: '#ff8a3d', stars: '#ffd34d', bubbles: '#a8e4ff', lightning: '#bfe6ff', love: '#ff8ac0', gold: '#ffd34d', notes: '#7fe3ff', snow: '#ffffff', leaves: '#e8732f', coins: '#ffd34d', bats: '#7a4aa0', comet: '#7fe3ff', petals: '#ffb7d5', galaxy: '#c79bff', crowns: '#ffd34d', diamonds: '#bfefff', dragon: '#5fd068', legend: '#ffd34d' };
 function drawTrailRibbon() {   // a soft tapered streak behind the ball, like a Hive trail
-  const r = ball._rib; if (!r || r.length < 2 || state === 'replay') return; const k = ball._pv || (SV.style || {}).trail; if (!k || k === 'none') return;
+  const r = ball._rib; if (!r || r.length < 2 || state === 'replay') return; const k = ball._pv || ball._tk || (SV.style || {}).trail; if (!k || k === 'none') return;
   ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; const gc = ctx.globalCompositeOperation; ctx.globalCompositeOperation = 'lighter';
   for (let i = 1; i < r.length; i++) { const a = r[i - 1], b = r[i], age = clamp((time - b.t) / 0.3, 0, 1), f = (1 - age) * (i / r.length);
     ctx.strokeStyle = k === 'rainbow' || k === 'pixels' ? `hsla(${(b.t * 900) % 360},95%,62%,${0.55 * f})` : (TRAIL_RIB[k] || '#ffffff') + Math.round(150 * f).toString(16).padStart(2, '0');
@@ -9195,8 +9234,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 125;
+const GAME_VERSION = 126;
 const UPDATES = [
+  [126, 'HYPE TIME', ['HYPE TIME lasts 12 seconds, gets its name in capitals, and has its own gold button next to Lob on phones. The tutorial teaches it.', 'Power-ups and status effects sit in the top corners: your team on the left, theirs on the right.', '2 players on one computer: both sides pick a team name, colour, jersey, sneakers and trail before the game, or skip.', 'Three saved kits in the locker: save a whole look and switch in one tap.', 'The CPU goes for alley-oops and self-oops now.', 'Auto Mode keeps your screen on.', 'Loser fates land with a shockwave and a flash.', 'The home screen tells you to tap for music, since browsers block sound until you do.']],
   [125, 'Full kit', ['Your jersey design now comes with a full kit: shorts with side stripes and a waistband, and socks with a stripe, all in the design\'s colour.', 'Jersey numbers get an outline so they stand out on busy designs.', 'Ball trails are thicker and last a little longer, so you can see them in games.', 'The locker keeps your place when you pick a trail or headband instead of jumping back to the top.']],
   [124, 'Show room', ['The locker shows your look on a real basketball jersey with a number, trim and shading, not a box.', 'Jersey designs got more detail: wavy flags, zigzag seams, script logos, palm trees, stars on the sash and more.', 'A live preview in the locker shoots a ball with your trail and sets off your score effect, like Rocket League. Hover over a trail or effect to try it before you pick it.']],
   [123, 'Account fix', ['If your progress can\'t save to your account, the message now says why.', 'Practice: arrow buttons on each side of the court picker step to the previous or next court.']],
@@ -9345,29 +9385,34 @@ const hypeAuto = i => attract || autoPlay || (teams[i] && teams[i].cpu && !(net 
 function activateHype(i) {
   const t = teams[i]; if (!t || !t.hypeReady || time < (t.hypeUntil || 0) || paused || attract && false) return;
   if (state === 'over' || state === 'replay') { if (hypeAuto(i)) setTimeout(() => activateHype(i), 1200); return; }
-  t.hypeReady = false; t.hype = 0; t.hypeUntil = time + 30; tutEv('hype'); if (humanTeam(i)) unlock('hype');
+  t.hypeReady = false; t.hype = 0; t.hypeUntil = time + 12; tutEv('hype'); if (humanTeam(i)) unlock('hype');
   hypeFlash = { t: 0, c: t.color, i }; flashA = Math.max(flashA, 0.5); shake = Math.max(shake, 10); roar(1.6, 0.12); crowdJump = 1.4;
   [523, 659, 784, 1047, 1319].forEach((f, k) => setTimeout(() => tone(f, 0.2, 'square', 0.04), k * 70));
-  pop('HYPE TIME! BIGGER GREENS', W / 2, 130, t.color); say(`${niceName(t.name)}. Hype time!`, true);
+  pop('BIGGER GREENS!', W / 2, 130, t.color); say(`${niceName(t.name)}. HYPE TIME!`, true);
   for (const p of players) if (p.team === i) react(p, 'flex', 0.9);
 }
 let hypeFlash = null;
 function drawHypeScreen(dt) {
   // the screen edge glows in the team colour while hype time runs; a big burst when it starts
   for (let i = 0; i < 2; i++) { const t = teams[i]; if (!t || !(time < (t.hypeUntil || 0))) continue;
-    const left = (t.hypeUntil - time) / 30, a = 0.18 + Math.sin(time * 6) * 0.06, side = i ? W : 0;
+    const left = (t.hypeUntil - time) / 12, a = 0.18 + Math.sin(time * 6) * 0.06, side = i ? W : 0;
     ctx.save(); ctx.setTransform(scale, 0, 0, scale, OXP, 0); const g = ctx.createLinearGradient(side, 0, i ? W - 140 : 140, 0); g.addColorStop(0, t.color); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalAlpha = a * Math.min(1, left * 4); ctx.fillStyle = g; ctx.fillRect(i ? W - 140 : 0, 0, 140, H); ctx.restore();
     if (state === 'play' && Math.random() < dt * 30) for (const p of players) if (p.team === i) particles.push({ x: p.x + rand(-14, 14), y: GROUND - 4, vx: rand(-20, 20), vy: rand(-180, -90), c: Math.random() < 0.5 ? t.color : '#ffd34d', life: 0.6, max: 0.6, g: -60, s: rand(3, 5), shape: Math.random() < 0.3 ? 'star' : undefined }); }
   const f = hypeFlash; if (!f) return; f.t += dt; if (f.t > 1.4) { hypeFlash = null; return; }
   ctx.save(); ctx.setTransform(scale, 0, 0, scale, OXP, 0); const a = f.t < 0.2 ? f.t / 0.2 : Math.max(0, 1 - (f.t - 0.9) / 0.5), s = 1 + Math.max(0, 0.3 - f.t) * 2;
   ctx.globalAlpha = a; ctx.fillStyle = 'rgba(10,6,20,.55)'; ctx.fillRect(0, H * 0.36, W, 96); ctx.fillStyle = f.c; ctx.fillRect(0, H * 0.36, W, 5); ctx.fillRect(0, H * 0.36 + 91, W, 5);
-  ctx.translate(W / 2, H * 0.36 + 48); ctx.scale(s, s); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `48px ${HYPE}`; twill('Hype time!', 0, -4, 48, f.c, INK, 0.9);
+  ctx.translate(W / 2, H * 0.36 + 48); ctx.scale(s, s); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `48px ${HYPE}`; noCase = true; twill('HYPE TIME!', 0, -4, 48, f.c, INK, 0.9); noCase = false;
   ctx.font = `700 15px ${TEXT}`; ctx.fillStyle = CREAM; ctx.fillText('Bigger greens for 12 seconds', 0, 32); ctx.restore();
 }
-{ const b = document.createElement('button'); b.id = 'hypeBtn'; b.type = 'button'; b.className = 'hypebtn'; b.hidden = true; b.textContent = 'Hype'; b.setAttribute('aria-label', 'Use hype time');
+{ const b = document.createElement('button'); b.id = 'hypeBtn'; b.type = 'button'; b.className = 'hypebtn tbtnh'; b.hidden = true; b.dataset.keep = ''; b.textContent = 'HYPE TIME'; b.setAttribute('aria-label', 'Use HYPE TIME');
   b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (netGuest()) net.conn.send({ t: 'hype' }); else activateHype(0); }); $('wrap').appendChild(b);
   document.head.insertAdjacentHTML('beforeend', '<style>.hypebtn{position:absolute;z-index:6;left:50%;bottom:calc(var(--u,1px)*150);transform:translateX(-50%);font-family:var(--pixel,inherit);font-weight:700;font-size:calc(var(--u,1px)*26);padding:.35em 1.1em;color:#1b1226;background:linear-gradient(180deg,#ffe27a,#ffc83d);border:4px solid #0b0612;box-shadow:inset 0 -5px 0 rgba(0,0,0,.25),0 0 22px rgba(255,200,61,.9);animation:hypePulse .8s ease-in-out infinite alternate}@keyframes hypePulse{to{box-shadow:inset 0 -5px 0 rgba(0,0,0,.25),0 0 40px rgba(255,200,61,1);transform:translateX(-50%) scale(1.07)}}@media (prefers-reduced-motion:reduce){.hypebtn{animation:none}}</style>'); }
-function syncHypeBtn() { const b = $('hypeBtn'); if (!b) return; const me = netGuest() ? 1 : 0, on = isTouch && !attract && !paused && (state === 'play' || state === 'intro') && teams[me] && teams[me].hypeReady && !teams[me].cpu && !autoPlay; if (b.hidden === on) b.hidden = !on; }
+setInterval(() => { let h = $('sndHint'); if (!h) { h = document.createElement('div'); h.id = 'sndHint'; h.dataset.keep = ''; h.textContent = '🔊 Tap or press any key for music'; $('wrap').appendChild(h); } const on = attract && music.on && !muted && !(ac && ac.state === 'running'); if (h.hidden === on) h.hidden = !on; }, 500);
+function placeHypeBtn(b) {   // sit just above the Lob button, whatever size the buttons are
+  const l = $('lL'), w = $('wrap'); if (!l || !w || l.offsetParent === null) return; const r = l.getBoundingClientRect(), wr = w.getBoundingClientRect();
+  b.style.setProperty('left', (r.left - wr.left) + 'px', 'important'); const hh = Math.round(r.height * 0.9); b.style.setProperty('top', (r.top - wr.top - hh - 10) + 'px', 'important'); b.style.setProperty('bottom', 'auto', 'important'); b.style.setProperty('width', Math.round(r.width * 1.3) + 'px', 'important'); b.style.setProperty('height', hh + 'px', 'important');
+}
+function syncHypeBtn() { const b = $('hypeBtn'); if (!b) return; if (!b.hidden && isTouch) placeHypeBtn(b); const me = netGuest() ? 1 : 0, on = isTouch && !attract && !paused && (state === 'play' || state === 'intro') && teams[me] && teams[me].hypeReady && !teams[me].cpu && !autoPlay; if (b.hidden === on) b.hidden = !on; }
 function hypeAdd(i, v) {
   if (attract || practice() || i < 0) return;
   const t = teams[i]; if (time < (t.hypeUntil || 0) || t.hypeReady) return;
