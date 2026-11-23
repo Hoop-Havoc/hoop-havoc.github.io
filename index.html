@@ -1284,7 +1284,7 @@ function jumpPlayer(p) {
   tone(200, 0.12, 'triangle', 0.05, 1.9);
 }
 function onPress(ti) {
-  if (teams[ti].power && teams[ti].power.id === 'JETPACK' && state === 'play') for (const p of players) if (p.team === ti && !p.grounded && !p.jetUsed && !p.dunkAnim && !(p.hang > 0) && !(p.down > 0) && !(p.dive > 0) && p.vy > -260) {
+  if (teams[ti].power && teams[ti].power.id === 'JETPACK' && state === 'play' && !(teams[ti].frozen > 0)) for (const p of players) if (p.team === ti && !p.grounded && !p.jetUsed && !p.dunkAnim && !(p.hang > 0) && !(p.down > 0) && !(p.dive > 0) && p.vy > -260) {
     p.jetUsed = true; if (humanTeam(ti)) unlock('jet'); p.vy = -jumpPower(p) * 0.82; p.vx += Math.sin(p.a) * 160; for (let i = 0; i < 14; i++) spark(p.x, p.y - 6, pick(['#ff6a3d', '#ffd34d', '#ffffff']), rand(-60, 60), rand(120, 260), false); tone(160, 0.25, 'sawtooth', 0.05, 2.4); }
   if (ti === 0) tutEv('hop');
   contestPress(ti);
@@ -1848,12 +1848,12 @@ function newPower(p, id) {
   // the new ones; returns true when the power was instant
   const T = teams[p.team], O = 1 - p.team;
   if (id === 'LIGHTNING') {
-    for (const q of players) if (q.team === O) { if (ball.holder === q) knockLoose(null); q.down = 0; q.downCD = 0; knockDown(q, Math.sign(q.x - p.x) || 1, 1.3); for (let k = 0; k < 6; k++) fxBolts.push({ x: q.Hd.x + rand(-10, 10), y: q.Hd.y, t: 0 }); }
+    for (const q of players) if (q.team === O && !q.dunkAnim && !(q.hang > 0)) { if (ball.holder === q) knockLoose(null); q.down = 0; q.downCD = 0; knockDown(q, Math.sign(q.x - p.x) || 1, 1.3); for (let k = 0; k < 6; k++) fxBolts.push({ x: q.Hd.x + rand(-10, 10), y: q.Hd.y, t: 0 }); }
     flashA = Math.max(flashA, 0.55); shake = Math.max(shake, 10); tone(90, 0.4, 'sawtooth', 0.08, 0.4); hiss(0.4, 0.1); return true;
   }
   if (id === 'SWAP') {
     const h = ball.holder; if (h && h.dunkAnim) return true;
-    if (h && h.team === p.team) return true;
+    if (h && h.team === p.team) { T.power = { id: 'SPEED', t: PDUR.SPEED, max: PDUR.SPEED, c: '#5dffc8' }; return true; }   // you already had it: a speed boost instead of nothing
     if (h) { h.cool = 0.6; h.stealCD = 1; }
     ball.holder = null; ball.lob = null; ball.pass = null; ball.oop = false; ball.shot = false; ball.shotTeam = -1; ball.x = p.hand.x; ball.y = p.hand.y; ball.vx = 0; ball.vy = 0;
     catchBall(p); ball.protectUntil = time + 0.8;
@@ -3492,7 +3492,7 @@ function stepPlayers(dt) {
         const imp = p.vy;
         p.y = GROUND;
         const spr = teams[p.team].power && teams[p.team].power.id === 'SPRING' ? 0.72 : 0;
-        if ((court.bouncy || spr) && imp > 260 && !(p.down > 0)) { p.vy = -imp * Math.max(court.bouncy || 0, spr); p.squash = 0.3; if (spr) tone(520 + rand(-40, 40), 0.08, 'triangle', 0.03, 1.8); }
+        if ((court.bouncy || spr) && imp > 260 && !(p.down > 0)) { p.vy = -imp * Math.max(court.bouncy || 0, spr); p.squash = 0.3; if (spr && time - (p.sprT || 0) > 0.25) { p.sprT = time; tone(520 + rand(-40, 40), 0.08, 'triangle', 0.03, 1.8); } }
         else {
           p.vy = 0; p.grounded = true; p.dive = 0;
           p.squash = clamp(imp / 1100, 0.08, 0.55);
@@ -4064,8 +4064,10 @@ function updateBall(dt) {
     if (collideCircle(p.Hd.x, p.Hd.y, p.headR, 0.55, p.Hd.vx, p.Hd.vy) && gtH && p.team !== ball.shotTeam) ball.goaltend = gtH;
   }
   // stuck on a rim or board
-  if (Math.hypot(ball.vx, ball.vy) < 30 && ball.y < GROUND - ball.r - 4) { ball.stuck += dt; if (!ball.holder && state === 'play' && Math.abs(ball.vx) < 15 && ball.y > GROUND - ball.r - 3) { ball.idleT = (ball.idleT || 0) + dt; if (ball.idleT > 6) { ball.vx = Math.sign(W / 2 - ball.x || 1) * 260; ball.vy = -220; ball.idleT = 0; } } else ball.idleT = 0;
-  if (ball.stuck > 1.5) { ball.vx = rand(-200, 200); ball.vy = -200; ball.stuck = 0; } }
+  if (!ball.holder && state === 'play' && Math.abs(ball.vx) < 15 && ball.y > GROUND - ball.r - 3) { ball.idleT = (ball.idleT || 0) + dt; if (ball.idleT > 6) { ball.vx = Math.sign(W / 2 - ball.x || 1) * 260; ball.vy = -220; ball.idleT = 0; } } else if (ball.holder || Math.abs(ball.vx) >= 15) ball.idleT = 0;   // a dead ball on the floor rolls back into play
+  { const hb = hoops.find(h => (ball.x - h.boardX) * Math.sign(h.boardX - W / 2) > 2 && ball.y > h.rimY - 90); if (!ball.holder && hb && state === 'play') { ball.behindT = (ball.behindT || 0) + dt; if (ball.behindT > 0.7) { ball.x = hb.boardX - Math.sign(hb.boardX - W / 2) * (ball.r + 10); ball.vx = -Math.sign(hb.boardX - W / 2) * 240; ball.vy = Math.min(ball.vy, -160); ball.behindT = 0; } } else ball.behindT = 0; }   // trapped behind the backboard: back into play
+  if (Math.hypot(ball.vx, ball.vy) < 30 && ball.y < GROUND - ball.r - 4) { ball.stuck += dt;
+  if (ball.stuck > 0.8) { ball.vx = rand(-200, 200); ball.vy = -200; ball.stuck = 0; } }
   else ball.stuck = 0;
 }
 function interactions() {
@@ -4274,19 +4276,24 @@ function scored(ti, hp) {
 }
 function updatePowers(dt) {
   if (state !== 'play' || rules().nopow) return;
-  if (!orb) { powerT -= dt * (rules().frenzy ? 2.6 : 1); if (powerT <= 0) { let pw, g = 0; do { pw = pick(POWERS); } while (recentPow.includes(pw.id) && g++ < 20); recentPow.push(pw.id); if (recentPow.length > 4) recentPow.shift(); orb = { id: pw.id, c: pw.c, x: rand(150, W - 150), y: -30, vx: rand(-40, 40), vy: rand(40, 110), life: 11, t: 0, r: 15, landed: false }; tone(1320, 0.1, 'sine', 0.035, 0.7); } return; }
-  orb.t += dt; orb.life -= dt;
+  if (!orb) { powerT -= dt * (rules().frenzy ? 2.6 : 1); if (powerT <= 0) { let pw, g = 0; do { pw = pick(POWERS); } while (recentPow.includes(pw.id) && g++ < 20); recentPow.push(pw.id); if (recentPow.length > 4) recentPow.shift(); let ox = rand(150, W - 150); for (let g2 = 0; g2 < 12 && hoops.some(h => Math.abs(h.cx - ox) < 110); g2++) ox = rand(150, W - 150);   // never right over a hoop
+      orb = { id: pw.id, c: pw.c, x: ox, y: -40, vx: rand(-25, 25), vy: 60, life: 12, t: 0, r: 15, landed: false, chute: true, ph: rand(0, 6) }; tone(1320, 0.1, 'sine', 0.035, 0.7); } return; }
+  orb.t += dt; orb.life -= dt; if (orb.cut) { orb.cut.t += dt; orb.cut.y -= 60 * dt; orb.cut.x += Math.sin(orb.cut.t * 5) * 20 * dt; if (orb.cut.t > 1) orb.cut = null; }
   if (!orb.landed || orb.y < GROUND - orb.r) {   // drifts down like a little balloon ball, bounces once or twice, then rolls to a stop
-    orb.vy = Math.min(orb.vy + 520 * dt, 260); orb.x += (orb.vx + wind * 0.15) * dt; orb.y += orb.vy * dt;
+    if (orb.chute) {   // floating down on its parachute, swaying a little
+      orb.vy += (105 - orb.vy) * Math.min(1, dt * 3); orb.vx += (Math.sin(orb.t * 2.1 + (orb.ph || 0)) * 40 - orb.vx) * Math.min(1, dt * 2);
+      if (orb.y > GROUND - 95) { orb.chute = false; orb.cut = { x: orb.x, y: orb.y - orb.r - 22, t: 0, rot: Math.sin(orb.t * 2.1 + (orb.ph || 0)) * 0.3 }; orb.vy = Math.max(orb.vy, 140); tone(980, 0.05, 'sine', 0.025, 1.4); }   // lets go of the chute just above the floor
+    } else orb.vy = Math.min(orb.vy + 1100 * dt, 520);
+    orb.x += (orb.vx + wind * 0.15) * dt; orb.y += orb.vy * dt;
     if (orb.x < 60 || orb.x > W - 60) { orb.x = clamp(orb.x, 60, W - 60); orb.vx = -orb.vx * 0.6; }
-    if (orb.y >= GROUND - orb.r) { orb.y = GROUND - orb.r; if (orb.vy > 90) { orb.vy = -orb.vy * 0.45; orb.vx *= 0.8; courtPuff(orb.x, GROUND, 0.25); tone(420, 0.06, 'triangle', 0.025, 1.2); } else { orb.vy = 0; orb.landed = true; } }
+    if (orb.y >= GROUND - orb.r) { orb.y = GROUND - orb.r; orb.chute = false; if (orb.vy > 90) { orb.vy = -orb.vy * 0.42; orb.vx *= 0.8; courtPuff(orb.x, GROUND, 0.25); tone(420, 0.06, 'triangle', 0.025, 1.2); } else { orb.vy = 0; orb.landed = true; } }
   } else { orb.vx *= Math.pow(0.2, dt); orb.x = clamp(orb.x + orb.vx * dt, 60, W - 60); }
   const oy = orb.y;
-  if (orb.life <= 0) { orb = null; powerT = rand(5, 12); return; }
+  if (orb.life <= 0) { for (let i = 0; i < 14; i++) spark(orb.x, orb.y, pick([orb.c, '#ffffff']), rand(-140, 140), rand(-160, 20), false); orb = null; powerT = rand(5, 12); return; }
   for (const p of players) {
     if (p.down > 0) continue;
     const ex = p.Hd.x - p.F.x, ey = p.Hd.y - p.F.y, l2 = ex * ex + ey * ey || 1, sP = clamp(((orb.x - p.F.x) * ex + (oy - p.F.y) * ey) / l2, 0, 1), bd = Math.hypot(orb.x - (p.F.x + ex * sP), oy - (p.F.y + ey * sP));
-    if (Math.hypot(p.hand.x - orb.x, p.hand.y - oy) < orb.r + 14 || Math.hypot(p.Hd.x - orb.x, p.Hd.y - oy) < orb.r + p.headR || bd < orb.r + 9 * p.scale) {
+    if (Math.hypot(p.hand.x - orb.x, p.hand.y - oy) < orb.r + 14 || Math.hypot(p.Hd.x - orb.x, p.Hd.y - oy) < orb.r + p.headR || bd < orb.r + 9 * p.scale || (orb.landed && Math.abs(p.F.x - orb.x) < orb.r + 14 && p.F.y > GROUND - 30)) {
       const t = teams[p.team];
       if (PDEBUFF.has(orb.id) && teams[1 - p.team].power && teams[1 - p.team].power.id === 'SHIELD') { teams[1 - p.team].power = null; pop('BLOCKED', W / 2, 150, '#6fa8ff'); for (const q of players) if (q.team !== p.team) for (let i = 0; i < 12; i++) spark(q.Hd.x, q.Hd.y, '#6fa8ff', rand(-200, 200), rand(-200, 60), true); }
       else if (orb.id === 'FREEZE') { teams[1 - p.team].frozen = 2.6; for (const q of players) if (q.team !== p.team && Math.random() < 0.5) quip(q, ['Brrr!', 'So cold!', "Can't move!", 'Frozen!'], false, 1.4); if (ball.holder && ball.holder.team === 1 - p.team) knockLoose(null); }
@@ -4311,7 +4318,7 @@ function powerTick(dt) {
   for (const p of players) {
     if (p.grounded) p.jetUsed = false;
     // banana peel: the other team's feet won't stay put
-    if (has(1 - p.team, 'BANANA') && p.grounded && !(p.down > 0)) { p.w += Math.sin(time * 9 + p.wob * 3) * 26 * dt; if (Math.random() < dt * 0.25 && !p.dunkAnim) knockDown(p, Math.sign(p.a) || 1, 0.7); }
+    if (has(1 - p.team, 'BANANA') && p.grounded && !(p.down > 0)) { p.w += Math.sin(time * 9 + p.wob * 3) * 26 * dt; if (Math.random() < dt * 0.25 && !p.dunkAnim && ball.holder !== p) knockDown(p, Math.sign(p.a) || 1, 0.7); }
   }
   for (const b of fxBolts) b.t += dt; fxBolts = fxBolts.filter(b => b.t < 0.35);
   for (const q of iconPops) q.t += dt; iconPops = iconPops.filter(q => q.t < 1.1);
@@ -6144,8 +6151,14 @@ function powerIcon(id, x, y, s) {
 function drawOrb() {
   if (!orb || state !== 'play') return;
   const y = orb.y, blink = orb.life < 2.2 && Math.sin(orb.t * 20) > 0, R = orb.r || 15;
-  if (!orb.landed) { ctx.globalAlpha = 0.35; ctx.strokeStyle = orb.c; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(orb.x, y - R); ctx.lineTo(orb.x - (orb.vx || 0) * 0.08, y - R - 26); ctx.stroke(); ctx.globalAlpha = 1; }
-  else { ctx.globalAlpha = 0.25; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(orb.x, GROUND - 1, R * 0.9, 3.5, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
+  const chute = (cx, cy, rot, a) => { ctx.save(); ctx.globalAlpha = a; ctx.translate(cx, cy); ctx.rotate(rot);
+      ctx.strokeStyle = 'rgba(255,240,207,.75)'; ctx.lineWidth = 1.2; ctx.beginPath(); for (const k of [-1, 0, 1]) { ctx.moveTo(k * 20, -2); ctx.lineTo(0, 24); } ctx.stroke();
+      ctx.fillStyle = INKD; ctx.beginPath(); ctx.moveTo(-26, 0); ctx.quadraticCurveTo(0, -36, 26, 0); ctx.quadraticCurveTo(13, -6, 0, 0); ctx.quadraticCurveTo(-13, -6, -26, 0); ctx.fill();
+      ctx.fillStyle = orb.c; ctx.beginPath(); ctx.moveTo(-23, -2); ctx.quadraticCurveTo(0, -32, 23, -2); ctx.quadraticCurveTo(11.5, -7, 0, -2); ctx.quadraticCurveTo(-11.5, -7, -23, -2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.beginPath(); ctx.moveTo(-6, -4); ctx.quadraticCurveTo(0, -27, 6, -4); ctx.fill(); ctx.restore(); };
+  if (orb.chute) chute(orb.x, y - R - 22, Math.sin(orb.t * 2.1 + (orb.ph || 0)) * 0.22, 1);
+  if (orb.cut) chute(orb.cut.x, orb.cut.y, orb.cut.rot + orb.cut.t * 1.5, clamp(1 - orb.cut.t, 0, 1));
+  if (orb.landed) { ctx.globalAlpha = 0.25; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.ellipse(orb.x, GROUND - 1, R * 0.9, 3.5, 0, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
   if (blink) return;
   ctx.save(); ctx.globalAlpha = 0.22 + 0.08 * Math.sin(orb.t * 6); ctx.fillStyle = orb.c; ctx.beginPath(); ctx.arc(orb.x, y, R + 9, 0, 7); ctx.fill(); ctx.restore();
   ctx.fillStyle = INKD; ctx.beginPath(); ctx.arc(orb.x, y, R + 2.5, 0, 7); ctx.fill();
@@ -8986,7 +8999,18 @@ function netLoadPeer() {
   return new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js'; s.onload = ok; s.onerror = () => no(new Error('load')); document.head.appendChild(s); });
 }
 // a tiny wrapper so the game doesn't care whether it's PeerJS or the local test channel
-function netWrapPeer(c) { const w = { send: o => { try { if (c.open) c.send(o); } catch (e) {} }, close: () => { try { c.close(); } catch (e) {} } }; c.on('data', d => netRecv(d)); c.on('close', () => netLost()); c.on('error', () => netLost()); return w; }
+function netWrapPeer(c) { const w = { send: o => { try { if (c.open) c.send(o); } catch (e) {} }, close: () => { try { c.close(); } catch (e) {} } }; c.on('data', d => { if (net && net.conn === w) netRecv(d); }); c.on('close', () => { if (net && net.conn === w) netDrop(); }); c.on('error', () => { if (net && net.conn === w) netDrop(); }); return w; }
+function netDrop() {   // the link dropped: keep the game, and try to get it back for up to 12 seconds
+  if (!net) return; if (!net.ready) { netLost(); return; }
+  if (net.dropAt) return; net.dropAt = performance.now(); toast('Reconnecting…', 'Hang on, trying to get your friend back.');
+  if (!net.host) netRejoin(0);
+  setTimeout(() => { if (net && net.dropAt && performance.now() - net.dropAt >= 11900) { net.dropAt = 0; netLost(); } }, 12000);
+}
+function netRejoin(n) {
+  if (!net || net.host || !net.dropAt || !net.peer || n > 5) return;
+  const pr = net.peer; try { if (pr.disconnected && !pr.destroyed) pr.reconnect(); } catch (e) {}
+  setTimeout(() => { if (!net || !net.dropAt) return; try { const c = pr.connect('hoophavoc-' + net.code.toLowerCase(), { reliable: true, serialization: 'json' }); c.on('open', () => { if (!net) return; net.conn = netWrapPeer(c); net.dropAt = 0; net.rxAt = performance.now(); net.conn.send({ t: 'hello', me: netMe(), re: 1 }); toast('Back online', 'You\'re reconnected.'); }); } catch (e) {} setTimeout(() => netRejoin(n + 1), 2000); }, 700);
+}
 function netWrapTest(code, host) {
   const bc = new BroadcastChannel('hh-net-' + code), me = host ? 'h' : 'g';
   bc.onmessage = e => { const m = e.data; if (m.from === me) return; if (m.d && m.d.t === 'hello' && host && net && !net.ready) { if (m.d.me) net.guest = m.d.me; netConnected(netWrapTestConn(bc, me)); return; } if (m.d && m.d.t === 'bye') { netLost(); return; } if (net && net.ready) netRecv(m.d); };
@@ -9017,7 +9041,8 @@ function netHostGame() {
     if (!net || net.code !== code) return;
     const peer = new Peer('hoophavoc-' + code.toLowerCase(), NET_OPTS); net.peer = peer;
     peer.on('open', () => netShowCode(code));
-    peer.on('connection', c => { if (net && !net.ready) c.on('open', () => netConnected(netWrapPeer(c))); else c.close(); });
+    peer.on('connection', c => { if (net && !net.ready) c.on('open', () => netConnected(netWrapPeer(c))); else if (net && net.ready && (net.dropAt || performance.now() - (net.rxAt || 0) > 2500)) c.on('open', () => { if (!net) return; net.conn = netWrapPeer(c); net.dropAt = 0; net.rxAt = performance.now(); netLast = null; netHoopKey = ''; toast('Back online', 'Your friend reconnected.'); }); else c.close(); });
+    peer.on('disconnected', () => { try { if (net && !peer.destroyed) setTimeout(() => { try { if (peer.disconnected && !peer.destroyed) peer.reconnect(); } catch (e) {} }, 800); } catch (e) {} });
     peer.on('error', e => { if (e.type === 'unavailable-id') { netHostGame(); return; } if (net && !net.ready && /network|server-error|socket/.test(e.type) && (net.tries = (net.tries || 0) + 1) <= 2) { netMsg('Server was slow, trying again...'); try { peer.destroy(); } catch (x) {} setTimeout(() => { const t = net && net.tries; netHostGame(); if (net) net.tries = t; }, 1200); return; } if (!net || !net.ready) netFail(netErr(e)); });
   }).catch(() => netFail("Couldn't load online play. Check your internet, then try again."));
 }
@@ -9117,7 +9142,7 @@ function netDec(v, ctx) {
   return v;
 }
 // the game globals the drawing code reads (checked at start: anything missing or not settable is left out)
-const NET_G = ['state', 'stateT', 'round', 'WIN', 'chaos', 'goldenRound', 'banner', 'pops', 'sub', 'flashA', 'shake', 'greenFx', 'greenBurst', 'timeScale', 'slowT', 'hitstop', 'wind', 'orb', 'powerT', 'meterFx', 'rings', 'wipe', 'crowdJump', 'quakeT',
+const NET_G = ['iconPops', 'fxBolts', 'state', 'stateT', 'round', 'WIN', 'chaos', 'goldenRound', 'banner', 'pops', 'sub', 'flashA', 'shake', 'greenFx', 'greenBurst', 'timeScale', 'slowT', 'hitstop', 'wind', 'orb', 'powerT', 'meterFx', 'rings', 'wipe', 'crowdJump', 'quakeT',
   'fxStreaks', 'fxFlares', 'fxBulbs', 'fxSwipes', 'fxSkids', 'goalCount', 'halfDone', 'roundStart', 'quietIntro', 'replay', 'attack', 'recentDunks', 'blockReplay', 'htOpen', 'lastTouchT', 'pregame', 'havocCard', 'havocHold', 'doom', 'hypeFlash', 'pendingReplay', 'mvpT', 'shots', 'greenBurst', 'paused']
   .filter((n, i, a) => a.indexOf(n) === i && n !== 'paused').filter(n => { try { eval(`${n} = ${n};`); return true; } catch (e) { return false; } });
 const netGet = eval(`() => ({ ${NET_G.join(', ')} })`);
@@ -9149,13 +9174,13 @@ function netTick(now) {
 }
 let netLast = null, netFull = null;
 // host: what the guest pressed
-setInterval(() => { if (!net || !net.ready || !net.rxAt) return; const q = performance.now() - net.rxAt; if (q > 12000) netLost(); else if (q > 3000 && !net.lagShown) { net.lagShown = true; toast('Reconnecting…', 'Waiting to hear from your friend.'); } }, 1000);   // quiet for 3s: hang on; 12s: they're gone
+setInterval(() => { if (!net || !net.ready || !net.rxAt) return; const q = performance.now() - net.rxAt; if (q > 4000 && !net.dropAt && !net.host && net.peer) { netDrop(); return; } if (q > 14000) netLost(); else if (q > 3000 && !net.lagShown) { net.lagShown = true; toast('Reconnecting…', 'Waiting to hear from your friend.'); } }, 1000);   // quiet for 3s: hang on; 12s: they're gone
 addEventListener('pagehide', () => { try { net && net.conn && net.conn.send({ t: 'bye' }); } catch (e) {} });
 function netRecv(m) {
   if (net) { net.rxAt = performance.now(); if (net.lagShown) { net.lagShown = false; toast('Back online', 'Your friend is back.'); } }
   if (!m || !net) return;
   if (m.t === 'ping') { net.conn.send({ t: 'pong', c: m.c }); return; }
-  if (m.t === 'hello') { if (net.host && m.me) { net.guest = m.me; netApplyTeams(); } return; }
+  if (m.t === 'hello') { if (net.host && m.me && !m.re) { net.guest = m.me; netApplyTeams(); } if (m.re) { net.dropAt = 0; netLast = null; netHoopKey = ''; } return; }
   if (m.t === 'pong') { const r = performance.now() - m.c; netPing = netPing ? netPing * 0.7 + r * 0.3 : r; return; }
   if (net.host) {
     if (m.t === 'st') netIn.steer = clamp(+m.s || 0, -1, 1);
@@ -9209,6 +9234,7 @@ function netGuestFrame(now) {
   const keepPause = paused;
   netSet(pd.g);
   paused = keepPause;
+  try { if (b && a.g.orb && b.g.orb && a.g.orb.id === b.g.orb.id && orb) orb = { ...orb, x: lerp(a.g.orb.x, b.g.orb.x, f), y: lerp(a.g.orb.y, b.g.orb.y, f) }; } catch (e) {}
   if (sub && sub.at !== undefined && !sub._g) { sub._g = 1; sub.at += netOff + 90; }   // subtitle timing is on the host's clock
   pd.tm.forEach((t, i) => Object.assign(teams[i], t));
   if (state === 'replay' && replay) { rec = [sn]; replay = { ...replay, pos: 0, i0: 0, i1: 0 }; }
@@ -10142,8 +10168,14 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 137;
+const GAME_VERSION = 138;
 const UPDATES = [
+  [138, 'Steady connection', ['Online: if the connection blips, the game now reconnects on its own (for up to 12 seconds) instead of ending with "Your friend left."',
+    'Online: drops are spotted faster, and the host side re-registers itself if it loses the server.', 'Online: your friend now sees power-ups float down smoothly, plus every grab and lightning strike.',
+    'Power-ups now float down on a little parachute, let go just above the floor, then drop and bounce.', 'Power-ups never drop onto a hoop.', 'You can grab a landed power-up by running through it.',
+    'Unused power-ups pop in a puff instead of vanishing.', 'Fixed: a ball stuck behind the backboard bounced forever. It\'s kicked back into play.', 'Fixed: a ball resting on the rim or board waited too long. It\'s nudged off sooner.',
+    'Fixed: the dead-ball roll-back from the last update never actually kicked in.', 'Fixed: lightning could break up a dunk mid-slam.', 'Fixed: Swap did nothing when your team already had the ball. It gives you Speed instead.',
+    'Fixed: the Spring sound could stack into a buzz.', 'Fixed: Banana knocked over the player holding the ball.', 'Fixed: a frozen team could still fire its Jetpack.']],
   [137, 'Unstuck', ['You can always hop over a player now: hops toward someone right in front of you get the height to clear them, and you sail over instead of bouncing off.',
     'Pinned on a wall behind someone? Your hop pops you back out, and players right on a wall rock away from it.', 'The CPU always goes for the ball: if it stops getting closer, it forces its way there.',
     'Fixed: the VS intro didn\'t reach the edges of wide phone screens.', 'Fixed: the pause and touch buttons showed through the VS intro.', 'Fixed: touch buttons hid your players. They go see-through when a player is behind them.',
