@@ -473,7 +473,7 @@ const ACH = [
   ['three20', 'Sniper', 'Score 20 or more in the 3-Point Shootout'], ['daily3', 'Daily Grinder', 'Finish the Daily Challenge 3 days in a row'], ['hype', 'Hype Machine', 'Set off Hype Time'],
   ['three3', 'Splash Zone', 'Hit 3 deep shots in one game'], ['fullcourt', 'Full-Court Press', 'Score an alley-oop thrown from across the court'], ['selfoop', 'Solo Act', 'Score a self-oop'],
   ['oop5', 'Lob Factory', 'Score 5 alley-oops in one game'], ['dunk5g', 'Slam Session', 'Dunk 5 times in one game'], ['green5g', 'Laser Show', 'Hit 5 greens in one game'],
-  ['putback', 'Second Chance', 'Score a putback'], ['tip', 'Tip Drill', 'Score a tip-in'], ['gng', 'Give And Go', 'Score off a give and go'],
+  ['putback', 'Second Chance', 'Score a putback'], ['tip', 'Tip Drill', 'Score a tip-in'], ['gng', 'Two-Man Game', 'Score off a give-and-go'],
   ['perfect', 'Perfect Timing', 'Nail the perfect-timing bonus on an oop'], ['swish', 'Nothing But Net', 'Hit a clean swish'], ['cns', 'Catch And Shoot', 'Score right off a catch'],
   ['nailbiter', 'Nail-Biter', 'Win by 2 points or fewer'], ['lockdown', 'Lockdown', 'Win and hold the other team under 10'], ['blocks3', 'The Wall', 'Block 3 shots in one game'],
   ['steals3', 'Sticky Fingers', 'Steal 3 times in one game'], ['max5', 'Big Bucket', 'Score 5 or more points on one basket'], ['power10', 'Power Hungry', 'Grab 10 power-ups'],
@@ -1330,7 +1330,7 @@ const TUT = [
   { cast: 'solo', key: 'fake',     need: 1, title: "Pump fake", text: "Tap W two times fast with the ball. You trick the other player into jumping.", big: "Tap W two times fast" },
   { cast: 'solo', key: 'overfill', need: 1, title: "Don't hold too long", text: "If the bar gets to the top, it shoots by itself and misses. Try it once: hold W until it shoots.", big: "Hold W until it shoots" },
   { cast: 'solo', key: 'hype',     need: 1, title: "HYPE TIME", text: isTouch ? "Big plays fill your hype meter, the little bar next to your team's name. When it's full, the gold HYPE TIME button lights up above Lob. Tap it: for 12 seconds your green window gets much bigger!" : "Big plays fill your hype meter, the little bar next to your team's name. When it's full, press R for HYPE TIME. For 12 seconds your green window gets much bigger!", big: isTouch ? "Tap the HYPE TIME button" : "Press R for HYPE TIME" },
-  { cast: 'solo', key: 'power',    need: 2, title: "Power-ups", text: isTouch ? "Power-ups fall from the sky as little glowing balls. Hop into one to grab it. Its icon and a timer show up by your team name. Some help you, like the jetpack, rocket and shield. Others mess with the other team, like freeze, lightning and banana. Grab 2." : "Power-ups fall from the sky as little glowing balls. Hop into one to grab it. Its icon and a timer show up in the corner by your team name. Some help you, like the jetpack, rocket and shield. Others mess with the other team, like freeze, lightning and banana. Grab 2.", big: "Hop into the power-up" },
+  { cast: 'solo', key: 'power',    need: 2, title: "Power-ups", text: isTouch ? "Power-ups fall from the sky as little glowing balls. Hop into one to grab it. Its icon and a timer show up by your team name. Some help you, like the jetpack, rocket and shield. Others mess with the other team, like freeze, lightning and banana. See them all in the Power-up guide. Grab 2." : "Power-ups fall from the sky as little glowing balls. Hop into one to grab it. Its icon and a timer show up in the corner by your team name. Some help you, like the jetpack, rocket and shield. Others mess with the other team, like freeze, lightning and banana. See them all in the Power-up guide (Locker, Settings). Grab 2.", big: "Hop into the power-up" },
   { cast: 'team', key: 'pass',     need: 1, title: "Pass", text: "You have a teammate now! Tap Q to pass them the ball.", big: "Tap Q to pass" },
   { cast: 'team', key: 'cns',      need: 1, title: "Catch and shoot", text: "Pass with Q. Then hold W right away to shoot. It's easier to hit a green this way.", big: "Tap Q, then hold W" },
   { cast: 'team', key: 'alleyoop', need: 1, title: "Alley-oop", text: "Wait until your teammate is near the hoop. Tap E to throw it up to them. Tap W when the circle gets small.", big: "Tap E, then tap W" },
@@ -4505,12 +4505,12 @@ function ledStrip(msg) {   // the scrolling LED board: the whole message drawn o
 }
 function drawPregame() {
   const P = pregame; if (!P || attract) return;
-  const t = P.t, out = clamp((P.dur - t) / 0.45, 0, 1), a = out;
+  const t = P.t, out = clamp((P.dur - t) / 0.5, 0, 1), a = 1, ex = 1 - ease(out);   // ex: the halves swing back open at the end
   const sk = t > 0.95 && t < 1.25 ? (1.25 - t) * 30 : 0;   // the VS slam shakes the screen
   ctx.save(); ctx.setTransform(scale, 0, 0, scale, OXP, 0); ctx.translate(rand(-sk, sk), rand(-sk, sk)); ctx.globalAlpha = a;
   const kL = ease(clamp(t / 0.45, 0, 1)), kR = ease(clamp((t - 0.08) / 0.45, 0, 1)), mid = W / 2, tilt = 70;
   for (let i = 0; i < 2; i++) {   // the two halves sweep in from their sides
-    const T = teams[i], L = i === 0, off = L ? -(1 - kL) * W * 0.6 : (1 - kR) * W * 0.6;
+    const T = teams[i], L = i === 0, off = (L ? -(1 - kL) * W * 0.6 : (1 - kR) * W * 0.6) + (L ? -1 : 1) * ex * W * 0.75;
     ctx.save(); ctx.translate(off, 0); ctx.beginPath();
     if (L) { ctx.moveTo(-20, -20); ctx.lineTo(mid + tilt, -20); ctx.lineTo(mid - tilt, H + 20); ctx.lineTo(-20, H + 20); } else { ctx.moveTo(mid + tilt, -20); ctx.lineTo(W + 20, -20); ctx.lineTo(W + 20, H + 20); ctx.lineTo(mid - tilt, H + 20); }
     ctx.closePath(); const g = ctx.createLinearGradient(L ? 0 : W, 0, mid, 0); g.addColorStop(0, T.dark || T.color); g.addColorStop(1, T.color); ctx.fillStyle = g; ctx.fill();
@@ -4534,14 +4534,14 @@ function drawPregame() {
     ctx.restore();
   }
   // the seam: a white lightning edge between the halves
-  const sk2 = Math.min(kL, kR); if (sk2 > 0.98) { ctx.save(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.shadowColor = '#fff'; ctx.shadowBlur = 14; ctx.beginPath(); for (let k2 = 0; k2 <= 10; k2++) { const y = k2 / 10 * H, x = lerp(mid + tilt, mid - tilt, k2 / 10) + (k2 % 2 ? 9 : -9); k2 ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); ctx.restore(); }
+  const sk2 = Math.min(kL, kR); if (sk2 > 0.98 && out > 0.98) { ctx.save(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 5; ctx.shadowColor = '#fff'; ctx.shadowBlur = 14; ctx.beginPath(); for (let k2 = 0; k2 <= 10; k2++) { const y = k2 / 10 * H, x = lerp(mid + tilt, mid - tilt, k2 / 10) + (k2 % 2 ? 9 : -9); k2 ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke(); ctx.restore(); }
   // VS slams down with a flash
-  const vt = clamp((t - 0.9) / 0.22, 0, 1); if (vt > 0) { const vsS = vt < 1 ? lerp(3.2, 1, ease(vt)) : 1 + Math.sin(t * 6) * 0.03;
+  const vt = clamp((t - 0.9) / 0.22, 0, 1); if (vt > 0) { ctx.globalAlpha = out * out; const vsS = vt < 1 ? lerp(3.2, 1, ease(vt)) : 1 + Math.sin(t * 6) * 0.03;
     ctx.save(); ctx.translate(mid, 255); ctx.rotate(-0.12); ctx.scale(vsS, vsS); ctx.font = `86px ${HYPE}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; twill('VS', 0, 0, 86, MUSTARD, INK, 1); ctx.restore();
     if (t < 1.2) { ctx.fillStyle = `rgba(255,255,255,${0.55 * (1 - (t - 0.9) / 0.3)})`; ctx.fillRect(-20, -20, W + 40, H + 40); } }
   // bottom banner: the game, the rules, the court
   const ik = ease(clamp((t - 1.3) / 0.4, 0, 1)); if (ik > 0) {
-    ctx.save(); ctx.globalAlpha = a * ik; ctx.translate(0, (1 - ik) * 60);
+    ctx.save(); ctx.globalAlpha = out * ik; ctx.translate(0, (1 - ik) * 60);
     ctx.fillStyle = 'rgba(10,6,20,.82)'; ctx.fillRect(0, 380, W, 112); ctx.fillStyle = MUSTARD; ctx.fillRect(0, 380, W, 4);
     const modeName = tourney ? (TOURNEY[Math.min(TLAST(), tourney.round)].label + ': ' + niceName(TOURNEY[Math.min(TLAST(), tourney.round)].name)) : daily ? 'Daily challenge' : contest ? 'Contest' : net && net.ready ? 'Online game' : autoPlay ? 'CPU vs CPU' : mode === 2 ? 'Multiplayer' : 'Vs the CPU';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `28px ${DISPLAY}`; ctx.fillStyle = CREAM; ctx.fillText(`${modeName}, first to ${WIN}${rules().by2 ? ', win by 2' : ''}`, W / 2, 410);
@@ -4550,7 +4550,7 @@ function drawPregame() {
     ctx.font = `700 13px ${TEXT}`; const ws = tags.map(x => ctx.measureText(x).width + 24), tw2 = ws.reduce((x, y) => x + y + 8, -8); let xx = W / 2 - tw2 / 2;
     tags.forEach((x, i) => { ctx.fillStyle = i === 0 ? MUSTARD : 'rgba(255,240,207,.14)'; rr(xx, 430, ws[i], 24, 12); ctx.fill(); ctx.fillStyle = i === 0 ? INK : CREAM; ctx.fillText(x, xx + ws[i] / 2, 443); xx += ws[i] + 8; });
     ctx.font = `600 14px ${TEXT}`; ctx.fillStyle = 'rgba(255,240,207,.8)'; ctx.fillText(`Tonight at ${niceName(court.name)}`, W / 2, 474); ctx.restore(); }
-  ctx.globalAlpha = a; ctx.fillStyle = 'rgba(255,240,207,.15)'; ctx.fillRect(W / 2 - 120, 504, 240, 4); ctx.fillStyle = MUSTARD; ctx.fillRect(W / 2 - 120, 504, 240 * clamp(t / P.dur, 0, 1), 4);
+  ctx.globalAlpha = out; ctx.fillStyle = 'rgba(255,240,207,.15)'; ctx.fillRect(W / 2 - 120, 504, 240, 4); ctx.fillStyle = MUSTARD; ctx.fillRect(W / 2 - 120, 504, 240 * clamp(t / P.dur, 0, 1), 4);
   ctx.font = `500 12px ${TEXT}`; ctx.fillStyle = 'rgba(255,240,207,.7)'; ctx.textAlign = 'center'; ctx.fillText(isTouch ? 'Tap to start now' : 'Press any key to start now', W / 2, 524);
   ctx.restore();
 }
@@ -8268,7 +8268,7 @@ function themePause() {
   $('pauseKeys').innerHTML = pauseControls();
   const mid = $('pauseScore').querySelector('.pmid'); if (mid) mid.innerHTML = `<small>First to ${WIN}</small>`;
 }
-{ const _tp = togglePause; togglePause = function () { _tp.apply(this, arguments); if (paused && !$('pause').hidden) try { themePause(); } catch (e) {} }; }
+{ const _tp = togglePause; togglePause = function () { _tp.apply(this, arguments); if (paused && !$('pause').hidden) try { themePause(); if (!$('pPow')) { const tg = $('pause').querySelector('.toggles'); if (tg) { tg.insertAdjacentHTML('afterend', '<button type="button" class="btn alt pgbtn" id="pPow"><b>Power-up guide</b></button>'); $('pPow').onclick = () => openPowerGuide(); } } } catch (e) {} }; }
 addEventListener('keydown', e => {   // arrow keys walk the pause menu's buttons
   if ($('pause').hidden || !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) return;
   const els = [...$('pause').querySelectorAll('button:not([disabled])')].filter(b => b.offsetParent);
@@ -8324,6 +8324,29 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhPhone">
 .p2grid input,.p2grid select{width:100%;min-width:0;box-sizing:border-box}.p2grid>div{min-width:0}
 @media (max-height:430px){#panel h2,#panelTitle{font-size:22px!important;margin:0 0 4px!important}#panelBtns .btn{padding-top:6px!important;padding-bottom:6px!important}}
 @media (max-height:430px){#trophy .trc{min-width:0;padding:5px 10px 5px 5px;gap:8px}#trophy .trg{width:38px;height:38px;flex-basis:38px}#trophy .trg svg{width:24px;height:24px}#trophy .trt b{font-size:15px}#trophy .trt span{display:none}#trophy.go{transform:translate(-50%,6px)}}
+</style>`);
+const PGUIDE = { ROCKET: ['Rocket', 'Your team jumps way higher.', 1], GLUE: ['Glue Hands', 'Catches, rebounds and loose balls stick to your hands.', 1], FREEZE: ['Freeze', 'The other team freezes solid for a few seconds and drops the ball.', 0],
+  GIANT: ['Giant', 'Your team grows huge: longer reach, bigger dunks.', 1], FIRE: ['On Fire', 'Every basket gets +1.', 1], MAGNET: ['Magnet', 'Loose balls fly to your team.', 1], SHRINK: ['Shrink Ray', 'The other team shrinks.', 0],
+  DOUBLE: ['Double', 'Your next basket gets +2.', 1], SNIPER: ['Sniper', 'A bigger green window on your shots.', 1], HEAVY: ['Heavy', 'The other team can barely get off the ground.', 0], SPEED: ['Speed', 'Your hops go way farther.', 1],
+  BOOM: ['Boom', 'Blasts the other team across the court.', 0], JETPACK: ['Jetpack', 'Press jump again in the air for a second jump.', 1], LIGHTNING: ['Lightning', 'Zaps the other team flat on the floor.', 0],
+  TORNADO: ['Tornado', 'A gust blows everything toward your hoop.', 1], SHIELD: ['Shield', 'Blocks the next nasty power-up the other team grabs.', 1], GHOST: ['Ghost', 'Nobody can steal the ball from you.', 1],
+  BANANA: ['Banana', 'The other team slips and slides around.', 0], BIGRIM: ['Big Rim', 'The hoop you shoot at gets wider.', 1], CLOUD: ['Storm Cloud', 'A storm cloud parks over the other team\'s hoop.', 0],
+  SWAP: ['Swap', 'The ball jumps straight into your hands.', 0], SPRING: ['Spring', 'Your team bounces off the floor when they land.', 1] };
+function powerPNG(id, c, px = 72) {
+  const cv2 = document.createElement('canvas'); cv2.width = cv2.height = px; const o = ctx; ctx = cv2.getContext('2d');
+  try { const k = px / 72; ctx.scale(k, k); ctx.fillStyle = '#0b0612'; ctx.beginPath(); ctx.arc(36, 36, 33, 0, 7); ctx.fill(); const g = ctx.createRadialGradient(28, 26, 2, 36, 36, 31); g.addColorStop(0, '#ffffff'); g.addColorStop(0.35, c); g.addColorStop(1, shadeHex(c, -0.35)); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(36, 36, 30, 0, 7); ctx.fill(); powerIcon(id, 36, 36, 1.55); }
+  catch (e) {} ctx = o; return cv2.toDataURL();
+}
+function openPowerGuide(back) {
+  const row = p => { const G = PGUIDE[p.id] || [p.id, '', 1], d = PDUR[p.id]; return `<div class="pgd"><img src="${powerPNG(p.id, p.c)}" alt=""><div><b data-keep>${G[0]}</b><span>${G[1]}</span><small><em class="${G[2] ? 'gd' : 'bd'}">${G[2] ? 'Helps you' : 'Hurts them'}</em> ${d ? `${d} seconds` : 'Instant'}</small></div></div>`; };
+  openPanel('Power-up guide', `<p class="cosp">Power-ups drop from the sky as little glowing balls. Hop into one to grab it. A card in your corner shows what you've got and how long it lasts.</p><div class="pgdg">${POWERS.map(row).join('')}</div>`, [['Done', () => back ? back() : closePanel(), 'red']]);
+}
+document.head.insertAdjacentHTML('beforeend', `<style>
+.pgdg{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}
+.pgd{display:flex;gap:10px;align-items:center;padding:8px 10px;background:rgba(0,0,0,.25);border:2px solid rgba(255,240,207,.12)}
+.pgd img{width:44px;height:44px;flex:0 0 44px}.pgd div{display:flex;flex-direction:column;gap:2px;min-width:0}.pgd b{font:700 16px/1.1 var(--pixel,inherit)}.pgd span{font-size:13px;line-height:1.3}.pgd small{font-size:11px;opacity:.85}
+.pgd em{font-style:normal;font-weight:700;margin-right:4px}.pgd em.gd{color:#5dff7a}.pgd em.bd{color:#ff8a9c}
+#pause .pgbtn{width:100%}
 </style>`);
 function fitOverTitle() {
   const h = $('overTitle'), sh = h && h.closest('.sheet'); if (!h || !sh || $('over').hidden) return;
@@ -8617,7 +8640,7 @@ function refreshKeep() {
   const set = new Set(); RAWNAMES.forEach(v => set.add(v)); try { TEAM_POOL.forEach(t => set.add(niceName(t.name || t[0] || ''))); } catch (e) {}
   teams.forEach(t => t && t.name && set.add(niceName(t.name))); COURTS.forEach(c => set.add(niceName(c.name))); players.forEach(q => q && q.pname && set.add(niceName(q.pname))); teams.forEach(t => (t.roster || []).forEach(r => r && r.pname && set.add(niceName(r.pname))));
   try { TOURNEY.forEach(r => r.name && set.add(niceName(r.name))); } catch (e) {}
-  ['Hoop Havoc', 'Morningfall Corp', 'Basket Random', 'First to 100', 'Play Online', 'Auto Mode', 'the Jump button', 'the Lob button', 'the Pass button', 'Hype Time', 'Havoc Round', 'Havoc Rounds', 'Golden Ball', 'Dunk Contest', '3-Point Shootout', 'Daily Challenge', 'Power Party', 'Havoc Mode', 'Bronze Cup', 'Silver Cup', 'Gold Cup', 'Diamond Cup', 'Hoop Havoc Cup', 'Locker Room', 'Big Green'].forEach(x => set.add(x));
+  ['Hoop Havoc', 'Morningfall Corp', 'Basket Random', 'First to 100', 'Play Online', 'Auto Mode', 'the Jump button', 'the Lob button', 'the Pass button', 'Hype Time', 'Havoc Round', 'Havoc Rounds', 'Golden Ball', 'Dunk Contest', '3-Point Shootout', 'Daily Challenge', 'Power Party', 'Havoc Mode', 'Bronze Cup', 'Silver Cup', 'Gold Cup', 'Diamond Cup', 'Hoop Havoc Cup', 'Locker Room', 'Big Green', 'Gauntlet'].forEach(x => set.add(x));
   try { const T = x => String(x).split(' ').map((w, i) => i && /^(to|of|the|a|an|and|or|vs|in|on|at|by|for)$/i.test(w) ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     const multi = x => x && /\s/.test(String(x).trim());
     [MODES.map(m => m[0]), ACH.map(a => a[1]), PATTERNS.map(p => p[1]), SHOES.map(z => z[1]), TRAILS.map(t => t[1]), SCOREFX.map(f => f[1]), RULES.map(r => r[1]), Object.values(HAVOC).map(h => h.name), CUP_TIERS.map(c => c[0])].forEach(L => L.forEach(x => { if (multi(x)) set.add(T(x)); })); } catch (e) {}
@@ -9201,13 +9224,15 @@ addEventListener('keydown', e => {
   e.preventDefault(); e.stopImmediatePropagation(); if (e.repeat) return; audio();
   const k = NET_KEYS[e.code];
   if (netGuest()) { keys[e.code] = true; if (k === 'KeyE') lobFor(1); if (k === 'KeyQ') passFor(1); return; }
-  keys[k] = true;
+  netDown[e.code] = true; keys[k] = true;
   if (paused || attract) return;
   if (state === 'replay') { endReplay(); return; }
   if (k === 'KeyW') { teams[0].latch = true; if (state === 'play') contestPress(0); }
   if (k === 'KeyE') lobFor(0); if (k === 'KeyQ') passFor(0);
 }, true);
-addEventListener('keyup', e => { if (net && net.ready && NET_KEYS[e.code]) { keys[e.code] = false; if (netHost()) keys[NET_KEYS[e.code]] = !!(Object.keys(NET_KEYS).some(c => c !== e.code && NET_KEYS[c] === NET_KEYS[e.code] && keys[c])); } }, true);
+const netDown = {};
+addEventListener('keyup', e => { if (net && net.ready && NET_KEYS[e.code]) { e.stopImmediatePropagation(); keys[e.code] = false; netDown[e.code] = false; if (netHost()) { const k = NET_KEYS[e.code]; keys[k] = Object.keys(NET_KEYS).some(c => NET_KEYS[c] === k && netDown[c]); } } }, true);
+addEventListener('blur', () => { for (const c in netDown) netDown[c] = false; });
 addEventListener('keydown', e => { if (pregame && !paused && pregame.t > 0.6 && !['Escape', 'KeyP'].includes(e.code)) { pregame.t = Math.max(pregame.t, pregame.dur - 0.45); e.stopImmediatePropagation(); e.preventDefault(); } }, true);
 addEventListener('pointerdown', e => { if (pregame && !paused && pregame.t > 0.6 && e.target && e.target.id === 'cv') pregame.t = Math.max(pregame.t, pregame.dur - 0.45); }, true);
 addEventListener('keydown', e => {
@@ -9274,7 +9299,7 @@ function openWelcome() {
     <div class="mgrid"><button class="pick" type="button" id="wTeach">Teach me<small>Start the tutorial. Every step tells you what to press.</small></button>
     <button class="pick" type="button" id="wSkip">I know how to play<small>Show me around the menu instead.</small></button></div>`, []);
   $('wTeach').onclick = () => { SV.tourNext = true; persist(); closePanel(); startGame(4); };
-  $('wSkip').onclick = () => openTour();
+  $('wSkip').onclick = () => { closePanel(true); openTour(); };
 }
 const TOUR = [
   { el: '.mark', t: 'Welcome to Hoop Havoc', d: 'Quick tour, about a minute. Use the arrow keys, or tap Next.' },
@@ -9405,7 +9430,7 @@ function chAfterGame(T, won) {
     if (SV.ch[D][id]) continue; SV.ch[P][id] = k === 'courts' ? add.courts : (SV.ch[P][id] || 0) + (add[k] || 0);
     if (SV.ch[P][id] >= need) { SV.ch[D][id] = true; done.push([name, xp]); }
   }
-  persist(); done.forEach(([n, xp], i) => setTimeout(() => { toast('Challenge done!', `${n}: +${xp} XP`); gainXP(xp); }, 900 + i * 1400));
+  persist(); done.forEach(([n, xp], i) => setTimeout(() => { toast('Challenge done!', `${n}: +${xp} XP.`); gainXP(xp); }, 900 + i * 1400));
 }
 function openChallenges() {
   const C = chState(), row = (c, P, D) => { const v = Math.min(c[3], SV.ch[P][c[0]] || 0), ok = SV.ch[D][c[0]]; return `<div class="chal${ok ? ' ok' : ''}"><div><b>${c[1]}</b><span>${ok ? 'Done!' : v + ' of ' + c[3]}</span></div><i style="--p:${v / c[3] * 100}%"></i><em>+${c[4]} XP</em></div>`; };
@@ -9579,16 +9604,17 @@ function openLocker0(tab) {
       <div class="h3">Star player</div><p style="margin:0 0 8px">A named player who joins your team in 1-player games, with their own number and a slightly better jump and shot. Unlock legends by levelling up.</p><div class="pgrid">${[[0, 'None', 1, 0], ...STARS].map(([L, n, num]) => `<button class="pick" type="button" data-star="${L ? n : ''}" aria-pressed="${String((st.star || '') === (L ? n : ''))}" ${lock(L || 1) ? 'disabled' : ''}>${L ? n + ` <small>#${num}${lock(L) ? ', level ' + L : ''}</small>` : 'None'}</button>`).join('')}</div>
       <div class="h3" style="margin-top:14px">Headband</div><div class="swrow">${BANDS.map((b, i) => [b, i]).sort((a, b) => (a[0][2] || 0) - (b[0][2] || 0) || a[1] - b[1]).map(([[c, n, L], i]) => `<button class="sw" type="button" data-hb="${i}" style="background:${c || 'repeating-linear-gradient(45deg,#33244a 0 6px,#21162f 6px 12px)'}" aria-label="${n}${lock(L) ? ', unlocks at level ' + L : ''}" aria-pressed="${String((st.band || 0) === i)}" ${lock(L) ? 'disabled' : ''}>${lock(L) ? `<small>Lv ${L}</small>` : ''}</button>`).join('')}</div>`;
   } if (lockerTab === 'settings') {
-    body = `<div class="h3">Help</div><div class="seg2" style="margin-bottom:12px"><button type="button" class="pick" id="lkTour">Take the site tour<small>A quick spotlight walk-through of the menu</small></button><button type="button" class="pick" id="lkTut">Play the tutorial<small>Learn every move</small></button><button type="button" class="pick" id="lkTrReset">Reset trophies<small>Start your trophy hunt over</small></button></div>` + acctHTML() + '<div class="credit"><b>Hoop Havoc</b><span>A Morningfall Corp game</span><small>Beta v' + GAME_VERSION + '</small></div>' + `<div class="rlist" style="margin-bottom:12px"><button class="tog" type="button" role="switch" data-sw="replays" aria-checked="${SV.replays !== false}"><span>Instant replays<small>On: big plays and blocks get a slow-motion replay. Off: no replays during games (highlights still save).</small></span><i></i></button>
+    body = `<div class="h3">Help</div><div class="seg2" style="margin-bottom:12px"><button type="button" class="pick" id="lkTour">Take the site tour<small>A quick spotlight walk-through of the menu</small></button><button type="button" class="pick" id="lkTut">Play the tutorial<small>Learn every move</small></button><button type="button" class="pick" id="lkTrReset">Reset trophies<small>Start your trophy hunt over</small></button><button type="button" class="pick" id="lkPow">Power-up guide<small>What every power-up does</small></button></div>` + acctHTML() + '<div class="credit"><b>Hoop Havoc</b><span>A Morningfall Corp game</span><small>Beta v' + GAME_VERSION + '</small></div>' + `<div class="rlist" style="margin-bottom:12px"><button class="tog" type="button" role="switch" data-sw="replays" aria-checked="${SV.replays !== false}"><span>Instant replays<small>On: big plays and blocks get a slow-motion replay. Off: no replays during games (highlights still save).</small></span><i></i></button>
       <button class="tog" type="button" role="switch" data-sw="study" aria-checked="${!!SV.study}"><span>Study mix<small>A calmer crowd, softer sound effects and mellow music. Great with Auto Mode.</small></span><i></i></button>
       ${isTouch ? `<button class="tog" type="button" role="switch" data-sw="noVib" aria-checked="${!!SV.noVib}"><span>No vibration<small>Turn off the buzz on blocks and dunks.</small></span><i></i></button>` : ''}</div>
       ${isTouch ? `<div class="h3">Button size</div><div class="seg2">${['Small', 'Medium', 'Large'].map(n => `<button type="button" class="pick" data-bs="${n[0].toLowerCase()}" aria-pressed="${String((SV.btn || 'm') === n[0].toLowerCase())}">${n}</button>`).join('')}</div>` : ''}` + [['music', 'Music'], ['crowd', 'Crowd'], ['sfx', 'Sound Effects'], ['shake', 'Screen Shake']].map(([k, l]) => `<div class="vrow"><label for="v_${k}">${l}</label><input type="range" id="v_${k}" data-v="${k}" min="0" max="100" step="5" value="${Math.round(vol(k) * 100)}"><span>${Math.round(vol(k) * 100)}%</span></div>`).join('');
   } if (lockerTab === 'trophies') {
     const n = ACH.filter(a => SV.ach[a[0]]).length;
-    body = `<p style="margin:0 0 10px">${n} of ${ACH.length} unlocked.</p><div class="agrid">${ACH.map(a => { const TT = trophyTier(a[0]); return `<div class="ach${SV.ach[a[0]] ? '' : ' off'}" style="--tc:${TT[1]}"><i>${SV.ach[a[0]] ? '★' : '?'}</i><div><b>${a[1]}</b><span>${a[2]}</span><em class="atier">${TT[0]}, +${TT[2]} XP</em></div></div>`; }).join('')}</div>`;
+    body = `<p style="margin:0 0 10px">${n} of ${ACH.length} unlocked.</p><div class="agrid">${ACH.map(a => { const TT = trophyTier(a[0]); return `<div class="ach${SV.ach[a[0]] ? '' : ' off'}" style="--tc:${TT[1]}"><i>${SV.ach[a[0]] ? '★' : '?'}</i><div><b>${a[1]}</b><span>${a[2]}.</span><em class="atier">${TT[0]}, +${TT[2]} XP</em></div></div>`; }).join('')}</div>`;
   }
   openPanel('Locker Room', tabs + lvl + body, [['Done', closePanel, 'red']]);
   { const a = $('lkTour'), b = $('lkTut'); if (a) a.onclick = () => { closePanel(true); openTour(); }; if (b) b.onclick = () => { closePanel(true); startGame(4); };
+    { const pg = $('lkPow'); if (pg) pg.onclick = () => openPowerGuide(() => openLocker('settings')); }
     const c = $('lkTrReset'); if (c) c.onclick = () => openPanel('Reset trophies?', `<p style="margin:0">This clears ${(n => n === 1 ? "your 1 trophy" : `all ${n} of your trophies`)(Object.keys(SV.ach || {}).length)} so you can earn them again. Your level and XP stay.</p>`, [['Reset trophies', () => { SV.ach = {}; persist(); closePanel(true); toast('Trophies reset', 'Go earn them all again.'); }, 'red'], ['Cancel', () => openLocker('settings')]]); }
   setTimeout(() => { try { fxPreviewStart(); const pb = $('panelBody'); if (pb && !pb.dataset.fxpv) { pb.dataset.fxpv = 1; pb.addEventListener('pointerover', e => { const b = e.target.closest && e.target.closest('[data-tr],[data-cos="scorefx"]'); if (!b) return; if (b.dataset.tr) fxPv.tr = b.dataset.tr; else fxPv.fx = b.dataset.val; }); pb.addEventListener('pointerout', e => { const b = e.target.closest && e.target.closest('[data-tr],[data-cos="scorefx"]'); if (!b) return; if (b.dataset.tr) fxPv.tr = null; else fxPv.fx = null; }); } } catch (e) {} }, 60);
   { const bc = $('svCopy'), bl = $('svLoad'), box = $('svBox');
@@ -9675,7 +9701,7 @@ function afterGame(w) {
     const ok = w === 0 && daily.goal[2](teams[0].stats, margin, teams[1]); lbl.textContent = 'Try Again';
     if (ok) {
       SV.daily.done = SV.daily.done || {};
-      if (!SV.daily.done[daily.key]) { SV.daily.done[daily.key] = 1; const y = dayKey(new Date(Date.now() - 864e5)); SV.daily.streak = SV.daily.last === y ? (SV.daily.streak || 0) + 1 : 1; SV.daily.last = daily.key; xp += 150; if (SV.daily.streak >= 3) unlock('daily3'); toast('Daily Challenge Complete!', `${SV.daily.streak} day streak. +150 XP`); persist(); }
+      if (!SV.daily.done[daily.key]) { SV.daily.done[daily.key] = 1; const y = dayKey(new Date(Date.now() - 864e5)); SV.daily.streak = SV.daily.last === y ? (SV.daily.streak || 0) + 1 : 1; SV.daily.last = daily.key; xp += 150; if (SV.daily.streak >= 3) unlock('daily3'); toast('Daily Challenge Complete!', `${SV.daily.streak}-day streak. +150 XP.`); persist(); }
       $('overSub').textContent = 'Daily Challenge done! New one tomorrow.';
     } else $('overSub').textContent = `So close. Today's goal: ${daily.goal[1]}.`;
   }
@@ -10088,8 +10114,9 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 135;
+const GAME_VERSION = 136;
 const UPDATES = [
+  [136, 'Power-up guide', ['Fixed: picking I know how to play left the welcome card open behind the tour.', 'Fixed: in online games, using the arrow keys could leave your jump stuck down until it shot by itself.', 'New Power-up guide: every power-up, what it does and how long it lasts. Find it in Locker, Settings, or tap Power-ups in the pause menu.', 'The VS intro now splits open at the end, the way it closed, instead of fading.', 'Punctuation cleaned up across the game.']],
   [135, 'Phone fit and 20 fixes', ['Phones: the home screen, Modes, pause menu, end screen, Locker and Multiplayer setup all fit small screens now.',
     'Fixed: the level bar was cut off on short phones.', 'Fixed: mode icons covered their names on phones.', 'Fixed: the pause menu ran off the bottom of the screen on phones.', 'Fixed: the end screen opened scrolled down, hiding the title and score.',
     'Fixed: the tour and trophy pop-ups showed on top of the turn-your-phone screen.', 'Fixed: saved kits overlapped the jersey preview in the Locker on small phones.', 'Fixed: Player 1\'s team name showed in all caps in Multiplayer setup.',
@@ -10202,7 +10229,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 .updh b{font:400 calc(var(--k)*18)/1.1 var(--display);color:var(--mustard)} .updh span{font:600 calc(var(--k)*12)/1 var(--text);color:var(--muted)}
 .upd ul{margin:calc(var(--k)*6) 0 0;padding-left:calc(var(--k)*18);color:var(--cream);font:500 calc(var(--k)*14)/1.4 var(--text)}
 </style>`);
-$('bVer').addEventListener('click', openUpdates); $('bVer').textContent = `Beta v${GAME_VERSION}, updates`;
+$('bVer').addEventListener('click', openUpdates); $('bVer').textContent = `v${GAME_VERSION}: What's new`;
 setTimeout(() => { if ((SV.seenVer || 0) < GAME_VERSION && !$('menu').hidden && $('panel').hidden) { SV.seenVer = GAME_VERSION; persist(); whatsNew(); } }, 900);
 document.head.insertAdjacentHTML('beforeend', `<style>.credit{display:flex;flex-direction:column;align-items:center;gap:calc(var(--k)*3);margin:0 0 calc(var(--k)*12);padding:calc(var(--k)*12);background:var(--deep);border-radius:calc(var(--k)*12)}.credit b{font:400 calc(var(--k)*24)/1 var(--hype,Shrikhand),cursive;color:var(--mustard)}.credit span{font:600 calc(var(--k)*15)/1.2 var(--text);color:var(--cream)}.credit small{font:600 calc(var(--k)*11)/1 var(--text);color:var(--muted)}</style>`);
 function sfxDest() { if (!sfxBus) { sfxBus = ac.createGain(); sfxBus.gain.value = vol('sfx'); sfxBus.connect(ac.destination);
