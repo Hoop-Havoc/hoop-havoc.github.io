@@ -7629,9 +7629,9 @@ const TAUNTS = {
 DOOM2.taunt = { at: 0.2,
   hit(d) {
     const T = TAUNTS[d.style] || TAUNTS.laugh, cx = d.cx;
-    d.winners.forEach((w, i) => { if (solo() || !w.celeb || !THROW_CELEB.has(w.celeb.kind)) { if (solo()) w.celeb = null; w.facing = Math.sign(cx - w.x) || w.facing; react(w, T.win, 2.6, { say: null, taunt: true }); } });
+    d.winners.forEach((w, i) => { if (w.celeb) return; w.facing = Math.sign(cx - w.x) || w.facing; react(w, T.win, 2.6, { say: i === 0 || T.all || Math.random() < 0.5 ? pick(T.say) : null, good: true, taunt: true }); });
     d.losers.forEach((p, i) => react(p, T.lose, 2.6, { say: i === 0 && Math.random() < 0.6 ? pick(T.loseSay) : null }));
-    d.lines = d.winners.map((w, i) => i === 0 || T.all || Math.random() < 0.5 ? pick(T.say) : null);
+    d.lines = [];   // the lines go in the normal speech bubbles now
     roar(0.5, 0.05); tone(330, 0.12, 'square', 0.03, 1.6);
   },
   step(d, p) { if (d.t > 0.2) { p.mood = 'sad'; p.moodT = 1; } },
@@ -7654,7 +7654,7 @@ DOOM2.taunt = { at: 0.2,
     const ti = hoops.indexOf(hp), sh = players.find(p => p.team === ti && p.celeb);
     if (sh && THROW_CELEB.has(sh.celeb.kind)) return;   // the celebration already pelts them: that's the whole show
     _sd.apply(this, arguments);
-    if (doom && Math.random() < 0.5) { doom.kind = 'taunt'; doom.style = pick(Object.keys(TAUNTS)); doom.winners = players.filter(p => p.team === ti && !(p.down > 0)); doom.hit = false; }
+    if (doom && !sh && !players.some(p => p.team === ti && p.celeb) && Math.random() < 0.15) { doom.kind = 'taunt'; doom.style = pick(Object.keys(TAUNTS)); doom.winners = players.filter(p => p.team === ti && !(p.down > 0)); doom.hit = false; }
   }; }
 drawPlayer = (orig => p => {
   const f = p.dfx; if (!f || !doom) return orig(p); if (f.gone || f.alpha <= 0.01) return;
@@ -10186,8 +10186,10 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 139;
+const GAME_VERSION = 140;
 const UPDATES = [
+  [140, 'Fewer taunts', ['The winning team laughs at the other team much less often, and never when someone is doing their celebration, so custom green celebrations show up again.',
+    'Taunt lines like "HAHAHAHA!" now use the same speech bubbles as everything else players say.']],
   [139, 'Mayhem', ['Singleplayer is red and Multiplayer is blue on the home screen.', 'New mode, Mayhem: turbo speed, golden balls, Havoc rounds, power-up rain and two random twists every point. First to 11.',
     'Power Party: power-ups now pour in nonstop, fall faster, and every point adds a random twist.', 'Havoc Mode: every Havoc round gets two random twists on top, like low gravity, big heads or slow motion.',
     'Gauntlet: every win stacks one more twist, up to four at once.', 'The twists in play pop up at the start of each point.']],
