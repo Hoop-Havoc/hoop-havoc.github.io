@@ -52,7 +52,7 @@ button:focus-visible{outline:calc(var(--k)*3) solid var(--mustard);outline-offse
 .btn b{display:block;font-weight:400;font-size:calc(var(--k)*27)}
 .btn small{display:block;font:600 calc(var(--k)*13)/1.15 var(--text);margin-top:calc(var(--k)*5);opacity:.9;text-shadow:none}
 .btn.red{background:var(--red)}
-.btn.split{background:linear-gradient(104deg,var(--red) 0 49.6%,var(--blue) 50.4% 100%)}
+.btn.split{background:var(--blue)}
 .btn.alt{font-size:calc(var(--k)*17);padding:calc(var(--k)*8) calc(var(--k)*12) calc(var(--k)*9);border-width:calc(var(--k)*2.5);text-align:center;box-shadow:0 calc(var(--k)*4) 0 var(--deep)}
 .btn.alt:hover{box-shadow:0 calc(var(--k)*6) 0 var(--deep)}
 .btn.alt:active{box-shadow:0 0 0 var(--deep);transform:translateY(calc(var(--k)*4))}
@@ -4276,12 +4276,12 @@ function scored(ti, hp) {
 }
 function updatePowers(dt) {
   if (state !== 'play' || rules().nopow) return;
-  if (!orb) { powerT -= dt * (rules().frenzy ? 2.6 : 1); if (powerT <= 0) { let pw, g = 0; do { pw = pick(POWERS); } while (recentPow.includes(pw.id) && g++ < 20); recentPow.push(pw.id); if (recentPow.length > 4) recentPow.shift(); let ox = rand(150, W - 150); for (let g2 = 0; g2 < 12 && hoops.some(h => Math.abs(h.cx - ox) < 110); g2++) ox = rand(150, W - 150);   // never right over a hoop
+  if (!orb) { powerT -= dt * (rules().party ? 7 : rules().frenzy ? 2.6 : 1); if (powerT <= 0) { let pw, g = 0; do { pw = pick(POWERS); } while (recentPow.includes(pw.id) && g++ < 20); recentPow.push(pw.id); if (recentPow.length > 4) recentPow.shift(); let ox = rand(150, W - 150); for (let g2 = 0; g2 < 12 && hoops.some(h => Math.abs(h.cx - ox) < 110); g2++) ox = rand(150, W - 150);   // never right over a hoop
       orb = { id: pw.id, c: pw.c, x: ox, y: -40, vx: rand(-25, 25), vy: 60, life: 12, t: 0, r: 15, landed: false, chute: true, ph: rand(0, 6) }; tone(1320, 0.1, 'sine', 0.035, 0.7); } return; }
   orb.t += dt; orb.life -= dt; if (orb.cut) { orb.cut.t += dt; orb.cut.y -= 60 * dt; orb.cut.x += Math.sin(orb.cut.t * 5) * 20 * dt; if (orb.cut.t > 1) orb.cut = null; }
   if (!orb.landed || orb.y < GROUND - orb.r) {   // drifts down like a little balloon ball, bounces once or twice, then rolls to a stop
     if (orb.chute) {   // floating down on its parachute, swaying a little
-      orb.vy += (105 - orb.vy) * Math.min(1, dt * 3); orb.vx += (Math.sin(orb.t * 2.1 + (orb.ph || 0)) * 40 - orb.vx) * Math.min(1, dt * 2);
+      orb.vy += ((rules().party ? 190 : 105) - orb.vy) * Math.min(1, dt * 3); orb.vx += (Math.sin(orb.t * 2.1 + (orb.ph || 0)) * 40 - orb.vx) * Math.min(1, dt * 2);
       if (orb.y > GROUND - 95) { orb.chute = false; orb.cut = { x: orb.x, y: orb.y - orb.r - 22, t: 0, rot: Math.sin(orb.t * 2.1 + (orb.ph || 0)) * 0.3 }; orb.vy = Math.max(orb.vy, 140); tone(980, 0.05, 'sine', 0.025, 1.4); }   // lets go of the chute just above the floor
     } else orb.vy = Math.min(orb.vy + 1100 * dt, 520);
     orb.x += (orb.vx + wind * 0.15) * dt; orb.y += orb.vy * dt;
@@ -8678,7 +8678,7 @@ function refreshKeep() {
   const set = new Set(); RAWNAMES.forEach(v => set.add(v)); try { TEAM_POOL.forEach(t => set.add(niceName(t.name || t[0] || ''))); } catch (e) {}
   teams.forEach(t => t && t.name && set.add(niceName(t.name))); COURTS.forEach(c => set.add(niceName(c.name))); players.forEach(q => q && q.pname && set.add(niceName(q.pname))); teams.forEach(t => (t.roster || []).forEach(r => r && r.pname && set.add(niceName(r.pname))));
   try { TOURNEY.forEach(r => r.name && set.add(niceName(r.name))); } catch (e) {}
-  ['Hoop Havoc', 'Morningfall Corp', 'Basket Random', 'First to 100', 'Play Online', 'Auto Mode', 'the Jump button', 'the Lob button', 'the Pass button', 'Hype Time', 'Havoc Round', 'Havoc Rounds', 'Golden Ball', 'Dunk Contest', '3-Point Shootout', 'Daily Challenge', 'Power Party', 'Havoc Mode', 'Bronze Cup', 'Silver Cup', 'Gold Cup', 'Diamond Cup', 'Hoop Havoc Cup', 'Locker Room', 'Big Green', 'Gauntlet'].forEach(x => set.add(x));
+  ['Hoop Havoc', 'Morningfall Corp', 'Basket Random', 'First to 100', 'Play Online', 'Auto Mode', 'the Jump button', 'the Lob button', 'the Pass button', 'Hype Time', 'Havoc Round', 'Havoc Rounds', 'Golden Ball', 'Dunk Contest', '3-Point Shootout', 'Daily Challenge', 'Power Party', 'Havoc Mode', 'Mayhem', 'Bronze Cup', 'Silver Cup', 'Gold Cup', 'Diamond Cup', 'Hoop Havoc Cup', 'Locker Room', 'Big Green', 'Gauntlet'].forEach(x => set.add(x));
   try { const T = x => String(x).split(' ').map((w, i) => i && /^(to|of|the|a|an|and|or|vs|in|on|at|by|for)$/i.test(w) ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     const multi = x => x && /\s/.test(String(x).trim());
     [MODES.map(m => m[0]), ACH.map(a => a[1]), PATTERNS.map(p => p[1]), SHOES.map(z => z[1]), TRAILS.map(t => t[1]), SCOREFX.map(f => f[1]), RULES.map(r => r[1]), Object.values(HAVOC).map(h => h.name), CUP_TIERS.map(c => c[0])].forEach(L => L.forEach(x => { if (multi(x)) set.add(T(x)); })); } catch (e) {}
@@ -8956,9 +8956,9 @@ function applyTeam() {
   teams[0].name = (T.name || 'HOT DOGS').toUpperCase(); teams[0].color = c[0]; teams[0].dark = c[1];
   const nm = niceName(teams[0].name);
   const rnd = SV.rollTeams !== false && !SV.useMine;
-  $('b1p').querySelector('small').textContent = rnd ? 'Random teams vs the CPU' : `You're the ${nm}`; $('b1p').style.background = c[0];
+  $('b1p').querySelector('small').textContent = rnd ? 'Random teams vs the CPU' : `You're the ${nm}`; $('b1p').style.background = 'var(--red)';
   if (!document.body.classList.contains('touch')) $('b2p').querySelector('small').textContent = `${rnd ? 'Random teams' : nm + ' vs Ice Pops'}${SV.riv && (SV.riv.r || SV.riv.b) ? `, Series ${SV.riv.r}-${SV.riv.b}` : ''}`;
-  $('b2p').style.background = `linear-gradient(104deg,${c[0]} 0 49.6%,var(--blue) 50.4% 100%)`;
+  $('b2p').style.background = 'var(--blue)';
 }
 // ---- panels ----
 function openPanel(title, html, buttons) {
@@ -9309,35 +9309,53 @@ let modeX = null, modeXNext = null, gaunt = { n: 0 };
 const GAUNT = ['rookie', 'rookie', 'pro', 'pro', 'pro', 'legend', 'legend', 'legend'];
 function startSpecial(k) {
   modeXNext = k; closePanel(true);
-  if (k === 'party') startGame(1, 21); else if (k === 'chaos') startGame(1, 15); else if (k === 'gauntlet') startGame(1, 7);
+  if (k === 'party') startGame(1, 21); else if (k === 'chaos') startGame(1, 15); else if (k === 'gauntlet') startGame(1, 7); else if (k === 'mayhem') startGame(1, 11);
 }
-{ const _r = rules; rules = function () { const r = _r(); if (!attract && tourney && tourney.round < TOURNEY.length && tourney.playing) { const tw = TWISTS[tourney.round] && TWISTS[tourney.round][0]; if (tw) return { ...r, [tw]: true }; } if (attract || !modeX) return r; if (modeX === 'party') return { ...r, frenzy: true, nopow: false }; if (modeX === 'chaos') return { ...r, allhavoc: true, nohavoc: false, frenzy: true, calm: false }; return r; }; }
+{ const _r = rules; rules = function () { const r = _r(); if (!attract && tourney && tourney.round < TOURNEY.length && tourney.playing) { const tw = TWISTS[tourney.round] && TWISTS[tourney.round][0]; if (tw) return { ...r, [tw]: true }; } if (attract || !modeX) return r; const tw = {}; for (const k of (modeX === 'gauntlet' ? (gaunt.tw || []) : xTw)) tw[k] = true;
+  if (modeX === 'party') return { ...r, ...tw, frenzy: true, party: true, nopow: false, calm: false };
+  if (modeX === 'chaos') return { ...r, ...tw, allhavoc: true, nohavoc: false, frenzy: true, calm: false };
+  if (modeX === 'mayhem') return { ...r, ...tw, allhavoc: true, nohavoc: false, frenzy: true, party: true, turbo: true, golden: true, calm: false, nopow: false };
+  if (modeX === 'gauntlet') return { ...r, ...tw };
+  return r; }; }
+// the per-point twists: Power Party, Havoc Mode and Mayhem roll new ones every point; the Gauntlet stacks one more every win
+let xTw = [];
+const XTW = { lowg: 'Low gravity', highg: 'Heavy gravity', turbo: 'Turbo speed', big: 'Big heads', golden: 'Golden ball', slow: 'Slow motion' };
+function rollTw(n, have) { const out = [...(have || [])]; let g = 0;
+  while (out.length < n && g++ < 40) { const k = pick(Object.keys(XTW)); if (out.includes(k) || (k === 'lowg' && out.includes('highg')) || (k === 'highg' && out.includes('lowg')) || (k === 'slow' && out.includes('turbo')) || (k === 'turbo' && out.includes('slow'))) continue; out.push(k); }
+  return out; }
+{ const _sr = startRound; startRound = function (fresh = true) {
+    if (!attract && modeX && modeX !== 'gauntlet' && (fresh || !hoops.length)) xTw = modeX === 'mayhem' ? rollTw(3, ['turbo']).slice(1) : rollTw(modeX === 'party' ? 1 : 2);
+    if (!modeX) xTw = [];
+    const r = _sr.apply(this, arguments);
+    try { const L = (modeX === 'gauntlet' ? (gaunt.tw || []) : xTw).map(k => XTW[k]); if (!attract && modeX && L.length) setTimeout(() => { if (state === 'intro' || state === 'play') pop(L.join(' + ').toUpperCase() + '!', W / 2, 150, '#ffc83d'); }, 400); } catch (e) {}
+    return r; }; }
 { const _c = cpuD; cpuD = function (ti) {
     if (attract) return _c(ti);
     if (modeX === 'gauntlet') { const k = GAUNT[Math.min(GAUNT.length - 1, gaunt.n)], D = DIFF[k], x = Math.max(0, gaunt.n - GAUNT.length + 1); return x ? { ...D, react: D.react * Math.pow(0.9, x), tol: D.tol * Math.pow(0.9, x) } : D; }
     if (tourney && tourney.round < TOURNEY.length) { const o = TOURNEY[tourney.round], base = DIFF[cupDiff(o.diff)], P = CUP_STYLE[o.style] || null; return P ? { ...base, ...P(base) } : base; }
     return _c(ti); }; }
 { const _sg2 = startGame; startGame = function (m, target, tour) { modeX = modeXNext; modeXNext = null; if (modeX !== 'gauntlet') gaunt.n = gaunt.n && modeX === 'gauntlet' ? gaunt.n : gaunt.n; return _sg2.apply(this, arguments); }; }
-{ const _ag = again; again = function () { if (modeX && !net) { const k = modeX; if (k === 'gauntlet' && gaunt.over) { gaunt = { n: 0 }; } startSpecial(k); return; } return _ag(); }; }
+{ const _ag = again; again = function () { if (modeX && !net) { const k = modeX; if (k === 'gauntlet' && gaunt.over) { gaunt = { n: 0, tw: [] }; } startSpecial(k); return; } return _ag(); }; }
 { const _tm = toMenu; toMenu = function () { modeX = null; modeXNext = null; gaunt = { n: 0 }; return _tm.apply(this, arguments); }; }
 { const _af = afterGame; afterGame = function (w) {
     const r = _af.apply(this, arguments);
     try {
       const lbl = $('bAgain').querySelector('b');
       if (modeX === 'gauntlet') {
-        if (w === 0) { gaunt.n++; gaunt.over = false; SV.gauntBest = Math.max(SV.gauntBest || 0, gaunt.n); persist(); gainXP(30 + gaunt.n * 10);
-          $('overTitle').textContent = `Win ${gaunt.n}`; $('overSub').textContent = `${gaunt.n} in a row. Up next is a ${niceName(GAUNT[Math.min(GAUNT.length - 1, gaunt.n)])} CPU, and they're sharper.`; lbl.textContent = 'Next game';
+        if (w === 0) { gaunt.n++; gaunt.over = false; gaunt.tw = rollTw(Math.min(4, gaunt.n), gaunt.tw); SV.gauntBest = Math.max(SV.gauntBest || 0, gaunt.n); persist(); gainXP(30 + gaunt.n * 10);
+          $('overTitle').textContent = `Win ${gaunt.n}`; $('overSub').textContent = `${gaunt.n} in a row. Up next is a ${niceName(GAUNT[Math.min(GAUNT.length - 1, gaunt.n)])} CPU, and they're sharper. Twists: ${gaunt.tw.map(k => XTW[k]).join(', ')}.`; lbl.textContent = 'Next game';
           if (gaunt.n >= 5) unlock('gaunt5'); if (gaunt.n >= 10) unlock('gaunt10'); }
         else { gaunt.over = true; $('overTitle').textContent = 'Run over'; $('overSub').textContent = `${gaunt.n} in a row. Your best: ${SV.gauntBest || 0}. Run it back?`; lbl.textContent = 'New run'; }
       }
       if (modeX === 'party' && w === 0) unlock('party');
-      if (modeX === 'chaos' && w === 0) unlock('chaoswin');
+      if (modeX === 'chaos' && w === 0) unlock('chaoswin'); if (modeX === 'mayhem' && w === 0) unlock('chaoswin');
     } catch (e) {}
     return r; }; }
-setTimeout(() => { MODE_ICON['power party'] = '<circle cx="8" cy="9" r="5"/><circle cx="17" cy="15" r="5" opacity=".6"/><path d="M8 6.5 6.8 9.4h1.6L7.6 12l2.4-3.4H8.4l.9-2.1z" fill="#000" opacity=".5"/>'; MODE_ICON['havoc mode'] = '<path d="M12 2 9 9H3l5 4-2 8 6-5 6 5-2-8 5-4h-6z"/>'; MODE_ICON['gauntlet'] = '<path d="M4 20h4v-6H4zM10 20h4V9h-4zM16 20h4V4h-4z"/>'; }, 0);
-MODES.push(['Power Party', 'Power-ups rain from the sky all game. Grab them, use them, cause chaos. First to 21.', () => startSpecial('party')],
-  ['Havoc Mode', 'Every point is a Havoc round, and power-ups drop nonstop. First to 15.', () => startSpecial('chaos')],
-  ['Gauntlet', () => `Beat CPU after CPU, each one tougher. One loss ends the run.${SV.gauntBest ? ` Best: ${SV.gauntBest} in a row.` : ''}`, () => { gaunt = { n: 0 }; startSpecial('gauntlet'); }]);
+setTimeout(() => { MODE_ICON['power party'] = '<circle cx="8" cy="9" r="5"/><circle cx="17" cy="15" r="5" opacity=".6"/><path d="M8 6.5 6.8 9.4h1.6L7.6 12l2.4-3.4H8.4l.9-2.1z" fill="#000" opacity=".5"/>'; MODE_ICON['havoc mode'] = '<path d="M12 2 9 9H3l5 4-2 8 6-5 6 5-2-8 5-4h-6z"/>'; MODE_ICON['mayhem'] = '<circle cx="12" cy="12" r="9"/><path d="M7 9l3 1M17 9l-3 1M8 16c2-2 6-2 8 0" stroke="#000" stroke-width="1.6" fill="none" opacity=".5"/>'; MODE_ICON['gauntlet'] = '<path d="M4 20h4v-6H4zM10 20h4V9h-4zM16 20h4V4h-4z"/>'; }, 0);
+MODES.push(['Power Party', 'Power-ups pour from the sky nonstop, and every point adds a random twist. First to 21.', () => startSpecial('party')],
+  ['Havoc Mode', 'Every point is a Havoc round with two random twists on top, like low gravity or big heads. First to 15.', () => startSpecial('chaos')],
+  ['Mayhem', 'Everything at once: turbo speed, golden balls, Havoc rounds, power-up rain and two random twists. First to 11.', () => startSpecial('mayhem')],
+  ['Gauntlet', () => `Beat CPU after CPU, each one tougher, with a new twist stacked on every win. One loss ends the run.${SV.gauntBest ? ` Best: ${SV.gauntBest} in a row.` : ''}`, () => { gaunt = { n: 0 }; startSpecial('gauntlet'); }]);
 function openHundred() {
   openPanel('First To 100', `<p style="margin:0 0 12px">A long game. First team to 100 points wins.</p><div class="mgrid">
     <button class="pick" type="button" data-h="1">Singleplayer<small>You against the CPU.</small></button>
@@ -9492,7 +9510,7 @@ function openChallenges() {
 }
 const MODE_ICON = {"play online": "<circle cx=\"12\" cy=\"12\" r=\"9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><path d=\"M3 12h18M12 3c3 3.5 3 14.5 0 18M12 3c-3 3.5-3 14.5 0 18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/>", "tournament": "<path d=\"M7 3h10v3h3v2a4 4 0 0 1-4 4h-.3A5 5 0 0 1 13 14.6V17h3v3H8v-3h3v-2.4A5 5 0 0 1 8.3 12H8a4 4 0 0 1-4-4V6h3zm-1 5a2 2 0 0 0 1 1.7V8zm12 0v1.7A2 2 0 0 0 18 8z\"/>", "daily challenge": "<path d=\"M6 2h2v2h8V2h2v2h3v17H3V4h3zm-1 7v10h14V9zm2 2h4v4H7z\"/>", "challenges": "<circle cx=\"12\" cy=\"12\" r=\"9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><circle cx=\"12\" cy=\"12\" r=\"1.8\"/>", "first to 100": "<path d=\"M5 2h2v20H5zm3 1h11l-2.5 4L19 11H8z\"/>", "dunk contest": "<path d=\"M3 4h18v2h-4v3a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6H3z\"/><path d=\"M8 11l1 9h6l1-9\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"/><path d=\"M9 14h6M9.5 17h5\" stroke=\"currentColor\" stroke-width=\"1.4\"/>", "3-point shootout": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M3 12h18M12 3v18M5.6 5.6c3 2.2 3 10.6 0 12.8M18.4 5.6c-3 2.2-3 10.6 0 12.8\" fill=\"none\" stroke=\"rgba(0,0,0,.45)\" stroke-width=\"1.6\"/>", "tutorial": "<path d=\"M12 3 1 9l11 6 9-4.9V17h2V9z\"/><path d=\"M5 13v4c2 2 4.5 3 7 3s5-1 7-3v-4l-7 3.8z\"/>", "practice": "<path d=\"M12 2l4 14H8z\"/><path d=\"M4 17h16v3H4z\"/><path d=\"M9.3 11h5.4l.6 2H8.7z\" fill=\"rgba(0,0,0,.35)\"/>", "auto mode": "<path d=\"M4 13a8 8 0 0 1 16 0v6a2 2 0 0 1-2 2h-2v-7h2.3A6.3 6.3 0 0 0 5.7 14H8v7H6a2 2 0 0 1-2-2z\"/>"};
 function openModes() {
-  const G = [['Play with friends', ['Play Online']], ['Compete', ['Tournament', 'Daily Challenge', 'Challenges', 'First To 100', 'Dunk Contest', '3-Point Shootout']], ['Practice', ['Tutorial', 'Practice']], ['Party modes', ['Power Party', 'Havoc Mode', 'Gauntlet']], ['Chill', ['Auto Mode']]];
+  const G = [['Play with friends', ['Play Online']], ['Compete', ['Tournament', 'Daily Challenge', 'Challenges', 'First To 100', 'Dunk Contest', '3-Point Shootout']], ['Practice', ['Tutorial', 'Practice']], ['Party modes', ['Power Party', 'Havoc Mode', 'Mayhem', 'Gauntlet']], ['Chill', ['Auto Mode']]];
   const cell = i => { const m = MODES[i], ic = MODE_ICON[m[0].toLowerCase()] || MODE_ICON['3-point shootout']; return `<button class="pick mpick" type="button" data-m="${i}"><i class="micon" data-keep aria-hidden="true"><svg viewBox="0 0 24 24">${ic}</svg></i>${m[0]}<small>${typeof m[1] === 'function' ? m[1]() : m[1]}</small></button>`; };
   const seen = new Set(), low = x => x.toLowerCase();
   let html = G.map(([h, names]) => { const idx = MODES.map((m, i) => i).filter(i => names.some(n => low(n) === low(MODES[i][0]))); idx.forEach(i => seen.add(i)); return idx.length ? `<div class="h3">${h}</div><div class="mgrid">${idx.map(cell).join('')}</div>` : ''; }).join('');
@@ -10168,8 +10186,11 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 138;
+const GAME_VERSION = 139;
 const UPDATES = [
+  [139, 'Mayhem', ['Singleplayer is red and Multiplayer is blue on the home screen.', 'New mode, Mayhem: turbo speed, golden balls, Havoc rounds, power-up rain and two random twists every point. First to 11.',
+    'Power Party: power-ups now pour in nonstop, fall faster, and every point adds a random twist.', 'Havoc Mode: every Havoc round gets two random twists on top, like low gravity, big heads or slow motion.',
+    'Gauntlet: every win stacks one more twist, up to four at once.', 'The twists in play pop up at the start of each point.']],
   [138, 'Steady connection', ['Online: if the connection blips, the game now reconnects on its own (for up to 12 seconds) instead of ending with "Your friend left."',
     'Online: drops are spotted faster, and the host side re-registers itself if it loses the server.', 'Online: your friend now sees power-ups float down smoothly, plus every grab and lightning strike.',
     'Power-ups now float down on a little parachute, let go just above the floor, then drop and bounce.', 'Power-ups never drop onto a hoop.', 'You can grab a landed power-up by running through it.',
