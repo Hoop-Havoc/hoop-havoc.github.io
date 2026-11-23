@@ -1265,12 +1265,21 @@ function jumpPower0(p, rise) {
   const boost = contest ? 1.42 : rise || ball.lob === p || (ball.holder === p && Math.abs(hoops[p.team].cx - p.x) < 230) ? 1.3 : 1;
   return 660 * body.jump * court.jump * Math.pow(court.g / 1400, 0.3) * (t.power && t.power.id === 'ROCKET' ? 1.35 : 1) * (teams[1 - p.team] && teams[1 - p.team].power && teams[1 - p.team].power.id === 'HEAVY' ? 0.72 : 1) * (t.onFire ? 1.08 : 1) * boost;
 }
+function vaultBoost(p) {
+  if (!p || p.grounded === false && p.y < GROUND - 2) return;
+  const dir = Math.sign(p.vx) || Math.sign(Math.sin(p.a)) || p.facing;
+  const blocker = players.find(q => q.team !== p.team && !(q.down > 0) && q.grounded && (q.x - p.x) * dir > 4 && (q.x - p.x) * dir < 75);
+  const wall = (p.x < 70 && dir < 0) || (p.x > W - 70 && dir > 0);
+  if (!blocker && !wall) return;
+  if (blocker) { const need = (blocker.L + blocker.headR * 2) * blocker.scale + 26, vyNeed = Math.sqrt(2 * court.g * need) * (court.bouncy ? 1 : 1.02); if (-p.vy < vyNeed) p.vy = -vyNeed; if (Math.abs(p.vx) < 170 || Math.sign(p.vx) !== dir) p.vx = dir * Math.max(190, Math.abs(p.vx)); p.vault = time + 0.75; p.vaultOver = blocker; }
+  if (wall && !blocker) { p.vx = -dir * Math.max(140, Math.abs(p.vx) * 0.6); }   // pinned on the wall: the hop pops you back out
+}
 function jumpPlayer(p) {
   p.rising = 0; p.phiBV = (p.phiBV || 0) + 9;   // arms swing up into the jump
   if (p.stun > 0) return;   // still recovering from biting on a fake
   const J = jumpPower(p);
   const ja = jumpAngle(p); p.vx = Math.sin(ja) * J * 1.05 * (body.hop || 1) * ((starOf(p) || {}).speed || 1) * (teams[p.team].power && teams[p.team].power.id === 'SPEED' ? 1.45 : 1) + p.vx * 0.2; p.vy = -Math.cos(ja) * J; p.w += p.a * 1.2;
-  p.grounded = false; p.y = GROUND - 1; p.jumpT = time;
+  p.grounded = false; p.y = GROUND - 1; p.jumpT = time; try { vaultBoost(p); } catch (e) {}
   for (let i = 0; i < 4; i++) spark(p.x, GROUND, 'rgba(255,255,255,.6)', rand(-60, 60), rand(-60, -10));
   tone(200, 0.12, 'triangle', 0.05, 1.9);
 }
@@ -1299,6 +1308,7 @@ function onPress(ti) {
     p.vy = -Math.cos(ja) * J;
     p.w += p.a * 1.6;
     p.grounded = false; p.y = GROUND - 1; p.jumpT = time; p.rising = 0; p.phiBV = (p.phiBV || 0) + 9;
+    try { if (ball.holder !== p || Math.abs(hoops[p.team].cx - p.x) > 200) vaultBoost(p); } catch (e) {}
     jumped = true;
     if (t.power && t.power.id === 'ROCKET') for (let i = 0; i < 10; i++) spark(p.x, p.y, '#ff8a3d', rand(-80, 80), rand(40, 160));
     else for (let i = 0; i < 4; i++) spark(p.x, GROUND, 'rgba(255,255,255,.6)', rand(-60, 60), rand(-60, -10));
@@ -2034,10 +2044,14 @@ function cpuThink(ti, dt) {
     }
     else if (leanOK) press(0.07);
   } else if (!h) {
+    { const dd = Math.abs(lead.x - ball.x); if (a.chaseD === undefined || dd < a.chaseD - 25 || a.chaseFor !== 'ball') { a.chaseD = dd; a.chaseT = time; a.chaseFor = 'ball'; }
+      if (time - a.chaseT > 1.1 && dd > 60) { mine.forEach(q => { q.unstickT = time + 0.9; }); a.chaseT = time; a.chaseD = dd; if (lead.grounded) { press(0.07); a.timer = 0; return; } } }
     const near = Math.abs(lead.x - ball.x) < 80 + ball.r && ball.y > GROUND - lead.L * 2.4;
     if (near && lead.grounded) press(rand(0.2, 0.32));
     else if (leanOK) press(0.07);
   } else {
+    { const dd = Math.abs(lead.x - h.x); if (a.chaseD === undefined || dd < a.chaseD - 25 || a.chaseFor !== h) { a.chaseD = dd; a.chaseT = time; a.chaseFor = h; }
+      if (time - a.chaseT > 1.4 && dd > 110) { mine.forEach(q => { q.unstickT = time + 0.8; }); a.chaseT = time; a.chaseD = dd; if (lead.grounded) { press(0.07); a.timer = 0; return; } } }
     const near = Math.abs(lead.x - h.x) < 130, shooting = teams[h.team].pressed && teams[h.team].pressT > TAP * 0.5;
     if (shooting && Math.abs(lead.x - h.x) < 170 && lead.grounded) press(0.35);       // close out on the shooter
     else if (near && lead.grounded && !(h.grounded && !shooting && Math.random() < (D.smart || 0))) press(0.25); else if (leanOK) press(0.07);
@@ -3359,6 +3373,8 @@ function leanTarget(p) {
   else ln = (human ? 0 : clamp(dx / 200, -1, 1) * 0.07) + sw * p.swayA;   // untouched: a pure rock, all the way left and all the way right
   // near a wall (under your own rim, say) the lean toward it is cut short, so a hop never carries you off the court
   if ((p.x < 130 && ln < 0) || (p.x > W - 130 && ln > 0)) ln *= lerp(0.3, 1, clamp((Math.min(p.x, W - p.x) - 30) / 100, 0, 1));
+  if (p.x < 75) ln += 0.22 * (1 - p.x / 75); else if (p.x > W - 75) ln -= 0.22 * (1 - (W - p.x) / 75);   // right up on the wall: rock away from it
+  if (!human && p.unstickT > time) ln = Math.sign(dx || 1) * 0.5 + sw * 0.15;   // a CPU that's stuck leans hard at the ball
   return ln;
 }
 function flatMax(p) { return Math.min(1.56, Math.acos(clamp(p.headR * 0.8 / p.L, 0, 0.99))); }   // lying flat, head resting on the floor
@@ -3542,7 +3558,7 @@ function stepPlayers(dt) {
     if (fa && fb) continue;
     const wa = fa ? 0 : fb ? 1 : 0.5, wb = fb ? 0 : fa ? 1 : 0.5;
     { // over the top: feet above the other player's head means you go over, not through
-      const over = (X, Y) => !X.grounded && !(X.down > 0) && X.F.y < Y.Hd.y - Y.headR * 0.4 && Math.abs(X.x - Y.x) < 60;
+      const over = (X, Y) => !X.grounded && !(X.down > 0) && ((X.F.y < Y.Hd.y - Y.headR * 0.4 && Math.abs(X.x - Y.x) < 60) || (X.vault > time && X.vaultOver === Y && !(Y.dunkAnim)));
       const top = !fa && over(A, B) ? A : !fb && over(B, A) ? B : null;
       if (top) {
         const und = top === A ? B : A;
@@ -4048,7 +4064,8 @@ function updateBall(dt) {
     if (collideCircle(p.Hd.x, p.Hd.y, p.headR, 0.55, p.Hd.vx, p.Hd.vy) && gtH && p.team !== ball.shotTeam) ball.goaltend = gtH;
   }
   // stuck on a rim or board
-  if (Math.hypot(ball.vx, ball.vy) < 30 && ball.y < GROUND - ball.r - 4) { ball.stuck += dt; if (ball.stuck > 1.5) { ball.vx = rand(-200, 200); ball.vy = -200; ball.stuck = 0; } }
+  if (Math.hypot(ball.vx, ball.vy) < 30 && ball.y < GROUND - ball.r - 4) { ball.stuck += dt; if (!ball.holder && state === 'play' && Math.abs(ball.vx) < 15 && ball.y > GROUND - ball.r - 3) { ball.idleT = (ball.idleT || 0) + dt; if (ball.idleT > 6) { ball.vx = Math.sign(W / 2 - ball.x || 1) * 260; ball.vy = -220; ball.idleT = 0; } } else ball.idleT = 0;
+  if (ball.stuck > 1.5) { ball.vx = rand(-200, 200); ball.vy = -200; ball.stuck = 0; } }
   else ball.stuck = 0;
 }
 function interactions() {
@@ -4075,7 +4092,7 @@ function interactions() {
       p.swipeT = 0.22; const bx0 = ball.x, by0 = ball.y; fxSwipes.push({ x: ball.x, y: ball.y, d: Math.sign(p.x - h.x) * -1 || -p.facing, t: 0, c: t.color, fx: bx0, fy: by0, p }); tone(1400, 0.08, 'triangle', 0.04, 0.5); tone(700, 0.12, 'sine', 0.03, 1.8);
       for (let k = 0; k < 10; k++) spark(bx0, by0, pick([t.color, '#ffffff']), rand(-200, 200), rand(-220, 40), false);
       if (!shielded || Math.random() < 0.6) { ball.holder = null; h.cool = 0.5; h.oop = 0; h.dive = 0; ball.shotTeam = -1; ball.oop = false; ball.lob = null; catchBall(p); p.cool = 0; ball.protectUntil = time + 0.6; } else knockLoose(p.hv);
-      ball.stolenAt = time; if (p.team === 0) tutEv('snatch'); if (t.stats) t.stats.steals++; hypeAdd(teams.indexOf(t), 0.2); react(p, 'flex', 0.7); pop('STEAL!', p.Hd.x, p.Hd.y - 50, '#ffffff'); break;
+      ball.stolenAt = time; if (p.team === 0) tutEv('snatch'); if (t.stats) t.stats.steals++; hypeAdd(teams.indexOf(t), 0.2); if (!teams[p.team].cpu) react(p, 'flex', 0.5); pop('STEAL!', p.Hd.x, p.Hd.y - 50, '#ffffff'); break;
     }
   }
   // dropped when the holder falls over
@@ -4512,13 +4529,13 @@ function drawPregame() {
   for (let i = 0; i < 2; i++) {   // the two halves sweep in from their sides
     const T = teams[i], L = i === 0, off = (L ? -(1 - kL) * W * 0.6 : (1 - kR) * W * 0.6) + (L ? -1 : 1) * ex * W * 0.75;
     ctx.save(); ctx.translate(off, 0); ctx.beginPath();
-    if (L) { ctx.moveTo(-20, -20); ctx.lineTo(mid + tilt, -20); ctx.lineTo(mid - tilt, H + 20); ctx.lineTo(-20, H + 20); } else { ctx.moveTo(mid + tilt, -20); ctx.lineTo(W + 20, -20); ctx.lineTo(W + 20, H + 20); ctx.lineTo(mid - tilt, H + 20); }
+    const EX = OXP / scale + 40; if (L) { ctx.moveTo(-EX, -20); ctx.lineTo(mid + tilt, -20); ctx.lineTo(mid - tilt, H + 20); ctx.lineTo(-EX, H + 20); } else { ctx.moveTo(mid + tilt, -20); ctx.lineTo(W + EX, -20); ctx.lineTo(W + EX, H + 20); ctx.lineTo(mid - tilt, H + 20); }
     ctx.closePath(); const g = ctx.createLinearGradient(L ? 0 : W, 0, mid, 0); g.addColorStop(0, T.dark || T.color); g.addColorStop(1, T.color); ctx.fillStyle = g; ctx.fill();
     ctx.save(); ctx.clip(); ctx.globalAlpha = a * 0.12; ctx.fillStyle = '#fff'; for (let s2 = -H; s2 < W + H; s2 += 46) { ctx.beginPath(); ctx.moveTo(s2 + ((t * 60) % 46), 0); ctx.lineTo(s2 + 22 + ((t * 60) % 46), 0); ctx.lineTo(s2 - H * 0.3 + 22 + ((t * 60) % 46), H); ctx.lineTo(s2 - H * 0.3 + ((t * 60) % 46), H); ctx.fill(); } ctx.restore();
     // team name, big and slanted
     const nk = ease(clamp((t - 0.35) / 0.35, 0, 1)), nm = niceName(T.name); let fs = 46; ctx.font = `${fs}px ${HYPE}`; while (fs > 22 && ctx.measureText(nm).width > W * 0.36) { fs -= 2; ctx.font = `${fs}px ${HYPE}`; }
     ctx.save(); ctx.globalAlpha = a * nk; ctx.translate(L ? W * 0.25 : W * 0.75, 92); ctx.rotate(-0.06); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; twill(nm, 0, 0, fs, CREAM, INK, 0.9);
-    ctx.font = `700 14px ${TEXT}`; ctx.fillStyle = 'rgba(255,240,207,.85)'; ctx.fillText(T.cpu ? 'CPU' + (mode === 1 && !tourney && !daily ? ': ' + niceName(diff) : '') : (net && net.ready && T.user) ? '@' + T.user : (mode === 2 || (net && net.ready)) ? (L ? 'Player 1' : 'Player 2') : 'You', 0, 32); ctx.restore();
+    ctx.font = `700 14px ${TEXT}`; ctx.fillStyle = 'rgba(255,240,207,.85)'; ctx.fillText(T.cpu ? 'CPU' + (mode === 1 && !tourney && !daily ? ': ' + (diff === 'auto' ? 'Auto (matches your level)' : niceName(diff)) : '') : (net && net.ready && T.user) ? '@' + T.user : (mode === 2 || (net && net.ready)) ? (L ? 'Player 1' : 'Player 2') : 'You', 0, 32); ctx.restore();
     // player cards pop in one by one
     const roster = players.filter(p => p.team === i), cw = 128, ch = 176, gap = 14, tw = roster.length * cw + (roster.length - 1) * gap, x0 = (L ? W * 0.25 : W * 0.75) - tw / 2;
     roster.forEach((p, j) => { const pk = clamp((t - 0.55 - j * 0.14 - (L ? 0 : 0.07)) / 0.32, 0, 1); if (pk <= 0) return; const sc2 = pk < 0.7 ? ease(pk / 0.7) * 1.12 : 1.12 - 0.12 * ease((pk - 0.7) / 0.3);
@@ -4538,11 +4555,11 @@ function drawPregame() {
   // VS slams down with a flash
   const vt = clamp((t - 0.9) / 0.22, 0, 1); if (vt > 0) { ctx.globalAlpha = out * out; const vsS = vt < 1 ? lerp(3.2, 1, ease(vt)) : 1 + Math.sin(t * 6) * 0.03;
     ctx.save(); ctx.translate(mid, 255); ctx.rotate(-0.12); ctx.scale(vsS, vsS); ctx.font = `86px ${HYPE}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; twill('VS', 0, 0, 86, MUSTARD, INK, 1); ctx.restore();
-    if (t < 1.2) { ctx.fillStyle = `rgba(255,255,255,${0.55 * (1 - (t - 0.9) / 0.3)})`; ctx.fillRect(-20, -20, W + 40, H + 40); } }
+    if (t < 1.2) { ctx.fillStyle = `rgba(255,255,255,${0.55 * (1 - (t - 0.9) / 0.3)})`; ctx.fillRect(-OXP / scale - 40, -20, W + OXP / scale * 2 + 80, H + 40); } }
   // bottom banner: the game, the rules, the court
   const ik = ease(clamp((t - 1.3) / 0.4, 0, 1)); if (ik > 0) {
     ctx.save(); ctx.globalAlpha = out * ik; ctx.translate(0, (1 - ik) * 60);
-    ctx.fillStyle = 'rgba(10,6,20,.82)'; ctx.fillRect(0, 380, W, 112); ctx.fillStyle = MUSTARD; ctx.fillRect(0, 380, W, 4);
+    { const EX2 = OXP / scale + 40; ctx.fillStyle = 'rgba(10,6,20,.82)'; ctx.fillRect(-EX2, 380, W + EX2 * 2, 112); ctx.fillStyle = MUSTARD; ctx.fillRect(-EX2, 380, W + EX2 * 2, 4); }
     const modeName = tourney ? (TOURNEY[Math.min(TLAST(), tourney.round)].label + ': ' + niceName(TOURNEY[Math.min(TLAST(), tourney.round)].name)) : daily ? 'Daily challenge' : contest ? 'Contest' : net && net.ready ? 'Online game' : autoPlay ? 'CPU vs CPU' : mode === 2 ? 'Multiplayer' : 'Vs the CPU';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `28px ${DISPLAY}`; ctx.fillStyle = CREAM; ctx.fillText(`${modeName}, first to ${WIN}${rules().by2 ? ', win by 2' : ''}`, W / 2, 410);
     const tags = [solo() ? '1 on 1' : players.filter(p => p.team === 0).length + ' on ' + players.filter(p => p.team === 1).length];
@@ -4555,6 +4572,13 @@ function drawPregame() {
   ctx.restore();
 }
 let pgHome = false;
+setInterval(() => { try { if (!isTouch || attract) return; const r0 = cv.getBoundingClientRect(), k = r0.width / (W + OXP * 2 / scale);
+  for (const id of ['tL', 'tR', 'pL', 'pR', 'lL', 'lR']) { const b = $(id); if (!b || b.hidden) continue; const r = b.getBoundingClientRect();
+    const behind = players.some(p => [[p.Hd.x, p.Hd.y], [p.x, p.y - p.L * 0.5], [p.F.x, p.F.y - 8]].some(([x, y]) => { const px = r0.left + (x * scale + OXP) * r0.width / cv.width, py = r0.top + y * scale * r0.height / cv.height; return px > r.left - 6 && px < r.right + 6 && py > r.top - 6 && py < r.bottom + 6; }));
+    b.classList.toggle('thru', behind); } } catch (e) {} }, 150);
+document.head.insertAdjacentHTML('beforeend', '<style>#tL.thru,#tR.thru,#pL.thru,#pR.thru,#lL.thru,#lR.thru{opacity:.28!important;transition:opacity .15s}</style>');
+{ const tk = () => { const on = !!pregame && !attract; if (document.body.classList.contains('pgon') !== on) document.body.classList.toggle('pgon', on); requestAnimationFrame(tk); }; tk(); }
+document.head.insertAdjacentHTML('beforeend', '<style>body.pgon #bPause,body.pgon #hudBtns,body.pgon #tL,body.pgon #tR,body.pgon #pL,body.pgon #pR,body.pgon #lL,body.pgon #lR,body.pgon #hypeBtn,body.pgon #pracBar,body.pgon .ctlhint{visibility:hidden!important}</style>');
 const pgOver = (() => { const c = document.createElement('canvas'); c.id = 'pgcv'; c.setAttribute('aria-hidden', 'true'); c.hidden = true; $('wrap').appendChild(c); return c; })();
 { const _sg = startGame;
   startGame = function () {
@@ -6151,11 +6175,11 @@ function statusList(i) {
   return out;
 }
 function drawStatusCards(i, L, yy) {
-  const list = statusList(i), CW = 168, CH = 44, now = time;
+  const list = statusList(i), CW = 152, CH = 42, now = time;
   for (const k in statSeen) if (k[0] === String(i) && !list.some(s => i + s.k === k)) delete statSeen[k];
   for (const S of list) {
     const id = i + S.k; if (statSeen[id] === undefined || statSeen[id] > now) statSeen[id] = now;
-    const k = ease(clamp((now - statSeen[id]) / 0.32, 0, 1)), x = (L ? 40 : W - 40 - CW) + (1 - k) * (L ? -70 : 70);
+    const k = ease(clamp((now - statSeen[id]) / 0.32, 0, 1)), x = (L ? 24 : W - 24 - CW) + (1 - k) * (L ? -70 : 70);
     ctx.save(); ctx.globalAlpha = k * (S.pulse ? 0.85 + 0.15 * Math.sin(now * 7) : 1);
     ctx.fillStyle = INKD; ctx.fillRect(x - 3, yy - 3, CW + 6, CH + 9);
     const bg = ctx.createLinearGradient(0, yy, 0, yy + CH); bg.addColorStop(0, '#2a1d3d'); bg.addColorStop(1, '#1a1228'); ctx.fillStyle = bg; ctx.fillRect(x, yy, CW, CH);
@@ -7602,7 +7626,7 @@ DOOM2.taunt = { at: 0.2,
     if (!d.hit) return; const t = d.t - 0.2, a = clamp(t / 0.2, 0, 1) * clamp((3 - t) / 0.4, 0, 1); if (a <= 0) return;
     ctx.save(); ctx.globalAlpha = a; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     (d.winners || []).forEach((w, i) => { const txt = d.lines && d.lines[i]; if (!txt || !w.Hd) return; const pk = ease(clamp((t - i * 0.15) / 0.25, 0, 1)); if (pk <= 0) return;
-      ctx.save(); ctx.globalAlpha = a; ctx.font = `700 15px ${TEXT}`; const tw = ctx.measureText(txt).width + 22, bh = 28, bx = clamp(w.Hd.x - tw / 2, 6, W - tw - 6), by = w.Hd.y - 62 - (i % 2) * 8 + Math.sin(t * 10 + i) * (d.style === 'laugh' ? 2.5 : 0);
+      ctx.save(); ctx.globalAlpha = a; ctx.font = `700 15px ${TEXT}`; const tw = ctx.measureText(txt).width + 22, bh = 28, bx = clamp(w.Hd.x - tw / 2, 6, W - tw - 6), by = Math.max(70, w.Hd.y - 62 - (i % 2) * 8) + Math.sin(t * 10 + i) * (d.style === 'laugh' ? 2.5 : 0);
       ctx.translate(w.Hd.x, by + bh); ctx.scale(pk, pk); ctx.translate(-w.Hd.x, -(by + bh));
       ctx.fillStyle = INKD; rr(bx - 2, by - 2, tw + 4, bh + 4, 14); ctx.fill(); ctx.beginPath(); ctx.moveTo(w.Hd.x - 8, by + bh); ctx.lineTo(w.Hd.x + 2, by + bh + 12); ctx.lineTo(w.Hd.x + 8, by + bh); ctx.fill();
       ctx.fillStyle = '#ffffff'; rr(bx, by, tw, bh, 12); ctx.fill(); ctx.beginPath(); ctx.moveTo(w.Hd.x - 5, by + bh - 1); ctx.lineTo(w.Hd.x + 2, by + bh + 8); ctx.lineTo(w.Hd.x + 5, by + bh - 1); ctx.fill();
@@ -8421,6 +8445,7 @@ function showOver(w) {
   $('stats').querySelectorAll('.hd.l').forEach(e => e.style.color = teams[0].color); $('stats').querySelectorAll('.hd.r').forEach(e => e.style.color = teams[1].color);
   $('over').hidden = false; $('bAgain').focus({ preventScroll: true });
   try { overTour(w); } catch (e) {}
+  if (pendUnlock) { const L = pendUnlock; pendUnlock = 0; setTimeout(() => { try { showUnlocks(L); } catch (e) {} }, 900); }
   { const sh = $('over').querySelector('.sheet'); if (sh) { sh.scrollTop = 0; requestAnimationFrame(() => { sh.scrollTop = 0; }); } }
   requestAnimationFrame(() => { try { fitOverTitle(); } catch (e) {} }); setTimeout(() => { try { fitOverTitle(); } catch (e) {} }, 520);
   tone(523, 0.15, 'square', 0.05); setTimeout(() => tone(659, 0.15, 'square', 0.05), 150); setTimeout(() => tone(784, 0.3, 'square', 0.05), 300);
@@ -8844,18 +8869,19 @@ function trophyTier(id) { for (const k of ['diamond', 'gold', 'silver']) if (TRO
 const trophyQ = []; let trophyBusy = false;
 function trophyPop(a) { trophyQ.push(a); if (!trophyBusy) nextTrophy(); }
 function nextTrophy() {
+  if (trophyQ.length && ((pregame && !attract) || paused || state === 'replay')) { trophyBusy = true; setTimeout(nextTrophy, 400); return; }
   const a = trophyQ.shift(); if (!a) { trophyBusy = false; return; } trophyBusy = true;
   let el = $('trophy'); if (!el) { el = document.createElement('div'); el.id = 'trophy'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite'); document.body.appendChild(el); }
   const n = Object.keys(SV.ach || {}).length;
   const TT = trophyTier(a[0]); el.style.setProperty('--tc', TT[1]);
   el.innerHTML = `<div class="trc"><div class="trg" aria-hidden="true"><i class="trr"></i><svg viewBox="0 0 24 24"><path d="M6 3h12v3h3v3a5 5 0 0 1-5 5 6 6 0 0 1-3 2.6V19h4v2H7v-2h4v-2.4A6 6 0 0 1 8 14a5 5 0 0 1-5-5V6h3zm0 5H5v1a3 3 0 0 0 1.6 2.6A9 9 0 0 1 6 8zm12 0a9 9 0 0 1-.6 3.6A3 3 0 0 0 19 9V8z"/></svg></div><div class="trt"><small>${TT[0]} trophy unlocked</small><b>${a[1]}</b><span>${a[2]}.</span></div><div class="trx"><b>+${TT[2]}</b><small>XP</small><em>${n}/${ACH.length}</em></div></div>`;
-  el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+  el.classList.toggle('ingame', document.body.classList.contains('ingame') && $('over').hidden); el.classList.toggle('bot', !$('over').hidden); el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
   if (!muted) [784, 988, 1175, 1568].forEach((f, i) => setTimeout(() => tone(f, 0.18, 'triangle', 0.05), i * 90));
   setTimeout(() => { el.classList.remove('go'); setTimeout(nextTrophy, 420); }, 3600);
 }
 document.head.insertAdjacentHTML('beforeend', `<style>
 #trophy{position:fixed;left:50%;top:0;z-index:300;transform:translate(-50%,-130%);pointer-events:none;transition:transform .45s cubic-bezier(.2,1.4,.35,1)}
-#trophy.go{transform:translate(-50%,14px)}
+#trophy.go{transform:translate(-50%,14px)}#trophy.ingame.go{transform:translate(-50%,calc(var(--u,1px)*86))}#trophy.bot{top:auto;bottom:0;transform:translate(-50%,130%)}#trophy.bot.go{transform:translate(-50%,-12px)}
 #trophy{--tc:#ffd34d}#trophy .trc{display:flex;align-items:center;gap:14px;padding:10px 16px 10px 10px;min-width:min(92vw,380px);background:linear-gradient(180deg,#2a1d3d,#1a1228);border:3px solid var(--tc);box-shadow:0 6px 0 #0b0612,0 0 0 3px #0b0612,0 0 30px color-mix(in srgb,var(--tc) 40%,transparent);color:#fff0cf;font-family:var(--pixel,inherit)}
 #trophy .trg{position:relative;width:58px;height:58px;flex:0 0 58px;display:grid;place-items:center;background:radial-gradient(circle,#4a3416,#21160a);border:3px solid #0b0612;overflow:hidden}
 #trophy .trg svg{position:relative;width:38px;height:38px;fill:var(--tc);filter:drop-shadow(0 2px 0 #8f7420);animation:trb 1s ease-in-out infinite alternate}
@@ -8892,11 +8918,13 @@ function showUnlocks(L) {
   try { [784, 988, 1175, 1568].forEach((f, i) => setTimeout(() => tone(f, 0.18, 'triangle', 0.045), 150 + i * 90)); } catch (e) {}
   return true;
 }
+let pendUnlock = 0;
 function gainXP(n) {
   if (autoPlay) return; n = Math.round(n * 1.125);   // 1.5x the old rate
   const b = lvlInfo().L; SV.xp += n; persist(); const a = lvlInfo().L;
   if (a >= 10) unlock('lvl10'); if (a >= 25) unlock('lvl25'); if (a >= 50) unlock('lvl50');
-  if (a > b) { if (!$('over').hidden || !showUnlocks(a)) toast(`Level ${a}!`, 'Unlocked: ' + rewardsAt(a).join(', ') + '.'); if (a >= 5) unlock('lvl5'); }
+  if (a > b) { const mid = !attract && $('over').hidden && $('menu').hidden && (state === 'play' || state === 'intro' || state === 'scored');
+    if (mid) { toast(`Level ${a}!`, 'New gear unlocked. See it after the game.'); pendUnlock = Math.max(pendUnlock || 0, a); } else if (!$('over').hidden || !showUnlocks(a)) toast(`Level ${a}!`, 'Unlocked: ' + rewardsAt(a).join(', ') + '.'); if (a >= 5) unlock('lvl5'); }
   syncLevel();
 }
 function syncLevel() { const I = lvlInfo(); $('lvlN').textContent = `Level ${I.L}`; $('lvlBar').style.width = (I.cur / I.need * 100) + '%'; $('lvlTxt').textContent = `${I.cur} / ${I.need} XP`; }
@@ -9510,7 +9538,7 @@ function garItems(tab) {   // [value, name, level, iconHTML, selected]
     case 'band': return BANDS.map((b, i) => [String(i), b[1], b[2] || 1, `<i class="gband" style="--bc:${b[0] || 'transparent'}">${b[0] ? '' : '⊘'}</i>`, (st.band || 0) === i]);
     case 'trail': return TRAILS.map(([k, n, L]) => [k, n, L, `<i class="gemo">${TRAIL_EMO[k] || '✨'}</i>`, (st.trail || 'none') === k]);
     case 'scorefx': return SCOREFX.map(([k, n, L]) => [k, n, L, `<i class="gemo">${FX_EMO[k] || '★'}</i>`, (st.scorefx || 'none') === k]);
-    case 'star': return [[0, 'None', 1, 0, null, 'No star'], ...STARS].map(([L, n, num, pk, short]) => [L ? n : '', n === 'None' ? 'None' : n, L || 1, `<i class="gnum">${L ? '#' + num : '⊘'}</i>`, (st.star || '') === (L ? n : ''), short]);
+    case 'star': return [[0, 'None', 1, 0, 'No star'], ...STARS].map(([L, n, num, pk, short]) => [L ? n : '', n === 'None' ? 'None' : n, L || 1, `<i class="gnum">${L ? '#' + num : '⊘'}</i>`, (st.star || '') === (L ? n : ''), short]);
     case 'colour': return TEAM_COLORS.map((c, i) => [String(i), c[3] || 'Colour', c[2] || 1, `<i class="gsw" style="background:linear-gradient(135deg,${c[0]} 0 58%,${c[1]} 58%)"></i>`, myColorIdx() === i]).sort((a, b) => a[2] - b[2]);
     case 'outfit': return [['map', 'Court outfits', 1, '<i class="gemo">🗺️</i>', (SV.outfit || 'map') === 'map', 'Dress for each court: cowboy hats on the ranch, helmets on the ice.'], ['custom', 'My custom jersey', 1, '<i class="gemo">👕</i>', SV.outfit === 'custom', 'Your design, sneakers and headband on every court.'], ['plain', 'Plain jersey', 1, '<i class="gemo">⬜</i>', SV.outfit === 'plain', 'Just team colours, no extras.']];
   }
@@ -9835,7 +9863,7 @@ function openFoe() {
 { const m = $('menu') && $('menu').querySelector('.modes'); if (m) { m.insertAdjacentHTML('beforeend', '<button type="button" id="bFoe" class="foebtn"><i></i></button>'); $('bFoe').addEventListener('click', e => { e.stopPropagation(); openFoe(); }); syncFoeBtn(); } }
 document.head.insertAdjacentHTML('beforeend', `<style>
 #menu .modes{position:relative}
-.foebtn{position:absolute;right:calc(var(--k,1px)*-14);top:calc(var(--k,1px)*-12);width:calc(var(--k,1px)*30);height:calc(var(--k,1px)*30);border-radius:50%;border:3px solid #0b0612;background:#1c1328;padding:3px;cursor:pointer;box-shadow:0 3px 0 #0b0612;z-index:2}
+.foebtn{position:absolute;right:calc(var(--k,1px)*-22);top:calc(var(--k,1px)*-18);width:calc(var(--k,1px)*30);height:calc(var(--k,1px)*30);border-radius:50%;border:3px solid #0b0612;background:#1c1328;padding:3px;cursor:pointer;box-shadow:0 3px 0 #0b0612;z-index:2}
 .foebtn i{display:block;width:100%;height:100%;border-radius:50%;background:var(--fc);box-shadow:inset 0 -3px 0 rgba(0,0,0,.3)}
 .foebtn:hover{transform:translateY(-2px)}.foebtn:focus-visible{outline:3px solid var(--cream,#fff0cf);outline-offset:2px}
 .foeg{display:grid;grid-template-columns:repeat(auto-fill,minmax(calc(var(--k,1px)*104),1fr));gap:8px}
@@ -10114,8 +10142,14 @@ document.head.insertAdjacentHTML('beforeend', `<style id="hhCos">
 .pat-galaxy{background:radial-gradient(circle at 30% 30%,#fff 1px,transparent 2px) 0 0/10px 10px,linear-gradient(135deg,#46208c,#e8483b)}.pat-gold{background:#e8483b;box-shadow:inset 0 0 0 3px #ffd34d}.pat-royal{background:linear-gradient(135deg,#e8483b 38%,#ffd34d 38% 56%,#e8483b 56%);box-shadow:inset 0 0 0 2px #ffd34d}
 @media (max-width:640px){.lookwrap{grid-template-columns:1fr}.lookcard{position:static}}
 </style>`);
-const GAME_VERSION = 136;
+const GAME_VERSION = 137;
 const UPDATES = [
+  [137, 'Unstuck', ['You can always hop over a player now: hops toward someone right in front of you get the height to clear them, and you sail over instead of bouncing off.',
+    'Pinned on a wall behind someone? Your hop pops you back out, and players right on a wall rock away from it.', 'The CPU always goes for the ball: if it stops getting closer, it forces its way there.',
+    'Fixed: the VS intro didn\'t reach the edges of wide phone screens.', 'Fixed: the pause and touch buttons showed through the VS intro.', 'Fixed: touch buttons hid your players. They go see-through when a player is behind them.',
+    'Fixed: a ball nobody touched could sit forever. After 6 seconds it rolls back toward the middle.', 'Fixed: taunt bubbles could go off the top of the screen.', 'Fixed: the rival colour swatch sat on top of the Multiplayer button\'s corner.',
+    'Fixed: levelling up mid-game covered the court with the unlock show. It now waits for the end screen.', 'Fixed: trophy pop-ups covered the scoreboard during play.', 'Fixed: trophy pop-ups could cover the VS intro and the pause menu.',
+    'Fixed: the None tile in Star player said Common.', 'Fixed: the music hint showed on top of the site tour.', 'Fixed: the intro now says what Auto CPU means.', 'Fixed: a CPU that stole the ball froze for a moment to flex.', 'Fixed: status cards could touch the scoreboard on phones.', 'Fixed: trophy pop-ups covered Victory on the end screen. They come up from the bottom there now.']],
   [136, 'Power-up guide', ['Fixed: picking I know how to play left the welcome card open behind the tour.', 'Fixed: in online games, using the arrow keys could leave your jump stuck down until it shot by itself.', 'New Power-up guide: every power-up, what it does and how long it lasts. Find it in Locker, Settings, or tap Power-ups in the pause menu.', 'The VS intro now splits open at the end, the way it closed, instead of fading.', 'Punctuation cleaned up across the game.']],
   [135, 'Phone fit and 20 fixes', ['Phones: the home screen, Modes, pause menu, end screen, Locker and Multiplayer setup all fit small screens now.',
     'Fixed: the level bar was cut off on short phones.', 'Fixed: mode icons covered their names on phones.', 'Fixed: the pause menu ran off the bottom of the screen on phones.', 'Fixed: the end screen opened scrolled down, hiding the title and score.',
@@ -10303,7 +10337,7 @@ function drawHypeScreen(dt) {
 { const b = document.createElement('button'); b.id = 'hypeBtn'; b.type = 'button'; b.className = 'hypebtn tbtnh'; b.hidden = true; b.dataset.keep = ''; b.textContent = 'HYPE TIME'; b.setAttribute('aria-label', 'Use HYPE TIME');
   b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); if (netGuest()) net.conn.send({ t: 'hype' }); else activateHype(0); }); $('wrap').appendChild(b);
   document.head.insertAdjacentHTML('beforeend', '<style>.hypebtn{position:absolute;z-index:6;left:50%;bottom:calc(var(--u,1px)*150);transform:translateX(-50%);font-family:var(--pixel,inherit);font-weight:700;font-size:calc(var(--u,1px)*26);padding:.35em 1.1em;color:#1b1226;background:linear-gradient(180deg,#ffe27a,#ffc83d);border:4px solid #0b0612;box-shadow:inset 0 -5px 0 rgba(0,0,0,.25),0 0 22px rgba(255,200,61,.9);animation:hypePulse .8s ease-in-out infinite alternate}@keyframes hypePulse{to{box-shadow:inset 0 -5px 0 rgba(0,0,0,.25),0 0 40px rgba(255,200,61,1);transform:translateX(-50%) scale(1.07)}}@media (prefers-reduced-motion:reduce){.hypebtn{animation:none}}</style>'); }
-setInterval(() => { let h = $('sndHint'); if (!h) { h = document.createElement('div'); h.id = 'sndHint'; h.dataset.keep = ''; h.textContent = '🔊 Tap or press any key for music'; $('wrap').appendChild(h); } const on = attract && music.on && !muted && !(ac && ac.state === 'running') && $('panel').hidden; if (h.hidden === on) h.hidden = !on; }, 500);
+setInterval(() => { let h = $('sndHint'); if (!h) { h = document.createElement('div'); h.id = 'sndHint'; h.dataset.keep = ''; h.textContent = '🔊 Tap or press any key for music'; $('wrap').appendChild(h); } const on = attract && music.on && !muted && !(ac && ac.state === 'running') && $('panel').hidden && !($('tourUI') && !$('tourUI').hidden); if (h.hidden === on) h.hidden = !on; }, 500);
 function placeHypeBtn(b) {   // sit just above the Lob button, whatever size the buttons are
   const l = $('lL'), w = $('wrap'); if (!l || !w || l.offsetParent === null) return; const r = l.getBoundingClientRect(), wr = w.getBoundingClientRect();
   b.style.setProperty('left', (r.left - wr.left) + 'px', 'important'); const hh = Math.round(r.height * 0.9); b.style.setProperty('top', (r.top - wr.top - hh - 10) + 'px', 'important'); b.style.setProperty('bottom', 'auto', 'important'); b.style.setProperty('width', Math.round(r.width * 1.3) + 'px', 'important'); b.style.setProperty('height', hh + 'px', 'important');
